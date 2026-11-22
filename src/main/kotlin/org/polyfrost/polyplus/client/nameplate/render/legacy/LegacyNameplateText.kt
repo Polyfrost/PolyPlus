@@ -80,7 +80,7 @@ class LegacyLine internal constructor(val text: String, val profileName: String?
                 continue
             }
             val glyph = count
-            val isArt = c == PolyPlusBadge.LEGACY_CHAR || EmojiFont.legacyIndex(c) >= 0
+            val isArt = c == PolyPlusBadge.LEGACY_CHAR || c == PolyPlusBadge.LEGACY_GAP || EmojiFont.legacyIndex(c) >= 0
             if (c == PolyPlusBadge.LEGACY_CHAR && badgeX < 0) {
                 badgeX = glyphX[glyph]
             }

@@ -41,14 +41,16 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.oneconfig.api.ui.v1.theme.ProvideOneConfigTheme
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.compose.minecraft.screen.ComposeScreen
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.nameplate.NameplateBinding
 import org.polyfrost.polyplus.client.nameplate.NameplateChoice
 import org.polyfrost.polyplus.client.nameplate.NameplateMotion
@@ -197,37 +199,23 @@ private fun NameplateTryOnPanel(onBack: () -> Unit) {
     }
     val trial = view.trial ?: return
     val settings = NameplateBinding.settings
-    val muted = mutedText()
+    val muted = OneConfigTheme.current.textColorSecondary
 
     BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
         val panelWidth = (maxWidth * PANEL_SCREEN_SHARE).coerceIn(minOf(PANEL_MIN_WIDTH, maxWidth), PANEL_MAX_WIDTH)
         Column(
             modifier = Modifier.align(Alignment.CenterStart)
                 .width(panelWidth)
-                .clip(ppShape(PANEL_RADIUS))
+                .clip(OneConfigTheme.shape(PANEL_RADIUS))
                 .background(theme.popupBackground.copy(alpha = 1f))
-                .border(1.dp, theme.borderColor, ppShape(PANEL_RADIUS))
+                .border(1.dp, theme.borderColor, OneConfigTheme.shape(PANEL_RADIUS))
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                SocialText(
-                    "TRYING ON",
-                    color = muted,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.6.sp,
-                    maxLines = 1,
-                )
-                SocialText(
-                    trial.title,
-                    color = theme.textColor,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                SocialText("Ends in ${clock(view.seconds)}", color = muted, fontSize = 12.sp, maxLines = 1)
+                Text("TRYING ON", color = muted, maxLines = 1, style = OneConfigTheme.current.typography.body.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.6.sp))
+                Text(trial.title, color = theme.textColor, maxLines = 2, overflow = TextOverflow.Ellipsis, style = OneConfigTheme.current.typography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium))
+                Text("Ends in ${clock(view.seconds)}", color = muted, maxLines = 1, style = OneConfigTheme.current.typography.body.copy(fontSize = 12.sp))
             }
             TryOnNote()
             Column(
@@ -267,9 +255,9 @@ private fun NameplateTryOnPanel(onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SmallButton("Back to wardrobe", iconPath = "left-arrow", primary = true, onClick = onBack)
+                TextButton("Back to wardrobe", "left-arrow", onBack, style = ControlStyle.Primary, size = ControlSize.Compact, sound = null)
                 Spacer(Modifier.weight(1f))
-                SocialText("Esc", color = muted, fontSize = 11.sp, maxLines = 1)
+                Text("Esc", color = muted, maxLines = 1, style = OneConfigTheme.current.typography.body.copy(fontSize = 11.sp))
             }
         }
     }
@@ -281,14 +269,14 @@ private fun TryOnNote() {
     val warning = tryOnWarning()
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (warning != null) {
-            Icon("alert-circle", color = theme.textColor, modifier = Modifier.padding(top = 1.dp).size(13.dp))
+            Icon(name = "alert-circle", contentDescription = null, modifier = Modifier.padding(top = 1.dp).size(13.dp), tint = theme.textColor)
         }
-        SocialText(
+        Text(
             warning
                 ?: "Nameplate motion is off, so it stays still.".takeIf { NameplateBinding.settings.motion == NameplateMotion.OFF }
                 ?: "Only you see this. Nothing is bought or equipped.",
-            color = if (warning != null) theme.textColor else mutedText(),
-            fontSize = 12.sp,
+            color = if (warning != null) theme.textColor else OneConfigTheme.current.textColorSecondary,
+            style = OneConfigTheme.current.typography.body.copy(fontSize = 12.sp),
         )
     }
 }
@@ -302,7 +290,7 @@ private fun TryOnVariantChip(choice: NameplateChoice, selected: Boolean, onClick
     val art = remember(choice.id, swatchVersion) { if (choice.id > 0) CosmeticSwatches.get(choice.id) else null }
     NameplateChip(selected, 28.dp, if (art != null) 4.dp else 10.dp, theme.textColorSecondary, onClick) {
         if (art != null) {
-            Box(Modifier.size(width = 13.dp, height = 20.dp).clip(ppShape(4.dp)).background(theme.chipBackground)) {
+            Box(Modifier.size(width = 13.dp, height = 20.dp).clip(OneConfigTheme.shape(4.dp)).background(theme.chipBackground)) {
                 when (art) {
                     is SwatchArt.Picture -> Image(
                         bitmap = art.bitmap,
@@ -319,14 +307,7 @@ private fun TryOnVariantChip(choice: NameplateChoice, selected: Boolean, onClick
                 }
             }
         }
-        SocialText(
-            choice.label,
-            color = if (selected) contentOnAccent() else theme.textColor,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = MAX_CHIP_LABEL_WIDTH),
-        )
+        Text(choice.label, color = if (selected) OneConfigTheme.current.accentTextColor else theme.textColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = MAX_CHIP_LABEL_WIDTH), style = OneConfigTheme.current.typography.body.copy(fontSize = 12.sp))
     }
 }
 

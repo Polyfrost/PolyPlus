@@ -49,10 +49,12 @@ import kotlinx.coroutines.delay
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Icon
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
+import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
-import org.polyfrost.polyplus.client.gui.SocialText
-import org.polyfrost.polyplus.client.gui.ppShape
 import org.polyfrost.polyplus.client.gui.preview.NameplatePreview
 import org.polyfrost.polyplus.client.gui.preview.NameplatePreviewController
 import org.polyfrost.polyplus.client.gui.preview.NameplatePreviewScale
@@ -159,7 +161,7 @@ private fun StageControls(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         stageNote(choice, settings.enabled, settings.motion)?.let {
-            SocialText(it, color = mutedText(), fontSize = 11.sp, textAlign = TextAlign.Center)
+            Text(it, color = OneConfigTheme.current.textColorSecondary, textAlign = TextAlign.Center, style = OneConfigTheme.current.typography.body.copy(fontSize = 11.sp))
         }
         Column(
             modifier = Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -179,7 +181,7 @@ private fun StageControls(
         }
         val inWorld by rememberInWorld()
         if (inWorld) {
-            SmallButton(label = "Try in world", iconPath = "profiles", primary = choice != null, onClick = onTryOn)
+            TextButton("Try in world", "profiles", onTryOn, style = if (choice != null) ControlStyle.Primary else ControlStyle.Secondary, size = ControlSize.Compact, sound = null)
         }
     }
 }
@@ -234,16 +236,16 @@ private fun tryOn(cosmeticId: Int, title: String, current: NameplateChoice) {
 internal fun Modifier.nameplateCard(): Modifier {
     val theme = OneConfigTheme.current
     return fillMaxWidth()
-        .clip(ppShape(CARD_RADIUS))
+        .clip(OneConfigTheme.shape(CARD_RADIUS))
         .background(theme.popupBackground.copy(alpha = 1f))
         .background(theme.chipBackground)
-        .border(1.dp, theme.borderColor, ppShape(CARD_RADIUS))
+        .border(1.dp, theme.borderColor, OneConfigTheme.shape(CARD_RADIUS))
         .padding(10.dp)
 }
 
 @Composable
 internal fun NameplateCardHeading(text: String) {
-    SocialText(text, color = mutedText(), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+    Text(text, color = OneConfigTheme.current.textColorSecondary, maxLines = 1, style = OneConfigTheme.current.typography.body.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -305,7 +307,7 @@ internal fun NameplateChip(
     val hovered by interaction.collectIsHoveredAsState()
     Row(
         modifier = Modifier.height(height)
-            .clip(ppShape(CONTROL_RADIUS))
+            .clip(OneConfigTheme.shape(CONTROL_RADIUS))
             .background(if (active) OneConfigTheme.accent else theme.componentBackground)
             .border(
                 1.dp,
@@ -314,7 +316,7 @@ internal fun NameplateChip(
                     hovered -> hoverBorder
                     else -> theme.borderColor
                 },
-                ppShape(CONTROL_RADIUS),
+                OneConfigTheme.shape(CONTROL_RADIUS),
             )
             .hoverable(interaction)
             .clickable(onClick = onClick)
@@ -328,8 +330,8 @@ internal fun NameplateChip(
 @Composable
 private fun StateToggle(label: String, on: Boolean, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
-    val muted = mutedText()
-    val onAccent = contentOnAccent()
+    val muted = OneConfigTheme.current.textColorSecondary
+    val onAccent = OneConfigTheme.current.accentTextColor
     NameplateChip(on, CONTROL_HEIGHT, 7.dp, muted, onClick) {
         Box(
             modifier = Modifier.size(MARK_SIZE)
@@ -338,7 +340,7 @@ private fun StateToggle(label: String, on: Boolean, onClick: () -> Unit) {
                 .border(1.5.dp, if (on) onAccent else muted, theme.checkBoxShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (on) Icon("tick", color = OneConfigTheme.accent, modifier = Modifier.size(10.dp))
+            if (on) Icon(name = "tick", contentDescription = null, modifier = Modifier.size(10.dp), tint = OneConfigTheme.accent)
         }
         CardLabel(label, color = if (on) onAccent else theme.textColor, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false))
     }
@@ -355,12 +357,12 @@ private fun PlayOnceChip(label: String, flashMillis: Long, onClick: () -> Unit) 
             litAt = 0L
         }
     }
-    val content = if (lit) contentOnAccent() else theme.textColor
+    val content = if (lit) OneConfigTheme.current.accentTextColor else theme.textColor
     NameplateChip(
         active = lit,
         height = CONTROL_HEIGHT,
         startPadding = 8.dp,
-        hoverBorder = mutedText(),
+        hoverBorder = OneConfigTheme.current.textColorSecondary,
         onClick = {
             litAt = System.nanoTime()
             onClick()

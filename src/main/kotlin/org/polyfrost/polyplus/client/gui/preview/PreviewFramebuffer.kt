@@ -45,7 +45,7 @@ import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 /*import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer
 *///?}
 //? if < 1.21.5 && > 1.8.9 {
-/*import org.polyfrost.oneconfig.internal.ui.RenderTargetFbo
+/*import org.polyfrost.compose.minecraft.render.RenderTargetFbo
 *///?}
 //? if = 1.21.1 {
 /*import com.mojang.blaze3d.vertex.VertexSorting

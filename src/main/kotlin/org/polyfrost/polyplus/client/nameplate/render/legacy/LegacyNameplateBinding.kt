@@ -76,7 +76,11 @@ object LegacyNameplateBinding {
     }
 
     private fun isNameLine(entity: Entity, name: String): Boolean {
-        val skip = if (name.isNotEmpty() && name[0] == PolyPlusBadge.LEGACY_CHAR) 1 else 0
+        val skip = when {
+            name.startsWith("${PolyPlusBadge.LEGACY_CHAR}${PolyPlusBadge.LEGACY_GAP}") -> 2
+            name.startsWith(PolyPlusBadge.LEGACY_CHAR) -> 1
+            else -> 0
+        }
         val display = displayName(entity)
         return name.length - skip == display.length && name.regionMatches(skip, display, 0, display.length)
     }

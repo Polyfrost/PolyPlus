@@ -3,9 +3,9 @@ package org.polyfrost.polyplus.client.gui.preview
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.compose.render.RenderContext
-import org.polyfrost.oneconfig.internal.ui.OffscreenTarget
-import org.polyfrost.oneconfig.internal.ui.TextureRenderer
-import org.polyfrost.oneconfig.internal.ui.compose.ComposeScreen
+import org.polyfrost.compose.minecraft.render.OffscreenTarget
+import org.polyfrost.compose.minecraft.render.TextureRenderer
+import org.polyfrost.compose.minecraft.screen.ComposeScreen
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.nameplate.BoundNameplate
 import org.polyfrost.polyplus.client.nameplate.NameplateBinding

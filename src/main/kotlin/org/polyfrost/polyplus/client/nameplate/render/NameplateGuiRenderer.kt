@@ -176,7 +176,7 @@ object NameplateGuiRenderer {
         val nameplate = tag.nameplate
         val decorated = NameplateGate.usable(nameplate) && NameplateGate.active()
         val gap = tag.badge && (!decorated || nameplate.variant.badge.placement.keepsGap)
-        val name = if (gap) "${PolyPlusBadge.LEGACY_CHAR}${tag.profileName}" else tag.profileName
+        val name = if (gap) "${PolyPlusBadge.LEGACY_CHAR}${PolyPlusBadge.LEGACY_GAP}${tag.profileName}" else tag.profileName
         val half = font.getWidth(name) / 2
         GlStateManager.pushMatrix()
         try {
