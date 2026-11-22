@@ -221,6 +221,7 @@ internal class NameplateFlatMaterialRenderType private constructor(
 /*import com.mojang.blaze3d.platform.GlDebug
 import com.mojang.blaze3d.platform.GlStateManager
 import com.mojang.blaze3d.platform.GlUtil
+import com.mojang.blaze3d.shaders.AbstractUniform
 import com.mojang.blaze3d.shaders.CompiledShader
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
@@ -336,6 +337,7 @@ internal class NameplateFlatMaterialRenderType private constructor(key: String, 
 /*import com.mojang.blaze3d.platform.GlDebug
 import com.mojang.blaze3d.platform.GlStateManager
 import com.mojang.blaze3d.platform.GlUtil
+import com.mojang.blaze3d.shaders.AbstractUniform
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.BufferUploader
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
@@ -517,7 +519,7 @@ private fun flatFragmentSource(program: NameplateShaderProgram, depth: Boolean):
     return source.substring(0, line) + "#define $DEPTH_ONLY\n" + source.substring(line)
 }
 
-private fun setFlatUniforms(program: NameplateShaderProgram, words: IntArray, uniform: (String) -> com.mojang.blaze3d.shaders.AbstractUniform) {
+private fun setFlatUniforms(program: NameplateShaderProgram, words: IntArray, uniform: (String) -> AbstractUniform) {
     for (flat in program.uniforms) {
         val target = uniform(flat.name)
         val at = flat.offset
