@@ -13,6 +13,7 @@ import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline
 import com.mojang.renderpearl.api.pipeline.DepthStencilState
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology
 import com.mojang.renderpearl.api.pipeline.RenderPipeline
+import com.mojang.renderpearl.api.pipeline.ShaderSource
 import com.mojang.renderpearl.api.pipeline.UniformType
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.BindGroupLayouts
@@ -70,12 +71,15 @@ object NameplateMaterialPipelines {
                 compiled.remove(pipeline)?.close()
             }
         }
+        NameplateIris.forget(entry.pipelines)
         NameplateShaderSources.remove(program)
+        retireIncludes()
     }
 
     @JvmStatic
     fun onShadersApplied(cache: PipelineCache) {
         NameplateMaterialAssets.onResourcesReloaded()
+        retireIncludes()
         generation?.release()
         val includes = ShaderManager.listAllIncludes(Minecraft.getInstance().resourceManager)
         val next = Generation(++generations, cache, NameplateShaderSource(includes))
@@ -85,6 +89,19 @@ object NameplateMaterialPipelines {
                 entry.status = NameplateShaderStatus.PENDING
             }
             compile(entry)
+        }
+    }
+
+    private fun retireIncludes() {
+        val retired = NameplateShaderSources.drainRetired()
+        if (retired.isEmpty()) {
+            return
+        }
+        val current = generation
+        if (current == null) {
+            retired.forEach { it.close() }
+        } else {
+            current.retire(retired)
         }
     }
 
@@ -239,14 +256,21 @@ object NameplateMaterialPipelines {
 
     private class Generation(val id: Int, val cache: PipelineCache, val source: NameplateShaderSource) {
         private val holds = AtomicInteger(1)
+        private val retired = ArrayList<ShaderSource.CachedIncludeSource>()
 
         fun acquire() {
             holds.incrementAndGet()
         }
 
+        fun retire(includes: List<ShaderSource.CachedIncludeSource>) {
+            retired += includes
+        }
+
         fun release() {
             if (holds.decrementAndGet() == 0) {
                 source.close()
+                retired.forEach { it.close() }
+                retired.clear()
             }
         }
     }
@@ -313,6 +337,7 @@ object NameplateMaterialPipelines {
         if (entry.status == NameplateShaderStatus.READY && entry.generation == generation) {
             parked[program.hash] = entry
         } else {
+            NameplateIris.forget(entry.pipelines)
             removeSources(program)
         }
     }
@@ -326,6 +351,7 @@ object NameplateMaterialPipelines {
         NameplateMaterialAssets.onResourcesReloaded()
         generation++
         for (entry in parked.values) {
+            NameplateIris.forget(entry.pipelines)
             removeSources(entry.program)
         }
         parked.clear()
@@ -560,6 +586,7 @@ object NameplateMaterialPipelines {
         entry.generation = RELEASED
         entry.status = NameplateShaderStatus.PENDING
         queue.remove(entry)
+        NameplateIris.forget(entry.pipelines)
         NameplateShaderSources.remove(program)
     }
 
@@ -769,6 +796,9 @@ object NameplateMaterialPipelines {
         entry.generation = RELEASED
         entry.status = NameplateShaderStatus.PENDING
         queue.remove(entry)
+        //? if = 1.21.5 {
+        /^NameplateIris.forget(entry.pipelines.map { it.pipeline })
+        ^///?}
         ClientPlatform.runOnMain { entry.close() }
     }
 

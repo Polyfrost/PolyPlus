@@ -15,6 +15,7 @@ object NameplateShaderSources {
     private val stages = ConcurrentHashMap<Stage, String>()
     //? if >= 26.3 {
     private val includes = ConcurrentHashMap<Identifier, Include>()
+    private val retired = ArrayList<ShaderSource.CachedIncludeSource>()
     //?}
 
     fun add(program: NameplateShaderProgram) {
@@ -22,13 +23,34 @@ object NameplateShaderSources {
         stages[Stage(program.fragmentShader, ShaderType.FRAGMENT)] = program.fragmentSource
         //? if >= 26.3 {
         for ((id, text) in program.includes) {
-            includes.compute(id) { _, old -> if (old != null && old.text == text) old else Include(id, text) }
+            includes.compute(id) { _, old ->
+                if (old != null && old.text == text) {
+                    old.also { it.users++ }
+                } else {
+                    old?.let(::retire)
+                    Include(id, text)
+                }
+            }
         }
         //?}
     }
 
     fun remove(program: NameplateShaderProgram) {
         stages.remove(Stage(program.fragmentShader, ShaderType.FRAGMENT))
+        //? if >= 26.3 {
+        for ((id, text) in program.includes) {
+            includes.computeIfPresent(id) { _, old ->
+                when {
+                    old.text != text -> old
+                    --old.users > 0 -> old
+                    else -> {
+                        retire(old)
+                        null
+                    }
+                }
+            }
+        }
+        //?}
     }
 
     @JvmStatic
@@ -39,6 +61,16 @@ object NameplateShaderSources {
     @JvmStatic
     fun include(id: Identifier): ShaderSource.CachedIncludeSource? =
         if (id.namespace == PolyPlusConstants.ID) includes[id]?.cached else null
+
+    fun drainRetired(): List<ShaderSource.CachedIncludeSource> = synchronized(retired) {
+        if (retired.isEmpty()) emptyList() else ArrayList(retired).also { retired.clear() }
+    }
+
+    private fun retire(include: Include) {
+        synchronized(retired) {
+            retired += include.cached
+        }
+    }
     //?}
 
     private data class Stage(val id: Identifier, val type: ShaderType)
@@ -46,6 +78,7 @@ object NameplateShaderSources {
     //? if >= 26.3 {
     private class Include(id: Identifier, val text: String) {
         val cached: ShaderSource.CachedIncludeSource = ShaderSource.CachedIncludeSource.create(id, text)
+        var users = 1
     }
     //?}
 }

@@ -64,6 +64,10 @@ object NameplateIris {
         }
     }
 
+    fun forget(pipelines: List<Any>) {
+        pipelines.forEach(assigned::remove)
+    }
+
     private fun detect(): Probe? {
         if (FabricLoader.getInstance().isModLoaded(IRIS_ID)) {
             return IrisProbe.create() ?: Blind("Iris", rawPrograms = true)
