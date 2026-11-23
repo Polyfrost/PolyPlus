@@ -304,6 +304,7 @@ object LobbyEntrance {
     data class View(val camera: Vec3, val look: Vec3, val right: Vec3, val up: Vec3, val tanHalf: Double, val aspect: Double)
 
     const val RUN_SPEED = 0.27
+    private const val MAX_FALL = 24.0
 
     private val ANIMATIONS by lazy {
         LobbyEntrance::class.java.getResourceAsStream("/assets/polyplus/lobby/entrance.animation.json")?.use(BedrockAnimationParser::parseStream)?.animations.orEmpty()
@@ -371,6 +372,22 @@ object LobbyEntrance {
         avatar.moveTo(slot)
         val route = Planner(level, standing, viewAt).between(avatar, from) ?: LobbyRoute(listOf(from, slot.pos))
         avatar.travel(RunIn(fromTick, level, route, turning = true))
+    }
+
+    fun stroll(level: ClientLevel, avatar: LobbyAvatar, standing: List<LobbyAvatar>, fromTick: Long, viewAt: (Double) -> View): Boolean {
+        val from = avatar.position()
+        val route = Planner(level, standing, viewAt).between(avatar, from) ?: LobbyRoute(listOf(from, avatar.rest.pos))
+        avatar.travel(RunIn(fromTick, level, route, turning = true))
+        return true
+    }
+
+    fun landing(level: ClientLevel, feet: Vec3): Double? {
+        if (level.obstacle(feet.x, feet.z, feet.y) != null) return null
+        val ground = level.ground(feet.x, feet.z, feet.y, MAX_FALL) ?: return null
+        val support = LobbyCompat.blockAt(feet.x, ground - SNAP, feet.z)
+        if (level.getBlockState(support).getCollisionShape(level, support).isEmpty) return null
+        val top = LobbyCompat.blockAt(feet.x, feet.y, feet.z).y
+        return ground.takeIf { (support.y..top).all { y -> level.getFluidState(BlockPos(support.x, y, support.z)).isEmpty } }
     }
 
     private fun headroom(level: ClientLevel, feet: Vec3): Double {

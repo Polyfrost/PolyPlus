@@ -239,6 +239,14 @@ class LobbyAvatar(
     }
     *///?}
 
+    fun halt() {
+        motion = null
+        landedThisTick = false
+        stride(null)
+        arrival = Arrival.LANDED
+        if (landedTick < 0L) landedTick = LobbyScene.tick()
+    }
+
     fun arriveNow() {
         motion = null
         landedThisTick = false

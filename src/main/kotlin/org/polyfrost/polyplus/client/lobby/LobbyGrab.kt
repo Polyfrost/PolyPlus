@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.lobby
 
+import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.resources.Identifier
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Pose
@@ -33,7 +34,7 @@ object LobbyGrab {
     private const val SUBSTEPS = 4
     private const val MAX_SWING = 70.0
     private const val FOLLOW_RATE = 16.0
-    private const val MAX_REACH = 4.0
+    private const val MAX_REACH = 10.0
     private const val MIN_LIFT = 0.45
     private const val MAX_LIFT = 3.5
     private const val MIN_SCALE = 1.0e-4
@@ -41,6 +42,9 @@ object LobbyGrab {
     private const val MIN_DROP_TICKS = 5
     private const val HOP = 0.35
     private const val SQUASH_TICKS = 6
+    private const val DAZE_TICKS = 14
+    private const val HOP_PACE = 0.3
+    private const val NEAR_HOME = 1.5
     private const val HEAD_HEIGHT = 1.6
     private const val TURN_AROUND = 180f
     private const val BASE_TICKS = 10.0
@@ -68,6 +72,8 @@ object LobbyGrab {
 
     private var held: Hold? = null
     private var drop: Drop? = null
+    private var strolling: LobbyAvatar? = null
+    private var level: ClientLevel? = null
 
     private val dangling by lazy { emote(FLAIL) }
     private val still by lazy { emote(0.0) }
@@ -91,9 +97,9 @@ object LobbyGrab {
         var starting = false
     }
 
-    private class Drop(val avatar: LobbyAvatar, val from: Vec3, val ticks: Int, val hop: Double) {
+    private class Drop(val avatar: LobbyAvatar, val from: Vec3, val to: Vec3, val ticks: Int, val hop: Double, val home: Boolean) {
         var elapsed = 0
-        var squash = -1
+        var after = -1
     }
 
     private fun ready(): Boolean = LobbyScene.showing() && LobbyScene.revealStarted() && !LobbyScene.introPlaying()
@@ -107,7 +113,7 @@ object LobbyGrab {
         bottom = minOf(feetY, headY)
         top = maxOf(feetY, headY)
         eye = camera
-        if (held != null || drop != null) return
+        if (held != null) return
         val share = NECK / avatar.bbHeight
         neckX = feetX + (headX - feetX) * share
         neckY = feetY + (headY - feetY) * share
@@ -131,21 +137,16 @@ object LobbyGrab {
 
     fun grab(x: Double, y: Double): Boolean {
         val avatar = seen ?: return false
-        if (held != null || !touches(x, y) || !usable(avatar)) return false
+        if (held != null || !visible || !ready() || !usable(avatar)) return false
         if (abs(perRight) < MIN_SCALE || abs(perUp) < MIN_SCALE) return false
+        if (avatar.arrival != LobbyAvatar.Arrival.LANDED) avatar.halt()
+        strolling = null
         val controller = controller(avatar)
-        val hold = Hold(avatar, avatar.rest.pos, controller.clock)
+        val hold = Hold(avatar, avatar.position(), controller.clock)
         hold.neckX = neckX
         hold.neckY = neckY
         hold.perRight = perRight
         hold.perUp = perUp
-        val at = avatar.position().subtract(hold.anchor)
-        hold.u = at.x * right.x + at.z * right.z
-        hold.v = at.y
-        hold.bobU = hold.u
-        hold.bobV = hold.v - ROD
-        hold.lastBobU = hold.bobU
-        hold.lastBobV = hold.bobV
         drop = null
         held = hold
         aim(hold, x, y)
@@ -166,12 +167,26 @@ object LobbyGrab {
         controller.clock = hold.previousClock
         if (Motion.reduced) controller.stop() else LobbyEntrance.fallPose()?.let(controller::play) ?: controller.stop()
         val from = avatar.position()
-        val height = (from.y - hold.anchor.y).coerceAtLeast(0.0)
-        val ticks = maxOf(MIN_DROP_TICKS, ceil(sqrt(2.0 * height / DROP_GRAVITY) / TICK_SECONDS).toInt())
-        drop = Drop(avatar, from, ticks, (HOP - height).coerceAtLeast(0.0))
+        val rest = avatar.rest.pos
+        val away = (from.x - rest.x) * (from.x - rest.x) + (from.z - rest.z) * (from.z - rest.z) > NEAR_HOME * NEAR_HOME
+        val ground = if (away) level?.let { LobbyEntrance.landing(it, from) } else null
+        drop = if (ground == null) dropping(avatar, from, rest, false) else dropping(avatar, from, Vec3(from.x, ground, from.z), true)
     }
 
-    fun tick(avatar: LobbyAvatar?) {
+    fun homeward(avatar: LobbyAvatar): Boolean = strolling === avatar
+
+    fun handling(avatar: LobbyAvatar): Boolean = held?.avatar === avatar || drop?.avatar === avatar || strolling === avatar
+
+    fun tick(level: ClientLevel, avatar: LobbyAvatar?) {
+        this.level = level
+        strolling?.let {
+            if (it !== avatar || it.arrival != LobbyAvatar.Arrival.ARRIVING) {
+                strolling = null
+            } else if (LobbyWardrobe.open) {
+                strolling = null
+                it.arriveNow()
+            }
+        }
         val hold = held
         if (hold != null) {
             if (avatar === hold.avatar && usable(avatar)) step(hold) else cancel()
@@ -211,19 +226,23 @@ object LobbyGrab {
 
     fun reset() {
         cancel()
+        strolling = null
+        level = null
         seen = null
         visible = false
     }
 
     private fun usable(avatar: LobbyAvatar): Boolean =
-        avatar.isLocal && avatar.arrival == LobbyAvatar.Arrival.LANDED && !avatar.dismissed && !avatar.spectral && !LobbyWardrobe.open && LobbyScene.showing()
+        avatar.isLocal && (avatar.arrival == LobbyAvatar.Arrival.LANDED || strolling === avatar) && !avatar.dismissed && !avatar.spectral && !LobbyWardrobe.open && LobbyScene.showing()
 
     private fun controller(avatar: LobbyAvatar): EmoteController = (avatar as PlayerEmotesAccess).`polyplus$emoteController`()
 
     private fun aim(hold: Hold, x: Double, y: Double) {
         val ndcX = x * 2.0 - 1.0
         val ndcY = 1.0 - y * 2.0
-        hold.targetU = ((ndcX - hold.neckX) / hold.perRight).coerceIn(-MAX_REACH, MAX_REACH)
+        val rest = hold.avatar.rest.pos
+        val shift = (hold.anchor.x - rest.x) * right.x + (hold.anchor.z - rest.z) * right.z
+        hold.targetU = ((ndcX - hold.neckX) / hold.perRight).coerceIn(-MAX_REACH - shift, MAX_REACH - shift)
         hold.targetV = ((ndcY - hold.neckY) / hold.perUp).coerceIn(MIN_LIFT, MAX_LIFT)
     }
 
@@ -240,10 +259,19 @@ object LobbyGrab {
         hold.tickNanos = System.nanoTime()
         val avatar = hold.avatar
         val head = avatar.yHeadRot
-        avatar.place(hold.anchor.add(right.x * hold.u, hold.v, right.z * hold.u), avatar.yBodyRot)
+        avatar.place(within(avatar.rest.pos, hold.anchor.add(right.x * hold.u, hold.v, right.z * hold.u)), avatar.yBodyRot)
         avatar.yHeadRot = head
         avatar.pose = Pose.STANDING
         if (controller(avatar).playbackSnapshot()?.emote !== pose()) play(hold)
+    }
+
+    private fun within(rest: Vec3, at: Vec3): Vec3 {
+        val dx = at.x - rest.x
+        val dz = at.z - rest.z
+        val reach = sqrt(dx * dx + dz * dz)
+        if (reach <= MAX_REACH) return at
+        val share = MAX_REACH / reach
+        return Vec3(rest.x + dx * share, at.y, rest.z + dz * share)
     }
 
     private fun swing(hold: Hold, fromU: Double, fromV: Double): Double {
@@ -265,18 +293,25 @@ object LobbyGrab {
         return Math.toDegrees(atan2(hold.bobU - hold.u, hold.v - hold.bobV))
     }
 
+    private fun dropping(avatar: LobbyAvatar, from: Vec3, to: Vec3, home: Boolean): Drop {
+        val height = (from.y - to.y).coerceAtLeast(0.0)
+        val falling = ceil(sqrt(2.0 * height / DROP_GRAVITY) / TICK_SECONDS).toInt()
+        val hopping = ceil(sqrt((to.x - from.x) * (to.x - from.x) + (to.z - from.z) * (to.z - from.z)) / HOP_PACE).toInt()
+        return Drop(avatar, from, to, maxOf(MIN_DROP_TICKS, falling, hopping), (HOP - height).coerceAtLeast(0.0), home)
+    }
+
     private fun fall(falling: Drop) {
         val avatar = falling.avatar
-        if (falling.squash >= 0) {
-            if (--falling.squash <= 0) {
-                avatar.pose = Pose.STANDING
-                drop = null
-            }
+        if (falling.after >= 0) {
+            if (++falling.after == SQUASH_TICKS) avatar.pose = Pose.STANDING
+            if (falling.after < if (falling.home) SQUASH_TICKS + DAZE_TICKS else SQUASH_TICKS) return
+            drop = null
+            if (falling.home) walkHome(avatar)
             return
         }
         falling.elapsed++
         val progress = (falling.elapsed.toDouble() / falling.ticks).coerceAtMost(1.0)
-        val rest = avatar.rest.pos
+        val rest = falling.to
         val slide = Easing.smoothstep(progress)
         val y = Mth.lerp(progress * progress, falling.from.y, rest.y) + falling.hop * HOP_ARC * progress * (1.0 - progress)
         val head = avatar.yHeadRot
@@ -285,7 +320,16 @@ object LobbyGrab {
         if (progress < 1.0) return
         controller(avatar).stop()
         avatar.pose = Pose.CROUCHING
-        falling.squash = SQUASH_TICKS
+        falling.after = 0
+        if (falling.home) level?.let { LobbyEntrance.land(it, rest, falling.from.y - rest.y) }
+    }
+
+    private fun walkHome(avatar: LobbyAvatar) {
+        if (LobbyScene.strollHome(avatar)) {
+            strolling = avatar
+            return
+        }
+        drop = dropping(avatar, avatar.position(), avatar.rest.pos, false)
     }
 
     private fun play(hold: Hold) {
