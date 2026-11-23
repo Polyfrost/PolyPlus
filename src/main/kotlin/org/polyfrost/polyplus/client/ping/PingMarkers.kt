@@ -23,11 +23,17 @@ import kotlin.math.sqrt
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.ClipContext
+import net.minecraft.world.phys.HitResult
+import net.minecraft.world.phys.Vec3
 //?} else {
 /*import net.minecraft.block.Block
 import net.minecraft.entity.ItemEntity
+import net.minecraft.entity.living.player.PlayerEntity
 import net.minecraft.item.Item
 import net.minecraft.item.ItemStack
+import net.minecraft.util.math.Vec3d
+import net.minecraft.world.HitResult
 *///?}
 
 object PingMarkers {
@@ -72,9 +78,12 @@ object PingMarkers {
     private const val REPLY_ROW_HEIGHT = HEAD_CELL + ROW_PAD_Y * 2
     private const val MAX_REPLY_LINES = 4
     private const val NETWORK_MATCH = 24.0
+    private const val SIGHT_CHECK_MS = 50L
+    private val SIGHT_HEIGHTS = doubleArrayOf(0.9, 0.5, 0.1)
 
     private val lastPositions = HashMap<String, DoubleArray>()
     private val lostTargets = HashSet<String>()
+    private val sightChecks = HashMap<String, Sight>()
     private val requestedNames = HashSet<String>()
     private val headings = HashMap<String, Heading>()
     private val expansion = HashMap<String, Float>()
@@ -89,6 +98,7 @@ object PingMarkers {
         if (pings.isEmpty()) {
             if (lastPositions.isNotEmpty()) lastPositions.clear()
             if (lostTargets.isNotEmpty()) lostTargets.clear()
+            if (sightChecks.isNotEmpty()) sightChecks.clear()
             if (headings.isNotEmpty()) headings.clear()
             if (expansion.isNotEmpty()) expansion.clear()
             hoveredId = null
@@ -106,12 +116,13 @@ object PingMarkers {
             return
         }
         val canvas = PingCanvas(graphics)
-        val entities = trackedEntities(pings)
         val now = System.currentTimeMillis()
         val viewer = viewerPosition(partialTicks) ?: return
         val ids = pings.mapTo(HashSet()) { it.id }
         lastPositions.keys.retainAll(ids)
         lostTargets.retainAll(ids)
+        sightChecks.keys.retainAll(ids)
+        val entities = trackedEntities(pings, partialTicks)
         headings.keys.retainAll(ids)
         expansion.keys.retainAll(ids)
         val frames = ArrayList<Frame>(pings.size)
@@ -144,7 +155,7 @@ object PingMarkers {
     }
 
     internal fun screenPosition(ping: Ping, partialTicks: Float): ScreenPoint? {
-        val pos = position(ping, trackedEntities(listOf(ping)), partialTicks)
+        val pos = position(ping, trackedEntities(listOf(ping), partialTicks), partialTicks)
         return PingProjection.project(pos[0], pos[1], pos[2], partialTicks)
     }
 
@@ -204,7 +215,7 @@ object PingMarkers {
         }
     }
 
-    private fun trackedEntities(pings: List<Ping>): Map<String, Entity> {
+    private fun trackedEntities(pings: List<Ping>, partialTicks: Float): Map<String, Entity> {
         val wanted = pings.mapNotNullTo(HashSet()) { it.target?.entity }
         if (wanted.isEmpty() && pings.none { it.target?.entityId != null }) return emptyMap()
         val byUuid = HashMap<String, Entity>()
@@ -222,18 +233,74 @@ object PingMarkers {
             val id = entity.uuid.toString()
             if (id in wanted) byUuid[id] = entity
         }
+        val now = System.currentTimeMillis()
         for (ping in pings) {
             val target = ping.target ?: continue
             if (ping.id in lostTargets) continue
             val entity = target.entity?.let { byUuid[it] } ?: target.entityId?.let { networkEntity(ping, it) } ?: continue
-            if (entity.isInvisible) {
+            if (hidden(entity)) {
                 lostTargets.add(ping.id)
                 continue
             }
+            if (!seen(ping.id, entity, partialTicks, now)) continue
             found[ping.id] = entity
         }
         return found
     }
+
+    private class Sight(val at: Long, val visible: Boolean)
+
+    private fun seen(id: String, entity: Entity, partialTicks: Float, now: Long): Boolean {
+        val cached = sightChecks[id]
+        if (cached != null && now - cached.at < SIGHT_CHECK_MS) return cached.visible
+        val visible = inSight(entity, partialTicks)
+        sightChecks[id] = Sight(now, visible)
+        return visible
+    }
+
+    //? if > 1.8.9 {
+    private fun hidden(entity: Entity): Boolean = entity.isInvisible || entity.isSpectator
+
+    private fun inSight(entity: Entity, partialTicks: Float): Boolean {
+        val mc = Minecraft.getInstance()
+        val level = mc.level ?: return false
+        val viewer = mc.cameraEntity ?: mc.player ?: return false
+        if (entity === viewer || entity === mc.player) return true
+        val eye = viewer.getEyePosition(partialTicks)
+        val feet = entity.getPosition(partialTicks)
+        val limit = PingTargeting.viewDistance()
+        for (height in SIGHT_HEIGHTS) {
+            val point = Vec3(feet.x, feet.y + entity.bbHeight * height, feet.z)
+            if (point.distanceToSqr(eye) > limit * limit) continue
+            if (PingProjection.project(point.x, point.y, point.z, partialTicks)?.onScreen != true) continue
+            val hit = level.clip(ClipContext(eye, point, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, viewer))
+            if (hit.type == HitResult.Type.MISS) return true
+        }
+        return false
+    }
+    //?} else {
+    /*private fun hidden(entity: Entity): Boolean = entity.isInvisible || (entity is PlayerEntity && entity.isSpectator)
+
+    private fun inSight(entity: Entity, partialTicks: Float): Boolean {
+        val mc = Minecraft.getInstance()
+        val world = mc.world ?: return false
+        val viewer = mc.camera ?: mc.player ?: return false
+        if (entity === viewer || entity === mc.player) return true
+        val eye = viewer.getEyePosition(partialTicks)
+        val x = entity.lastX + (entity.x - entity.lastX) * partialTicks
+        val y = entity.lastY + (entity.y - entity.lastY) * partialTicks
+        val z = entity.lastZ + (entity.z - entity.lastZ) * partialTicks
+        val limit = PingTargeting.viewDistance()
+        for (height in SIGHT_HEIGHTS) {
+            val point = Vec3d(x, y + entity.height * height, z)
+            if (point.squaredDistanceTo(eye) > limit * limit) continue
+            if (PingProjection.project(point.x, point.y, point.z, partialTicks)?.onScreen != true) continue
+            val hit = world.rayTrace(eye, point, false, true, false)
+            if (hit == null || hit.type != HitResult.Type.BLOCK) return true
+        }
+        return false
+    }
+    *///?}
 
     private fun networkEntity(ping: Ping, id: Int): Entity? {
         val mc = Minecraft.getInstance()

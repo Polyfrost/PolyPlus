@@ -53,6 +53,12 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 *///?}
 
+//? if = 1.21.1 {
+/*import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.network.chat.Component;
+import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
+*///?}
+
 //? if >= 1.21.10 {
 @Mixin(AvatarRenderer.class)
 //?} else {
@@ -153,6 +159,15 @@ public class MixinAvatarRenderer {
     private void polyplus$leanHerobrine(AbstractClientPlayer player, PoseStack poseStack, float bob, float bodyRot, float partialTick, float scale, CallbackInfo ci) {
         LobbyHerobrine.lean(player.getId(), poseStack);
         LobbyAntics.spin(player.getId(), poseStack);
+    }
+
+    @Inject(
+        method = "renderNameTag(Lnet/minecraft/client/player/AbstractClientPlayer;Lnet/minecraft/network/chat/Component;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;IF)V",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void polyplus$hidePauseAvatarName(AbstractClientPlayer player, Component name, PoseStack poseStack, MultiBufferSource buffers, int light, float partialTick, CallbackInfo ci) {
+        if (PauseAvatar.hidesName(player)) ci.cancel();
     }
     *///?}
 //? if > 1.8.9

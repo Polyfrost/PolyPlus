@@ -277,7 +277,7 @@ object FlashbackReplays : ReplayProvider {
 
     override val canDiscard: Boolean get() = recording != null
 
-    override val controlKeyPrefixes: List<String> = listOf("flashback.recording_controls.")
+    override val controlKeyPrefixes: List<String> = listOf("flashback.recording_controls.", "flashback.flashback")
 
     override fun start() = ClientPlatform.runOnMain { call { it.start.invoke(null) } }
 

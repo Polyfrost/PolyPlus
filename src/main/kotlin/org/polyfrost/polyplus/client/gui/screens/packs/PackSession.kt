@@ -43,6 +43,7 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.StandardCopyOption
+import java.util.zip.ZipFile
 import javax.imageio.ImageIO
 *///?}
 
@@ -1565,9 +1566,14 @@ internal class PackSession private constructor(private val exit: Screen?, privat
     private fun format(pack: ResourcePacks.UnopenedPack): Int = runCatching { pack.getFormat() }.getOrDefault(LEGACY_FORMAT)
 
     private fun readIcon(item: PackItem): ImageBitmap? = runCatching {
-        val pack = item.pack
-        val image = if (pack == null) repository.defaultPack.getIcon() else (pack as Any as PackUnopenedPackAccessor).`polyplus$icon`()
-        image?.let(::bitmap)
+        val pack = item.pack ?: return@runCatching repository.defaultPack.getIcon()?.let(::bitmap)
+        packPng(fileOf(pack))?.let { PolyBitmap.decode(it)?.asComposeImageBitmap() }
+            ?: (pack as Any as PackUnopenedPackAccessor).`polyplus$icon`()?.let(::bitmap)
+    }.getOrNull()
+
+    private fun packPng(file: File): ByteArray? = runCatching {
+        if (file.isDirectory) return@runCatching File(file, "pack.png").takeIf { it.isFile }?.readBytes()
+        ZipFile(file).use { zip -> zip.getEntry("pack.png")?.let { entry -> zip.getInputStream(entry).use { it.readBytes() } } }
     }.getOrNull()
 
     private fun bitmap(image: BufferedImage): ImageBitmap? {

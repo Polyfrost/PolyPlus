@@ -77,14 +77,16 @@ internal object PingTargeting {
 
     private fun isOre(path: String) = path.endsWith("_ore") || path in ORE_BLOCKS
 
-    fun reach(): Double {
+    fun reach(): Double = max(MIN_REACH, viewDistance())
+
+    fun viewDistance(): Double {
         val mc = Minecraft.getInstance()
         //? if > 1.8.9 {
         val chunks = mc.options.effectiveRenderDistance
         //?} else {
         /*val chunks = mc.options.viewDistance
         *///?}
-        return max(MIN_REACH, chunks * 16.0)
+        return chunks * 16.0
     }
 
     private fun blockHit(id: String, label: String, hitX: Double, hitY: Double, hitZ: Double, bx: Int, by: Int, bz: Int, top: Boolean): PingHit {
@@ -121,11 +123,12 @@ internal object PingTargeting {
 
         val area = camera.boundingBox.expandTowards(look.x * reach, look.y * reach, look.z * reach).inflate(1.0)
         val candidates = level.getEntities(camera, area) { pingable(it, camera) }
+        val sight = viewDistance() * viewDistance()
         for (entity in candidates) {
             val box = entity.boundingBox.inflate(max(entity.pickRadius.toDouble(), ENTITY_MARGIN))
             val at = if (box.contains(eye)) eye else box.clip(eye, end).orElse(null) ?: continue
             val distance = at.distanceToSqr(eye)
-            if (distance < nearest) {
+            if (distance < nearest && distance <= sight) {
                 nearest = distance
                 picked = entity
                 pickedAt = at
@@ -193,13 +196,14 @@ internal object PingTargeting {
         var pickedAt = eye
 
         val area = camera.shape.expanded(look.x * reach, look.y * reach, look.z * reach).grown(1.0, 1.0, 1.0)
+        val sight = viewDistance() * viewDistance()
         for (entity in world.getEntities(camera, area)) {
             if (!pingable(entity, camera)) continue
             val margin = max(entity.pickRadius.toDouble(), ENTITY_MARGIN)
             val box = entity.shape.grown(margin, margin, margin)
             val at = if (box.contains(eye)) eye else box.clip(eye, end)?.facePos ?: continue
             val distance = at.squaredDistanceTo(eye)
-            if (distance < nearest) {
+            if (distance < nearest && distance <= sight) {
                 nearest = distance
                 picked = entity
                 pickedAt = at

@@ -110,6 +110,9 @@ object PauseAvatar {
     }
 
     @JvmStatic
+    fun hidesName(entity: Any?): Boolean = isLocal(entity as? Entity)
+
+    @JvmStatic
     fun light(entity: Entity?, packed: Int): Int {
         if (!isLocal(entity)) return packed
         val living = entity as? LivingEntity ?: return packed
@@ -151,6 +154,8 @@ object PauseAvatar {
         state.bodyRot = bodyYaw
         state.xRot = pitchNow(state.xRot)
         state.ageInTicks = age(state.ageInTicks)
+        state.nameTag = null
+        state.scoreText = null
         state.walkAnimationSpeed *= 1f - weight
         //? if >= 26.3 {
         state.swingAnimation *= 1f - weight
@@ -169,6 +174,8 @@ object PauseAvatar {
         state.bodyRot = bodyYaw
         state.xRot = pitchNow(state.xRot)
         state.ageInTicks = age(state.ageInTicks)
+        state.nameTag = null
+        state.scoreText = null
         state.walkAnimationSpeed *= 1f - weight
         state.attackTime *= 1f - weight
     }
