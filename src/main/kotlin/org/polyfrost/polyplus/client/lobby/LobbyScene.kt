@@ -1088,6 +1088,10 @@ object LobbyScene {
         }
         val dimension = registries.lookupOrThrow(Registries.DIMENSION_TYPE).getOrThrow(dimensionKey)
         val root = loaded.root
+        val anchorData = checkNotNull(root.optIntArray("anchor"))
+        val anchor = BlockPos(anchorData[0], anchorData[1], anchorData[2])
+        val bottom = dimension.value().minY()
+        check(anchor.y >= bottom && anchor.y < bottom + dimension.value().height()) { "Scene ${loaded.entry.id} is outside the world height" }
         val radius = root.getIntOr("radius", LobbySnapshot.DEFAULT_RADIUS)
         val level = ClientLevel(
             listener,
@@ -1113,8 +1117,6 @@ object LobbyScene {
             mc.gameRenderer.setLevel(level)
             setReach(mc, 0)
         }
-        val anchorData = checkNotNull(root.optIntArray("anchor"))
-        val anchor = BlockPos(anchorData[0], anchorData[1], anchorData[2])
         val center = LobbyCompat.chunkOf(anchor)
         populate(level, root, center, radius)
         val gameMode = MultiPlayerGameMode(mc, listener)
@@ -1278,6 +1280,7 @@ object LobbyScene {
             }
             tag.getListOrEmpty("block_entities").compounds().forEach { blockEntity ->
                 val blockPos = LobbyCompat.blockEntityPos(pos, blockEntity)
+                if (level.isOutsideBuildHeight(blockPos)) return@forEach
                 val state = chunk.getBlockState(blockPos)
                 BlockEntity.loadStatic(blockPos, state, blockEntity, level.registryAccess())?.let(chunk::addAndRegisterBlockEntity)
             }
