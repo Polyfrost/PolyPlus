@@ -1949,6 +1949,7 @@ object LobbyScene {
             if (!rigFinite(scene)) restRig(mc, scene)
             scene.level.update()
             val camera = LobbyCompat.camera(renderer)
+            if (!camera.isInitialized) renderer.setLevel(scene.level)
             camera.update(deltaTracker)
             //? if < 26.2
             /*mc.levelRenderer.update(camera)*/
