@@ -347,6 +347,7 @@ val relocateSerialization = tasks.register<ShadowJar>("relocateSerialization") {
 }
 
 tasks.jar {
+    val mainClassesDirs = mainClassesDirs // required for configuration cache
     exclude { it.name.endsWith(".class") && mainClassesDirs.any { dir -> it.file.startsWith(dir) } }
     for (relocated in listOf(relocateSentry, relocateSerialization)) {
         from(zipTree(relocated.flatMap { it.archiveFile })) {
@@ -503,6 +504,7 @@ tasks.test {
 }
 
 val generateTesterFlag = tasks.register("generateTesterFlag") {
+    val testerBuild = testerBuild // required for configuration cache
     val output = layout.buildDirectory.file("generated/tester/polyplus-tester.properties")
     inputs.property("tester", testerBuild)
     outputs.file(output)
@@ -515,6 +517,9 @@ val generateTesterFlag = tasks.register("generateTesterFlag") {
 }
 
 tasks.withType<ProcessResources>().configureEach {
+    val generateTesterFlag = generateTesterFlag // required for configuration cache
+    val isOrnithe = isOrnithe // required for configuration cache
+
     from(generateTesterFlag)
     val keptChain = when {
         stonecutter.eval(mcVersion, ">= 1.21.8") -> "lobby.json"
@@ -551,8 +556,11 @@ tasks.withType<ProcessResources>().configureEach {
         filesMatching("$shaders/effect/core/*") { path = "$shaders/core/$name" }
         filesMatching(listOf("$shaders/effect/program/*", "$shaders/post/*")) { path = "assets/minecraft/shaders/program/polyplus_$name" }
     }
+    val modId = modId // required for configuration cache
     val modName = project.property("mod.name") as String
     val modVersion = project.property("mod.version") as String
+    val minecraftPredicate = minecraftPredicate // required for configuration cache
+    val oneconfigVersion = oneconfigVersion // required for configuration cache
     inputs.property("modId", modId)
     inputs.property("modName", modName)
     inputs.property("modVersion", modVersion)
