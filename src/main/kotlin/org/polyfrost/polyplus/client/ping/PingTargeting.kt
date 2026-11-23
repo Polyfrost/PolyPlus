@@ -37,6 +37,7 @@ import net.minecraft.entity.living.LivingEntity
 import net.minecraft.entity.living.mob.monster.Monster
 import net.minecraft.entity.living.player.PlayerEntity
 import net.minecraft.entity.vehicle.InventoryMinecartEntity
+import net.minecraft.util.math.Box
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
 import net.minecraft.world.HitResult
@@ -188,11 +189,12 @@ internal object PingTargeting {
         val world = mc.world ?: return null
         val camera = mc.camera ?: mc.player ?: return null
         val reach = reach()
-        val eye = camera.getEyePosition(partialTicks)
-        val look = camera.getRotationVector(partialTicks)
+        val view = PingProjection.detachedView(partialTicks)
+        val eye = if (view != null) Vec3d(view.x, view.y, view.z) else camera.getEyePosition(partialTicks)
+        val look = if (view != null) Vec3d(view.forwardX, view.forwardY, view.forwardZ) else camera.getRotationVector(partialTicks)
         val end = eye.add(look.x * reach, look.y * reach, look.z * reach)
 
-        mc.crosshairTarget?.takeIf { it.type == HitResult.Type.ENTITY }?.let { vanilla ->
+        if (view == null) mc.crosshairTarget?.takeIf { it.type == HitResult.Type.ENTITY }?.let { vanilla ->
             val entity = vanilla.entity
             if (entity != null && pingable(entity, camera)) return entityHit(owner(entity), vanilla.facePos ?: eye)
         }
@@ -203,7 +205,7 @@ internal object PingTargeting {
         var picked: Entity? = null
         var pickedAt = eye
 
-        val area = camera.shape.expanded(look.x * reach, look.y * reach, look.z * reach).grown(1.0, 1.0, 1.0)
+        val area = (if (view != null) Box(eye.x, eye.y, eye.z, end.x, end.y, end.z) else camera.shape.expanded(look.x * reach, look.y * reach, look.z * reach)).grown(1.0, 1.0, 1.0)
         val sight = viewDistance() * viewDistance()
         for (entity in world.getEntities(camera, area)) {
             if (!pingable(entity, camera)) continue

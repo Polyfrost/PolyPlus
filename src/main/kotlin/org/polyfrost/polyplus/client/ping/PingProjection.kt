@@ -12,7 +12,9 @@ import org.joml.Quaternionf
 import org.joml.Vector3f
 import org.polyfrost.polyplus.client.lobby.LobbyCompat
 //?} else {
-/*import net.minecraft.entity.living.LivingEntity
+/*import net.minecraft.client.render.Camera
+import net.minecraft.entity.Entity
+import net.minecraft.entity.living.LivingEntity
 import net.minecraft.util.math.Vec3d
 import org.polyfrost.polyplus.mixin.client.ping.PingFovInvoker
 import kotlin.math.tan
@@ -33,6 +35,21 @@ internal object PingProjection {
     //? if = 1.8.9 {
     /*private const val THIRD_PERSON_DISTANCE = 4.0
     private const val CLIP_JITTER = 0.1
+    private const val LOOK_MATCH = 0.9999
+
+    internal class CameraView(
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val cosYaw: Double,
+        val sinYaw: Double,
+        val cosPitch: Double,
+        val sinPitch: Double,
+    ) {
+        val forwardX: Double get() = -sinYaw * cosPitch
+        val forwardY: Double get() = -sinPitch
+        val forwardZ: Double get() = cosYaw * cosPitch
+    }
     *///?}
 
     fun guiWidth(): Float = Platform.screen().guiWidth().toFloat()
@@ -65,6 +82,52 @@ internal object PingProjection {
         return resolve(view.x, view.y, -view.z, up.y, -up.z, scaleX, scaleY, width, height)
         //?} else {
         /*val camera = mc.camera ?: return null
+        val view = detachedView(partialTicks) ?: entityView(camera, partialTicks)
+        val fx = view.forwardX
+        val fy = view.forwardY
+        val fz = view.forwardZ
+        val rx = -view.cosYaw
+        val rz = -view.sinYaw
+        val ux = -rz * fy
+        val uy = rz * fx - rx * fz
+        val uz = rx * fy
+        val dx = x - view.x
+        val dy = y - view.y
+        val dz = z - view.z
+        val depth = dx * fx + dy * fy + dz * fz
+        val right = dx * rx + dz * rz
+        val upward = dx * ux + dy * uy + dz * uz
+        val fovDeg = (mc.gameRenderer as PingFovInvoker).`polyplus$pingFov`(partialTicks, true)
+        val half = tan(Math.toRadians(fovDeg / 2.0))
+        val aspect = if (mc.height > 0) mc.width.toDouble() / mc.height else 1.0
+        if (half <= 0.0 || !half.isFinite()) return null
+        val scaleY = (1.0 / half).toFloat()
+        val scaleX = (1.0 / (half * aspect)).toFloat()
+        return resolve(right.toFloat(), upward.toFloat(), depth.toFloat(), uy.toFloat(), fy.toFloat(), scaleX, scaleY, width, height)
+        *///?}
+    }
+
+    //? if = 1.8.9 {
+    /*internal fun detachedView(partialTicks: Float): CameraView? {
+        val mc = Minecraft.getInstance()
+        val player = mc.player ?: return null
+        val camera = mc.camera ?: return null
+        val cosYaw = Camera.dx().toDouble()
+        val sinYaw = Camera.dz().toDouble()
+        if (cosYaw == 0.0 && sinYaw == 0.0) return null
+        val cosPitch = Camera.dy().toDouble()
+        val sinPitch = Camera.sideways().toDouble() * cosYaw - Camera.forwards().toDouble() * sinYaw
+        val mirrored = mc.options.perspective == 2
+        val yaw = Math.toRadians((if (mirrored) player.yaw + 180f else player.yaw).toDouble())
+        val pitch = Math.toRadians((if (mirrored) -player.pitch else player.pitch).toDouble())
+        val dot = -sinYaw * cosPitch * -sin(yaw) * cos(pitch) + sinPitch * sin(pitch) + cosYaw * cosPitch * cos(yaw) * cos(pitch)
+        if (dot >= LOOK_MATCH) return null
+        val origin = Camera.getPos(camera, partialTicks.toDouble())
+        return CameraView(origin.x, origin.y, origin.z, cosYaw, sinYaw, cosPitch, sinPitch)
+    }
+
+    private fun entityView(camera: Entity, partialTicks: Float): CameraView {
+        val mc = Minecraft.getInstance()
         val eye = camera.getEyePosition(partialTicks)
         var yaw = camera.lastYaw + (camera.yaw - camera.lastYaw) * partialTicks
         var pitch = camera.lastPitch + (camera.pitch - camera.lastPitch) * partialTicks
@@ -91,32 +154,10 @@ internal object PingProjection {
         }
         val yawRad = Math.toRadians(yaw.toDouble())
         val pitchRad = Math.toRadians(pitch.toDouble())
-        val fx = -sin(yawRad) * cos(pitchRad)
-        val fy = -sin(pitchRad)
-        val fz = cos(yawRad) * cos(pitchRad)
-        val rx = -cos(yawRad)
-        val rz = -sin(yawRad)
-        val ux = -rz * fy
-        val uy = rz * fx - rx * fz
-        val uz = rx * fy
-        val dx = x - cx
-        val dy = y - cy
-        val dz = z - cz
-        val depth = dx * fx + dy * fy + dz * fz
-        val right = dx * rx + dz * rz
-        val upward = dx * ux + dy * uy + dz * uz
-        val fovDeg = (mc.gameRenderer as PingFovInvoker).`polyplus$pingFov`(partialTicks, true)
-        val half = tan(Math.toRadians(fovDeg / 2.0))
-        val aspect = if (mc.height > 0) mc.width.toDouble() / mc.height else 1.0
-        if (half <= 0.0 || !half.isFinite()) return null
-        val scaleY = (1.0 / half).toFloat()
-        val scaleX = (1.0 / (half * aspect)).toFloat()
-        return resolve(right.toFloat(), upward.toFloat(), depth.toFloat(), uy.toFloat(), fy.toFloat(), scaleX, scaleY, width, height)
-        *///?}
+        return CameraView(cx, cy, cz, cos(yawRad), sin(yawRad), cos(pitchRad), sin(pitchRad))
     }
 
-    //? if = 1.8.9 {
-    /*private fun thirdPersonDistance(eye: Vec3d, ox: Double, oy: Double, oz: Double): Double {
+    private fun thirdPersonDistance(eye: Vec3d, ox: Double, oy: Double, oz: Double): Double {
         val world = Minecraft.getInstance().world ?: return THIRD_PERSON_DISTANCE
         var distance = THIRD_PERSON_DISTANCE
         for (i in 0 until 8) {
