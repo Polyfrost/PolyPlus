@@ -82,6 +82,7 @@ internal class PackTreeWatcher(private val root: Path) {
             )
             keys[key] = dir
             watched[real] = key
+            if (depth > 0 && Files.isRegularFile(dir.resolve("pack.mcmeta"))) return
             Files.newDirectoryStream(dir).use { children ->
                 for (child in children) {
                     if (child.fileName.toString().startsWith(".")) continue
