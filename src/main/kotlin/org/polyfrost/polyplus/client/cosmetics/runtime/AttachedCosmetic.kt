@@ -1,16 +1,12 @@
 package org.polyfrost.polyplus.client.cosmetics.runtime
 
 import net.minecraft.resources.Identifier
-import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
-import org.polyfrost.polyplus.client.bedrock.model.BedrockEffectModel
+import org.polyfrost.polyplus.client.cosmetics.render.CosmeticScene
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 
 data class AttachedCosmetic(
     val id: Identifier,
     val slot: BodySlot,
     val texture: Identifier,
-    val model: BedrockEffectModel,
-    val animation: BedrockAnimation? = null,
-    val scale: Float = 1f,
-    val textureFrameCount: Int = 1,
+    val scene: CosmeticScene,
 )

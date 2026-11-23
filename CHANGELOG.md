@@ -5,6 +5,11 @@ All notable changes to PolyPlus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Cosmetics are now drawn by plusrenderer, Polyfrost's shared cosmetic renderer, so they look the same in game as everywhere else it's used
+
 ## [2.4.0] - 2026-11-23
 
 ### Added

@@ -425,7 +425,7 @@ object CosmeticAssetCache {
             1
         } else {
             val detected =
-                detectVerticalTextureFrameCount(image.width, image.height, sheet.width, sheet.height, 0f, minFrames = 2)
+                detectVerticalTextureFrameCount(image.width, image.height, sheet.width, sheet.height)
             when {
                 detected < 2 -> {
                     LOGGER.warn(
@@ -470,8 +470,7 @@ object CosmeticAssetCache {
 
     private fun loadAttachedCosmetic(id: Int, dir: Path, slot: BodySlot, scale: Float = 1f, anchor: PlayerModelBone? = null): Boolean {
         val stamp = generation
-        val playerGeometry = playerGeometryOrNull(id, dir) ?: return false
-        val attached = AttachedCosmeticParser.parse(id, dir, slot, playerGeometry, scale, anchor) ?: return false
+        val attached = AttachedCosmeticParser.parse(id, dir, slot, scale, anchor) ?: return false
 
         installOnMain(stamp, attached.texture) {
             attachedById[id] = attached

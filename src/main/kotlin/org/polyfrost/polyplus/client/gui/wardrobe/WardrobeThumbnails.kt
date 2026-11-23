@@ -79,7 +79,7 @@ private fun needsLivePreview(type: CosmeticType, source: PlayerPreviewSource): B
     val override = source as? PlayerPreviewSource.Override ?: return false
     if (override.capeCosmeticId?.let(CosmeticAssetCache::isCapeAnimated) == true) return true
     if (override.pet?.let { it.animations.isNotEmpty() || it.controller != null } == true) return true
-    return override.equipment.equipped().any { it.cosmetic.animation != null || it.cosmetic.textureFrameCount > 1 }
+    return override.equipment.equipped().any { it.cosmetic.scene.isAnimated }
 }
 
 private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val verticalAnchor: Float)

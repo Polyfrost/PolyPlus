@@ -429,6 +429,7 @@ dependencies {
         testCompileOnly("$module:$version")
     }
 
+    implementation(include("org.polyfrost:plusrenderer:${property("deps.plusrenderer")}")!!)
     implementation(include("gg.sona:eos:2.2.0")!!)
     implementation(include("io.github.jaredmdobson:concentus:1.0.2")!!)
 

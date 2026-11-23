@@ -31,13 +31,19 @@ object BedrockAttachedModelRenderer {
         val texture: Identifier,
         val sample: Map<String, BoneTransform>,
         val poseWeight: Float,
-        val color: Int = -1,
-        val translucent: Boolean = false,
-        val backOffset: Float = 0f,
-        val scale: Float = 1f,
-        val textureVScale: Float = 1f,
-        val textureVOffset: Float = 0f,
     )
+
+    /** Two-sided, as cosmetics are modelled. */
+    //? if >= 26.1 {
+    fun renderType(texture: Identifier, translucent: Boolean) =
+        if (translucent) RenderTypes.entityTranslucent(texture) else RenderTypes.entityCutout(texture)
+    //?} elif >= 1.21.11 {
+    /*fun renderType(texture: Identifier, translucent: Boolean) =
+        if (translucent) RenderTypes.entityTranslucent(texture) else RenderTypes.entityCutoutNoCull(texture)
+    *///?} elif > 1.8.9 {
+    /*fun renderType(texture: Identifier, translucent: Boolean) =
+        if (translucent) RenderType.entityTranslucent(texture) else RenderType.entityCutoutNoCull(texture)
+    *///?}
 
     private fun prepare(draw: DrawCall) {
         draw.model.resetPose()
@@ -58,36 +64,16 @@ object BedrockAttachedModelRenderer {
         for (draw in draws) {
             prepare(draw)
 
-            //? if >= 26.1 {
-            val renderType = if (draw.translucent) RenderTypes.entityTranslucent(draw.texture) else RenderTypes.entityCutout(draw.texture)
-            //?} elif >= 1.21.11 {
-            /*val renderType = if (draw.translucent) RenderTypes.entityTranslucent(draw.texture) else RenderTypes.entityCutoutNoCull(draw.texture)
-            *///?} else {
-            /*val renderType = if (draw.translucent) RenderType.entityTranslucent(draw.texture) else RenderType.entityCutoutNoCull(draw.texture)
-            *///?}
+            val renderType = renderType(draw.texture, translucent = false)
 
             for (attachment in draw.model.attachments) {
                 poseStack.pushPose()
                 attachment.attachBone.translateAndRotateChain(playerModel, poseStack)
-                if (draw.backOffset != 0f) {
-                    poseStack.translate(0f, 0f, draw.backOffset)
-                }
-                if (draw.scale != 1f) {
-                    poseStack.scale(draw.scale, draw.scale, draw.scale)
-                }
 
                 submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
                     val localStack = PoseStack()
                     localStack.last().set(basePose)
-                    attachment.rootBone.render(
-                        localStack,
-                        buffer,
-                        lightCoords,
-                        overlayCoords,
-                        draw.color,
-                        draw.textureVScale,
-                        draw.textureVOffset,
-                    )
+                    attachment.rootBone.render(localStack, buffer, lightCoords, overlayCoords)
                 }
 
                 poseStack.popPose()
@@ -105,27 +91,12 @@ object BedrockAttachedModelRenderer {
     ) {
         for (draw in draws) {
             prepare(draw)
-            val renderType = if (draw.translucent) RenderType.entityTranslucent(draw.texture) else RenderType.entityCutoutNoCull(draw.texture)
-            val buffer = bufferSource.getBuffer(renderType)
+            val buffer = bufferSource.getBuffer(renderType(draw.texture, translucent = false))
 
             for (attachment in draw.model.attachments) {
                 poseStack.pushPose()
                 attachment.attachBone.translateAndRotateChain(playerModel, poseStack)
-                if (draw.backOffset != 0f) {
-                    poseStack.translate(0f, 0f, draw.backOffset)
-                }
-                if (draw.scale != 1f) {
-                    poseStack.scale(draw.scale, draw.scale, draw.scale)
-                }
-                attachment.rootBone.render(
-                    poseStack,
-                    buffer,
-                    lightCoords,
-                    overlayCoords,
-                    draw.color,
-                    draw.textureVScale,
-                    draw.textureVOffset,
-                )
+                attachment.rootBone.render(poseStack, buffer, lightCoords, overlayCoords)
                 poseStack.popPose()
             }
         }
@@ -140,25 +111,11 @@ object BedrockAttachedModelRenderer {
     ) {
         for (draw in draws) {
             prepare(draw)
-            VertexConsumer.draw(draw.texture, draw.translucent) { buffer ->
+            VertexConsumer.draw(draw.texture, translucent = false) { buffer ->
                 for (attachment in draw.model.attachments) {
                     poseStack.pushPose()
                     attachment.attachBone.translateAndRotateChain(playerModel, poseStack)
-                    if (draw.backOffset != 0f) {
-                        poseStack.translate(0f, 0f, draw.backOffset)
-                    }
-                    if (draw.scale != 1f) {
-                        poseStack.scale(draw.scale, draw.scale, draw.scale)
-                    }
-                    attachment.rootBone.render(
-                        poseStack,
-                        buffer,
-                        lightCoords,
-                        overlayCoords,
-                        draw.color,
-                        draw.textureVScale,
-                        draw.textureVOffset,
-                    )
+                    attachment.rootBone.render(poseStack, buffer, lightCoords, overlayCoords)
                     poseStack.popPose()
                 }
             }
