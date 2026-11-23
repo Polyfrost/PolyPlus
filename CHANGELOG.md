@@ -5,6 +5,17 @@ All notable changes to PolyPlus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-11-23
+
+### Added
+- Village lobby scenes sometimes have 2 or 3 stray cats playing near your party (not on 1.8.9)
+- You can drag your lobby avatar up to 10 blocks away and drop it. It gets back up, runs back to its spot and waves
+
+### Fixed
+- Fixed pings landing away from the crosshair when using Freelook
+- Fixed the resource pack menu lagging the game when your resource pack folder has unzipped packs in it
+- Fixed lobby scenes captured above or below normal world height failing to load. You can no longer capture a scene there
+
 ## [2.3.2] - 2026-11-23
 
 ### Fixed
