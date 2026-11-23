@@ -23,9 +23,12 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.projectile.Projectile
 import net.minecraft.world.entity.vehicle.ContainerEntity
 import net.minecraft.world.level.ClipContext
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3f
+import org.polyfrost.polyplus.client.lobby.LobbyCompat
 //?} else {
 /*import net.minecraft.block.Block
 import net.minecraft.entity.Entities
@@ -34,6 +37,7 @@ import net.minecraft.entity.living.LivingEntity
 import net.minecraft.entity.living.mob.monster.Monster
 import net.minecraft.entity.living.player.PlayerEntity
 import net.minecraft.entity.vehicle.InventoryMinecartEntity
+import net.minecraft.util.math.Box
 import net.minecraft.util.math.Direction
 import net.minecraft.util.math.Vec3d
 import net.minecraft.world.HitResult
@@ -52,6 +56,7 @@ internal object PingTargeting {
     private const val MIN_REACH = 64.0
     private const val ENTITY_MARGIN = 0.3
     private const val LABEL_LIFT = 0.25
+    private const val LOOK_MATCH = 0.9999f
 
     private val DANGER_BLOCKS = setOf(
         "lava", "flowing_lava", "fire", "soul_fire", "cactus", "magma_block", "tnt", "powder_snow",
@@ -106,11 +111,15 @@ internal object PingTargeting {
         val level = mc.level ?: return null
         val camera = mc.cameraEntity ?: mc.player ?: return null
         val reach = reach()
-        val eye = camera.getEyePosition(partialTicks)
-        val look = camera.getViewVector(partialTicks)
+        val view = LobbyCompat.camera(mc.gameRenderer)
+        val viewLook = Vector3f(0f, 0f, -1f).rotate(view.rotation())
+        val entityLook = camera.getViewVector(partialTicks)
+        val detached = viewLook.x * entityLook.x + viewLook.y * entityLook.y + viewLook.z * entityLook.z < LOOK_MATCH
+        val eye = if (detached) LobbyCompat.cameraPosition(mc.gameRenderer) else camera.getEyePosition(partialTicks)
+        val look = if (detached) Vec3(viewLook.x.toDouble(), viewLook.y.toDouble(), viewLook.z.toDouble()) else entityLook
         val end = eye.add(look.x * reach, look.y * reach, look.z * reach)
 
-        (mc.hitResult as? EntityHitResult)?.let { vanilla ->
+        if (!detached) (mc.hitResult as? EntityHitResult)?.let { vanilla ->
             val entity = vanilla.entity
             if (pingable(entity, camera)) return entityHit(owner(entity), vanilla.location)
         }
@@ -121,7 +130,7 @@ internal object PingTargeting {
         var picked: Entity? = null
         var pickedAt = eye
 
-        val area = camera.boundingBox.expandTowards(look.x * reach, look.y * reach, look.z * reach).inflate(1.0)
+        val area = (if (detached) AABB(eye, end) else camera.boundingBox.expandTowards(look.x * reach, look.y * reach, look.z * reach)).inflate(1.0)
         val candidates = level.getEntities(camera, area) { pingable(it, camera) }
         val sight = viewDistance() * viewDistance()
         for (entity in candidates) {
@@ -180,11 +189,12 @@ internal object PingTargeting {
         val world = mc.world ?: return null
         val camera = mc.camera ?: mc.player ?: return null
         val reach = reach()
-        val eye = camera.getEyePosition(partialTicks)
-        val look = camera.getRotationVector(partialTicks)
+        val view = PingProjection.detachedView(partialTicks)
+        val eye = if (view != null) Vec3d(view.x, view.y, view.z) else camera.getEyePosition(partialTicks)
+        val look = if (view != null) Vec3d(view.forwardX, view.forwardY, view.forwardZ) else camera.getRotationVector(partialTicks)
         val end = eye.add(look.x * reach, look.y * reach, look.z * reach)
 
-        mc.crosshairTarget?.takeIf { it.type == HitResult.Type.ENTITY }?.let { vanilla ->
+        if (view == null) mc.crosshairTarget?.takeIf { it.type == HitResult.Type.ENTITY }?.let { vanilla ->
             val entity = vanilla.entity
             if (entity != null && pingable(entity, camera)) return entityHit(owner(entity), vanilla.facePos ?: eye)
         }
@@ -195,7 +205,7 @@ internal object PingTargeting {
         var picked: Entity? = null
         var pickedAt = eye
 
-        val area = camera.shape.expanded(look.x * reach, look.y * reach, look.z * reach).grown(1.0, 1.0, 1.0)
+        val area = (if (view != null) Box(eye.x, eye.y, eye.z, end.x, end.y, end.z) else camera.shape.expanded(look.x * reach, look.y * reach, look.z * reach)).grown(1.0, 1.0, 1.0)
         val sight = viewDistance() * viewDistance()
         for (entity in world.getEntities(camera, area)) {
             if (!pingable(entity, camera)) continue
