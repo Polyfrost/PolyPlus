@@ -28,6 +28,7 @@ import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
 import org.polyfrost.polyplus.client.launcher.SessionRefresh
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.ConnectionDisconnectedScreenAccessor
@@ -69,12 +70,14 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
 
     //? if >= 26.1 {
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (shell == ScreenShell.Lobby) LobbyScene.start()
         hold.frame()
         super.extractRenderState(ctx, mouseX, mouseY, tickDelta)
         hold.veil(ctx, width, height)
     }
     //?} else {
     /*override fun render(ctx: GuiGraphics, mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (shell == ScreenShell.Lobby) LobbyScene.start()
         hold.frame()
         super.render(ctx, mouseX, mouseY, tickDelta)
         hold.veil(ctx, width, height)
@@ -162,6 +165,7 @@ import org.polyfrost.polyplus.client.gui.screens.ScreenShell
 import org.polyfrost.polyplus.client.gui.screens.ShellScreen
 import org.polyfrost.polyplus.client.launcher.SessionRefresh
 import org.polyfrost.polyplus.client.lobby.LobbyI18n
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.mixin.client.access.LegacyDisconnectedScreenAccessor
@@ -203,6 +207,7 @@ class DisconnectedShellScreen(shell: ScreenShell, val vanilla: DisconnectedScree
     }
 
     override fun render(mouseX: Int, mouseY: Int, tickDelta: Float) {
+        if (shell == ScreenShell.Lobby) LobbyScene.start()
         hold.frame()
         super.render(mouseX, mouseY, tickDelta)
         hold.veil(width, height)
