@@ -176,6 +176,9 @@ object LobbyCapture {
     private const val MOVED_BLOCKS = 24.0
     private const val MIN_SKY_LIGHT = 10
     private const val VANILLA_NAMESPACE = "minecraft:"
+    private const val OVERWORLD_MIN_Y = -64
+    private const val OVERWORLD_TOP_Y = 320
+    private const val OTHER_TOP_Y = 256
     private const val STAGE_SCORE_WEIGHT = 0.2
     private const val BIOME_NAME_FALLBACK = "minecraft:plains"
     private const val COPY_SHARE = 0.9f
@@ -690,6 +693,9 @@ object LobbyCapture {
         } else if (!id.startsWith(VANILLA_NAMESPACE)) {
             return LobbySceneScore.Rejection.DIMENSION
         }
+        val bottom = if (realm == LobbyRealm.OVERWORLD) OVERWORLD_MIN_Y else 0
+        val top = if (realm == LobbyRealm.OVERWORLD) OVERWORLD_TOP_Y else OTHER_TOP_Y
+        if (feet.y < bottom || feet.y >= top) return LobbySceneScore.Rejection.HEIGHT
         //?} else {
         /*if (realm == LobbyRealm.OVERWORLD && level.dimension.id != 0) return LobbySceneScore.Rejection.DIMENSION
         *///?}

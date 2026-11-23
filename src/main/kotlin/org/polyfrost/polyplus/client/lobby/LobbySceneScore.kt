@@ -78,6 +78,7 @@ object LobbySceneScore {
         DARK("Too dark here. Add some lights."),
         LAVA("Too close to lava"),
         ROOF("You are above the Nether roof"),
+        HEIGHT("This spot is above or below normal world height"),
     }
 
     enum class Profile(val label: String, val key: String) {
@@ -165,6 +166,7 @@ object LobbySceneScore {
 
     private val REQUIREMENTS = listOf(
         Requirement("Normal sky", setOf(Rejection.DIMENSION)),
+        Requirement("Normal world height", setOf(Rejection.HEIGHT)),
         Requirement("Above ground", setOf(Rejection.UNDERGROUND)),
         Requirement("Open sky", setOf(Rejection.ENCLOSED, Rejection.CEILING)),
         Requirement("Room to stand", setOf(Rejection.SMALL, Rejection.NO_STAGE)),
@@ -177,6 +179,7 @@ object LobbySceneScore {
 
     private val INTERIOR_REQUIREMENTS = listOf(
         Requirement("Normal world", setOf(Rejection.DIMENSION)),
+        Requirement("Normal world height", setOf(Rejection.HEIGHT)),
         Requirement("Big enough room", setOf(Rejection.ROOM, Rejection.NO_STAGE)),
         Requirement("Room for the camera", setOf(Rejection.LOW_CEILING, Rejection.CAMERA)),
         Requirement("Bright enough", setOf(Rejection.DARK)),
@@ -186,6 +189,7 @@ object LobbySceneScore {
     )
 
     private val END_REQUIREMENTS = listOf(
+        Requirement("Normal world height", setOf(Rejection.HEIGHT)),
         Requirement("Above ground", setOf(Rejection.UNDERGROUND)),
         Requirement("Nothing overhead", setOf(Rejection.ENCLOSED, Rejection.CEILING)),
         Requirement("Room to stand", setOf(Rejection.SMALL, Rejection.NO_STAGE)),
