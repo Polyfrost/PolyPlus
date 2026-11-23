@@ -119,7 +119,7 @@ object LobbyEntities {
         try {
             for (index in ticking.indices) {
                 val entity = ticking[index]
-                if (entity.isRemoved || entity.isPassenger || level.tickRateManager().isEntityFrozen(entity)) continue
+                if (entity.isRemoved || entity.isPassenger || LobbyCats.owns(entity) || level.tickRateManager().isEntityFrozen(entity)) continue
                 //? if >= 26.1
                 if (!level.isTickingEntity(entity)) continue
                 try {
@@ -216,7 +216,7 @@ object LobbyEntities {
         *///?}
     }
 
-    private fun create(level: ClientLevel, data: CompoundTag): Entity? {
+    fun create(level: ClientLevel, data: CompoundTag): Entity? {
         //? if >= 1.21.10 {
         val input = TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), data)
         val type = EntityType.by(input).orElse(null) ?: return null
