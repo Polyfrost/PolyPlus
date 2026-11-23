@@ -5,6 +5,16 @@ All notable changes to PolyPlus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-11-23
+
+### Fixed
+- Fixed your nametag showing behind the avatar on the pause screen
+- Fixed cosmetics made of several parts splitting apart on the body
+- Fixed resource pack icons missing in the pack menu on 1.8.9
+- Fixed the disconnect button being labelled "Flashback"
+- Fixed the old panorama showing behind the disconnect screen after being kicked; it now shows the lobby
+- Fixed the lobby scene erroring and closing when starting a world from the lobby
+
 ## [2.3.1] - 2026-11-22
 
 ### Fixed
