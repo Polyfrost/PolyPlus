@@ -181,14 +181,26 @@ internal object AttachedCosmeticParser {
         val prepared = if (slot == BodySlot.Boots) splitStraddlingLegBones(geometry) else geometry
 
         val renderable = prepared.renderableBoneNames()
-        val rewritten = prepared.bones.mapValues { (name, bone) ->
-            if (name !in renderable || !isAttachmentRoot(prepared, bone)) {
-                return@mapValues bone
+        val roots = prepared.bones.values.filter { it.name in renderable && isAttachmentRoot(prepared, it) }
+        val targets = roots.associate { it.name to (anchor ?: attachTargetFor(prepared, slot, it)) }
+        val attach = HashMap<String, PlayerModelBone>()
+        for ((top, group) in roots.groupBy { topAncestor(prepared, it) }) {
+            val shared = group.mapTo(hashSetOf()) { targets[it.name] }.singleOrNull()
+            if (shared != null && shared.serializedName !in prepared.bones) {
+                attach[top] = shared
+            } else {
+                for (bone in group) targets[bone.name]?.let { attach[bone.name] = it }
             }
-            val target = anchor ?: attachTargetFor(prepared, slot, bone) ?: return@mapValues bone
-            bone.copy(parent = target.serializedName)
+        }
+        val rewritten = prepared.bones.mapValues { (name, bone) ->
+            attach[name]?.let { bone.copy(parent = it.serializedName) } ?: bone
         }
         return prepared.copy(bones = rewritten)
+    }
+
+    private fun topAncestor(geometry: BedrockGeometry, bone: BedrockBone): String {
+        var current = bone
+        while (true) current = geometry.bones[current.parent] ?: return current.name
     }
 
     private fun isAttachmentRoot(geometry: BedrockGeometry, bone: BedrockBone): Boolean {
