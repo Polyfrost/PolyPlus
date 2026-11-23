@@ -12,6 +12,7 @@ import org.polyfrost.polyplus.client.render.PolyPlayerModel as PlayerModel
 import org.polyfrost.polyplus.client.render.VertexConsumer
 import java.io.File
 import java.lang.ref.Cleaner
+import kotlin.math.sqrt
 
 //? if > 1.8.9 {
 import net.minecraft.client.model.geom.ModelPart
@@ -311,12 +312,12 @@ class CosmeticMesh internal constructor(
                 val nx = skin.normals[i * 3]
                 val ny = skin.normals[i * 3 + 1]
                 val nz = skin.normals[i * 3 + 2]
-                pose.transformNormal(
-                    frame[b] * nx + frame[b + 1] * ny + frame[b + 2] * nz,
-                    frame[b + 4] * nx + frame[b + 5] * ny + frame[b + 6] * nz,
-                    frame[b + 8] * nx + frame[b + 9] * ny + frame[b + 10] * nz,
-                    normal,
-                )
+                val tx = frame[b] * nx + frame[b + 1] * ny + frame[b + 2] * nz
+                val ty = frame[b + 4] * nx + frame[b + 5] * ny + frame[b + 6] * nz
+                val tz = frame[b + 8] * nx + frame[b + 9] * ny + frame[b + 10] * nz
+                val length = sqrt(tx * tx + ty * ty + tz * tz)
+                val scale = if (length > 0f) 1f / length else 0f
+                pose.transformNormal(tx * scale, ty * scale, tz * scale, normal)
                 val light = emissive(lightCoords, skin.glow[i].toInt())
                 buffer.addVertex(
                     position.x, position.y, position.z, color,
