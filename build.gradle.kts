@@ -359,12 +359,7 @@ dependencies {
     minecraft("com.mojang:minecraft:$mcVersion")
 
     if (isOrnithe) {
-        mappings(ploceus!!.layeredMappings {
-            mappings("net.ornithemc:feather-gen2:$mcVersion+build.${property("feather_build")}:v2") {
-                containsUnpick()
-            }
-            mappings(rootProject.file("mappings/feather-overrides.tiny"))
-        })
+        mappings(ploceus!!.featherMappings(property("feather_build") as String))
         testCompileOnly("net.ornithemc.osl-gen2:entrypoints:${property("deps.osl_entrypoints")}")
         modImplementation("net.ornithemc.osl-gen2:core:${property("deps.osl_core")}")
         modImplementation("net.ornithemc.osl-gen2:keybinds:${property("deps.osl_keybinds")}")
