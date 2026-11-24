@@ -26,9 +26,12 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 private val lookChangePending = AtomicBoolean(false)
 private val equipLock = Mutex()
+private val auraColorLock = Mutex()
+private val auraColorRequest = AtomicLong(0)
 
 internal var auraColorFailures by mutableIntStateOf(0)
     private set
@@ -184,15 +187,26 @@ internal fun deleteSkin(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
 }
 
 internal fun selectAuraColor(color: Int?, onStatus: (String) -> Unit) {
-    launchLibraryCall(
-        onStatus,
-        if (color != null) "Updating aura color..." else "Clearing aura color...",
-        { CosmeticService.setParticleColor(color) },
-        {
-            auraColorFailures++
-            wardrobeFailure(it, "update your aura color")
-        },
-    ) { if (color != null) "Aura color updated." else "Aura color cleared." }
+    val request = auraColorRequest.incrementAndGet()
+    onStatus(if (color != null) "Updating aura color..." else "Clearing aura color...")
+    PolyPlusClient.SCOPE.launch {
+        val result = auraColorLock.withLock {
+            if (auraColorRequest.get() != request) return@launch
+            CosmeticService.setParticleColor(color)
+        }
+        if (auraColorRequest.get() != request) return@launch
+        ClientPlatform.runOnMain {
+            onStatus(
+                result.fold(
+                    onSuccess = { if (color != null) "Aura color updated." else "Aura color cleared." },
+                    onFailure = {
+                        auraColorFailures++
+                        wardrobeFailure(it, "update your aura color")
+                    },
+                ),
+            )
+        }
+    }
 }
 
 internal fun addEmoteToWheel(item: CosmeticUiItem, targetSlot: Int?, onStatus: (String) -> Unit) {
@@ -213,6 +227,8 @@ internal fun addEmoteToWheel(item: CosmeticUiItem, targetSlot: Int?, onStatus: (
 }
 
 internal fun emoteKeybindWarning(): String? = when {
+    !EmoteWheelKeybind.isBound() && EmoteWheelKeybind.canBindController() ->
+        "The emote wheel has no keyboard keybind. Unless it's bound in Controlify, it can't be opened in game."
     !EmoteWheelKeybind.isBound() -> "The emote wheel has no keybind yet, so it can't be opened in game."
     else -> EmoteWheelKeybind.conflictingKeybindNames().takeIf { it.isNotEmpty() }
         ?.let { "The emote wheel keybind is also used by ${it.joinToString()}." }

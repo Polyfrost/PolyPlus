@@ -17,18 +17,37 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.PopupPositionProvider
+import org.polyfrost.oneconfig.api.ui.v1.components.ScrollContainer
+import org.polyfrost.compose.host.controller.ControllerButton
+import org.polyfrost.compose.host.controller.Controllers
+import org.polyfrost.compose.host.controller.controllerAction
+import org.polyfrost.compose.host.controller.focusWhenShown
+import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -56,6 +75,7 @@ import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbysocial.InvitePicker
 import org.polyfrost.polyplus.client.gui.lobbysocial.MemberPopoverContent
+import org.polyfrost.polyplus.client.gui.lobbysocial.PartyCardText
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyCell
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyIcons
 import org.polyfrost.polyplus.client.gui.lobbysocial.PartyInviteCard
@@ -83,6 +103,8 @@ private val TagInviteSize = 22.dp
 private val SeatHeight = 60.dp
 private val PartyPopupGap = 14.dp
 private const val MAX_INVITE_CARDS = 3
+private val CardStackMargin = 24.dp
+private val CardStackMinHeight = 96.dp
 
 private const val LEAVE_VOICE = SOCIAL_ASSETS + "log-out-04.svg"
 private const val WARNING = "alert-circle"
@@ -334,8 +356,6 @@ private fun PartyPopupButton(icon: String, contentDescription: String, tint: Col
     )
 }
 
-private enum class FirstCard { Request, Hosted, Rejoin, LeaderMoved, Invite }
-
 @Composable
 internal fun PartyInviteCards(host: SocialHost) {
     val invites by PartyRepository.incomingInvites.collectAsState()
@@ -345,24 +365,52 @@ internal fun PartyInviteCards(host: SocialHost) {
     if (invites.isEmpty() && LeaderFollow.card == null && rejoin == null && hosted == null && requests.isEmpty()) return
     val shownRequests = requests.takeLast(MAX_INVITE_CARDS)
     val shownInvites = invites.takeLast(MAX_INVITE_CARDS)
-    val first = when {
-        shownRequests.isNotEmpty() -> FirstCard.Request
-        hosted != null -> FirstCard.Hosted
-        rejoin != null -> FirstCard.Rejoin
-        LeaderFollow.card != null -> FirstCard.LeaderMoved
-        else -> FirstCard.Invite
-    }
-    Popup(popupPositionProvider = rememberAbove(alignEnd = true), properties = PopupProperties(focusable = false)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            shownRequests.forEachIndexed { index, request ->
-                key(request.id) { HostJoinRequestCard(request, shortcut = first == FirstCard.Request && index == 0) }
-            }
-            hosted?.let { LeaderHostingCard(it, shortcut = first == FirstCard.Hosted) }
-            rejoin?.let { RejoinWorldCard(it, shortcut = first == FirstCard.Rejoin) }
-            LeaderMovedCard(host, shortcut = first == FirstCard.LeaderMoved)
-            shownInvites.forEachIndexed { index, invite ->
-                key(invite.id) { PartyInviteCard(invite, shortcut = first == FirstCard.Invite && index == 0) }
+    var responding by remember { mutableStateOf(false) }
+    var inside by remember { mutableStateOf(false) }
+    val controller = Controllers.isActive
+    LaunchedEffect(controller) { if (!controller) responding = false }
+    if (responding) EscapeCloses { responding = false }
+    var space by remember { mutableStateOf<Int?>(null) }
+    val above = rememberAbove(alignEnd = true)
+    val position = remember(above) { SpaceTrackingPosition(above) { space = it } }
+    val density = LocalDensity.current
+    val maxHeight = space?.let { with(density) { (it.toDp() - CardStackMargin).coerceAtLeast(CardStackMinHeight) } }
+    Popup(
+        popupPositionProvider = position,
+        onDismissRequest = { responding = false },
+        properties = PopupProperties(focusable = responding),
+    ) {
+        val focus = LocalFocusManager.current
+        LaunchedEffect(responding) { if (!responding) focus.clearFocus(force = true) }
+        ScrollContainer(
+            modifier = if (maxHeight != null) Modifier.heightIn(max = maxHeight) else Modifier,
+            scrollbar = false,
+            fadingEdges = true,
+        ) {
+            Column(
+                Modifier
+                    .controllerAction(ControllerButton.Y, PartyCardText.RESPOND, enabled = !responding, requireFocus = false) { responding = true }
+                    .onFocusChanged { inside = it.hasFocus }
+                    .focusWhenShown(responding && !inside),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                shownRequests.forEach { request ->
+                    key(request.id) { HostJoinRequestCard(request) }
+                }
+                hosted?.let { LeaderHostingCard(it) }
+                rejoin?.let { RejoinWorldCard(it) }
+                LeaderMovedCard(host)
+                shownInvites.forEach { invite ->
+                    key(invite.id) { PartyInviteCard(invite) }
+                }
             }
         }
+    }
+}
+
+private class SpaceTrackingPosition(private val base: PopupPositionProvider, private val onSpace: (Int) -> Unit) : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+        onSpace(maxOf(anchorBounds.top, windowSize.height - anchorBounds.bottom))
+        return base.calculatePosition(anchorBounds, windowSize, layoutDirection, popupContentSize)
     }
 }

@@ -28,8 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.polyfrost.compose.host.controller.ControllerButton
-import org.polyfrost.compose.host.controller.controllerAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
@@ -498,6 +496,7 @@ internal object PartyCardText {
     const val ALLOW = "Allow"
     const val DENY = "Deny"
     const val WANTS_TO_JOIN = "Wants to join your world"
+    const val RESPOND = "Respond"
 
     fun needs(version: String?): String = version?.let { "Needs Minecraft $it" } ?: "Needs another Minecraft version"
 
@@ -520,10 +519,8 @@ internal fun PartyCard(
     acceptEnabled: Boolean = true,
     dismissEnabled: Boolean = true,
     warning: String? = null,
-    shortcut: Boolean = false,
 ) {
     val frame = modifier
-        .controllerAction(ControllerButton.Y, acceptLabel, enabled = shortcut && acceptEnabled, requireFocus = false, onPress = onAccept)
         .width(PartyCardWidth)
         .popup()
         .padding(12.dp)
@@ -553,7 +550,7 @@ internal fun PartyCard(
 }
 
 @Composable
-internal fun PartyInviteCard(invite: PartyInvite, modifier: Modifier = Modifier, shortcut: Boolean = false) {
+internal fun PartyInviteCard(invite: PartyInvite, modifier: Modifier = Modifier) {
     val names by PlayerNamesRepository.names.collectAsState()
     PartyCard(
         invite.sender,
@@ -564,7 +561,6 @@ internal fun PartyInviteCard(invite: PartyInvite, modifier: Modifier = Modifier,
         PartyCardText.JOIN_PARTY,
         { PartyRepository.accept(invite) },
         modifier,
-        shortcut = shortcut,
     )
 }
 

@@ -20,6 +20,7 @@
   "polyplus.controller.openSocials": "Open Socials",
   "polyplus.controller.openWardrobe": "Open Wardrobe",
   "polyplus.controller.emoteWheel": "Emote Wheel",
+  "polyplus.controller.emoteWheelNext": "Next Emote Wheel",
   "polyplus.controller.ping": "Ping",
   "polyplus.controller.pushToTalk": "Push to Talk",
   "polyplus.controller.toggleMute": "Toggle Mute",

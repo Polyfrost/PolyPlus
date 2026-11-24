@@ -91,11 +91,15 @@ object WheelOverlay {
         session = next
         shown = next
         stickUsed = false
-        if (Controllers.isActive) look = Controllers.captureLook()
+        look = Controllers.captureGameplay()
         return true
     }
 
     fun cancel() = finish(false)
+
+    fun page(step: Int) {
+        session?.onScroll?.invoke(step)
+    }
 
     @JvmStatic
     fun consumeLook(dx: Double, dy: Double): Boolean {
@@ -175,16 +179,19 @@ object WheelOverlay {
             cancel()
             return
         }
-        if (look != null) steerWithStick(current)
+        if (Controllers.isActive) steerWithStick(current) else stickUsed = false
         if (!current.held()) finish(true)
     }
 
     private fun steerWithStick(current: WheelSession) {
         val stick = Controllers.rightStick
-        val deflected = stick.getDistance() >= STICK_DEAD
-        if (deflected) stickUsed = true
-        if (!stickUsed) return
-        if (deflected) current.state.aimAt(stick.x * STICK_REACH, stick.y * STICK_REACH) else current.state.aimAt(0f, 0f)
+        if (stick.getDistance() >= STICK_DEAD) {
+            stickUsed = true
+            current.state.aimAt(stick.x * STICK_REACH, stick.y * STICK_REACH)
+        } else if (stickUsed) {
+            stickUsed = false
+            current.state.aimAt(0f, 0f)
+        }
     }
 
     private fun finish(pick: Boolean) {

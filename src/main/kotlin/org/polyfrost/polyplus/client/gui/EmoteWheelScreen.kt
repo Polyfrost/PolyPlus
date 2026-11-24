@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.PageDots
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuItem
@@ -59,6 +60,7 @@ private fun EmoteWheelContent(session: WheelSession) {
     val title = if (empty) "No emotes yet" else "Emotes"
     val subtitle = when {
         empty -> null
+        wheelCount > 1 && Controllers.isActive -> "Wheel ${wheelIndex + 1} of $wheelCount"
         wheelCount > 1 -> "Wheel ${wheelIndex + 1} of $wheelCount · Scroll for more"
         else -> null
     }

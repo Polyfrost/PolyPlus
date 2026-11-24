@@ -43,6 +43,7 @@ object PartyVoice {
     @Volatile private var deafened = false
     @Volatile private var micBlocked = false
     @Volatile private var pttHeld = false
+    @Volatile private var controllerPttHeld = false
     @Volatile private var rtcFailedAt = 0L
     @Volatile private var rtcSessionFailed = false
     @Volatile private var linuxRtcChecked = false
@@ -162,6 +163,10 @@ object PartyVoice {
         pttHeld = state
     }
 
+    fun onControllerPushToTalk(state: Boolean) {
+        controllerPttHeld = state
+    }
+
     fun onSettingsChanged(restartAudio: Boolean = false) {
         RtcVoice.setInputGain(PartyVoiceSettings.inputGain())
         if (active == VoiceTransport.P2p) P2PSessionManager.setVoiceRelay(PolyPlusConfig.voiceHideIp)
@@ -272,7 +277,7 @@ object PartyVoice {
             }
         }
         if (level >= PartyVoiceSettings.activityThreshold()) lastLoud = now
-        val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld else now - lastLoud < VAD_HANGOVER_MS
+        val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld || controllerPttHeld else now - lastLoud < VAD_HANGOVER_MS
         val allowed = inVoice && !muted && !deafened && !micBlocked && !selfHardMuted
         val talk = allowed && gate
         talking = talk

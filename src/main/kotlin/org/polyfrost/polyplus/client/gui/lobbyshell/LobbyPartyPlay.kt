@@ -73,7 +73,7 @@ internal fun PlayTogetherHooks(host: SocialHost) {
 }
 
 @Composable
-internal fun LeaderMovedCard(host: SocialHost, shortcut: Boolean = false) {
+internal fun LeaderMovedCard(host: SocialHost) {
     val card = LeaderFollow.card ?: return
     val incompatible = card.check == ServerCheck.Result.INCOMPATIBLE
     LeaderJoinEffect(host)
@@ -88,7 +88,6 @@ internal fun LeaderMovedCard(host: SocialHost, shortcut: Boolean = false) {
         captionFirst = true,
         acceptEnabled = !incompatible && !card.checking && !card.cleared,
         warning = if (incompatible) PartyCardText.needs(card.needs) else null,
-        shortcut = shortcut,
     )
 }
 
@@ -100,7 +99,7 @@ internal fun leaderHostedWorld(): LeaderFollow.Hosted? {
 }
 
 @Composable
-internal fun LeaderHostingCard(hosted: LeaderFollow.Hosted, shortcut: Boolean = false) {
+internal fun LeaderHostingCard(hosted: LeaderFollow.Hosted) {
     val names by PlayerNamesRepository.names.collectAsState()
     val name = names[hosted.leader] ?: hosted.name
     PartyCard(
@@ -113,12 +112,11 @@ internal fun LeaderHostingCard(hosted: LeaderFollow.Hosted, shortcut: Boolean = 
         LeaderFollow::joinHosted,
         captionFirst = true,
         acceptEnabled = !hosted.busy,
-        shortcut = shortcut,
     )
 }
 
 @Composable
-internal fun HostJoinRequestCard(request: HostJoinRequests.Request, shortcut: Boolean = false) {
+internal fun HostJoinRequestCard(request: HostJoinRequests.Request) {
     val names by PlayerNamesRepository.names.collectAsState()
     PartyCard(
         request.player,
@@ -130,7 +128,6 @@ internal fun HostJoinRequestCard(request: HostJoinRequests.Request, shortcut: Bo
         { HostJoinRequests.allow(request.id) },
         acceptEnabled = !request.answering,
         dismissEnabled = !request.answering,
-        shortcut = shortcut,
     )
 }
 
@@ -142,7 +139,7 @@ internal fun rejoinableWorld(): SessionInvite? {
 }
 
 @Composable
-internal fun RejoinWorldCard(invite: SessionInvite, shortcut: Boolean = false) {
+internal fun RejoinWorldCard(invite: SessionInvite) {
     PartyCard(
         invite.sender,
         PartyCardText.world(PlayerNamesRepository.nameOr(invite.sender)),
@@ -151,7 +148,6 @@ internal fun RejoinWorldCard(invite: SessionInvite, shortcut: Boolean = false) {
         P2PSessionManager::forgetRejoin,
         "Rejoin",
         P2PSessionManager::rejoin,
-        shortcut = shortcut,
     )
 }
 

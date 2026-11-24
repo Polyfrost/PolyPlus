@@ -38,8 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import org.polyfrost.compose.host.controller.ControllerButton
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.compose.host.controller.controllerAction
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -292,6 +295,24 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
     val theme = OneConfigTheme.current
     val hover = rememberHoverState()
     var confirmRemove by remember { mutableStateOf(false) }
+    var confirmByController by remember { mutableStateOf(false) }
+    var refocusRow by remember { mutableIntStateOf(0) }
+    val rowFocus = remember { FocusRequester() }
+    val keepFocus = remember { FocusRequester() }
+    fun closeConfirm() {
+        confirmRemove = false
+        if (confirmByController) {
+            confirmByController = false
+            refocusRow++
+        }
+    }
+    LaunchedEffect(confirmRemove, confirmByController) {
+        if (confirmRemove && confirmByController) runCatching { keepFocus.requestFocus() }
+    }
+    LaunchedEffect(refocusRow) {
+        if (refocusRow > 0) runCatching { rowFocus.requestFocus() }
+    }
+    if (confirmRemove && confirmByController) EscapeCloses { closeConfirm() }
     var focused by remember { mutableStateOf(false) }
     val revealed = hover.hovered || focused
     val busy = actions.refreshingId == account.id || state.pendingId == account.id
@@ -311,7 +332,11 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
             .height(CustomizeKit.RowHeight)
             .graphicsLayer { alpha = if (idle || busy) 1f else theme.disabledAlpha }
             .onFocusChanged { focused = it.hasFocus }
-            .controllerAction(ControllerButton.X, "Remove", enabled = idle && !busy && !confirmRemove) { confirmRemove = true }
+            .focusRequester(rowFocus)
+            .controllerAction(ControllerButton.X, "Remove", enabled = idle && !busy && !confirmRemove) {
+                confirmByController = true
+                confirmRemove = true
+            }
             .controllerAction(ControllerButton.Y, "Refresh", enabled = idle && !busy && !confirmRemove && account.refreshable) { state.refresh(account) }
             .then(if (account.active) Modifier.focusableOnController() else Modifier)
             .hoverable(hover.interactionSource)
@@ -350,10 +375,10 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
             busy -> Spinner(OneConfigTheme.accent)
             confirmRemove -> {
                 RowIcon("check", "Remove ${account.username}", SocialDangerText, idle) {
-                    confirmRemove = false
+                    closeConfirm()
                     state.remove(account)
                 }
-                RowIcon("x-close", "Keep ${account.username}", theme.textColorSecondary, true) { confirmRemove = false }
+                RowIcon("x-close", "Keep ${account.username}", theme.textColorSecondary, true, Modifier.focusRequester(keepFocus)) { closeConfirm() }
             }
             else -> {
                 if (account.expired && account.refreshable) {
@@ -362,7 +387,10 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
                     RowIcon("refresh-cw-01", "Refresh ${account.username}", theme.textColorSecondary, idle) { state.refresh(account) }
                 }
                 if (revealed) {
-                    RowIcon("trash-01", "Remove ${account.username}", theme.textColorSecondary, idle) { confirmRemove = true }
+                    RowIcon("trash-01", "Remove ${account.username}", theme.textColorSecondary, idle) {
+                        if (Controllers.isDispatching) confirmByController = true
+                        confirmRemove = true
+                    }
                 } else if (account.active) {
                     LobbyIcon("check", OneConfigTheme.accent, 18.dp)
                 }
@@ -615,11 +643,12 @@ private fun Spinner(color: Color, size: Dp = 16.dp) {
 }
 
 @Composable
-private fun RowIcon(icon: String, label: String, tint: Color, enabled: Boolean, onClick: () -> Unit) {
+private fun RowIcon(icon: String, label: String, tint: Color, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     IconButton(
         icon = "$ASSETS$icon.svg",
         contentDescription = label,
         onClick = onClick,
+        modifier = modifier,
         enabled = enabled,
         tooltip = null,
         tint = tint,
