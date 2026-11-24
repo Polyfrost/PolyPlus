@@ -40,6 +40,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
@@ -53,6 +58,8 @@ import androidx.compose.ui.window.PopupProperties
 import java.awt.Color as AwtColor
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import org.polyfrost.compose.host.controller.ControllerAxes
+import org.polyfrost.compose.host.controller.controllerArrows
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.Placement
@@ -61,6 +68,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.focusableOnController
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 
 @Composable
@@ -175,6 +183,37 @@ private fun Color.toArgb(alpha: Float): Int =
         ((green.coerceIn(0f, 1f) * 255f).roundToInt() shl 8) or
         (blue.coerceIn(0f, 1f) * 255f).roundToInt()
 
+private const val PAD_STEP = 0.05f
+private const val HUE_STEP = 10f
+
+private fun Modifier.arrowAdjust(
+    state: AuraPickerState,
+    vertical: Boolean,
+    onDone: () -> Unit,
+    onStep: (dx: Float, dy: Float) -> Boolean,
+): Modifier =
+    onKeyEvent { event ->
+        val dx = when (event.key) {
+            Key.DirectionLeft -> -1f
+            Key.DirectionRight -> 1f
+            else -> 0f
+        }
+        val dy = when (event.key) {
+            Key.DirectionUp -> if (vertical) -1f else 0f
+            Key.DirectionDown -> if (vertical) 1f else 0f
+            else -> 0f
+        }
+        if (dx == 0f && dy == 0f) return@onKeyEvent false
+        when (event.type) {
+            KeyEventType.KeyDown -> onStep(dx, dy).also { if (it) state.adjusting = true }
+            KeyEventType.KeyUp -> state.adjusting.also {
+                if (it) onDone()
+                state.adjusting = false
+            }
+            else -> false
+        }
+    }.controllerArrows(if (vertical) ControllerAxes.Both else ControllerAxes.Horizontal).focusableOnController()
+
 private class AuraPickerState(argb: Int) {
     var hue by mutableFloatStateOf(0f)
     var saturation by mutableFloatStateOf(0f)
@@ -182,6 +221,8 @@ private class AuraPickerState(argb: Int) {
     var alpha by mutableFloatStateOf(1f)
 
     var lastEmitted: Int? = null
+
+    var adjusting = false
 
     init {
         applyFrom(argb)
@@ -300,6 +341,15 @@ private fun AuraCustomPopover(
             modifier = Modifier.fillMaxWidth().height(120.dp)
                 .clip(barShape)
                 .onSizeChanged { paneSize = Size(it.width.toFloat(), it.height.toFloat()) }
+                .arrowAdjust(state, vertical = true, ::emitCommit) { dx, dy ->
+                    val nextSaturation = (state.saturation + dx * PAD_STEP).coerceIn(0f, 1f)
+                    val nextBrightness = (state.brightness - dy * PAD_STEP).coerceIn(0f, 1f)
+                    val changed = nextSaturation != state.saturation || nextBrightness != state.brightness
+                    state.saturation = nextSaturation
+                    state.brightness = nextBrightness
+                    if (changed) emitPreview()
+                    changed
+                }
                 .drawWithCache {
                     val hueColor = hsbToColor(hue, 1f, 1f)
                     val horizontal = Brush.horizontalGradient(listOf(Color.White, hueColor))
@@ -352,6 +402,13 @@ private fun AuraCustomPopover(
                     )
                     onDrawBehind { drawRect(gradient) }
                 }
+                .arrowAdjust(state, vertical = false, ::emitCommit) { dx, _ ->
+                    val next = (state.hue + dx * HUE_STEP).coerceIn(0f, 360f)
+                    val changed = next != state.hue
+                    state.hue = next
+                    if (changed) emitPreview()
+                    changed
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -388,6 +445,13 @@ private fun AuraCustomPopover(
         Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
                 .clip(barShape)
+                .arrowAdjust(state, vertical = false, ::emitCommit) { dx, _ ->
+                    val next = (state.alpha + dx * PAD_STEP).coerceIn(0f, 1f)
+                    val changed = next != state.alpha
+                    state.alpha = next
+                    if (changed) emitPreview()
+                    changed
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()

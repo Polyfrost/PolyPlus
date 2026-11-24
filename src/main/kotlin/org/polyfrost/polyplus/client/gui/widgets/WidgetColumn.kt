@@ -57,6 +57,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.ToggleControl
 import org.polyfrost.oneconfig.api.ui.v1.components.ToggleRow
 import org.polyfrost.oneconfig.api.ui.v1.components.UiSound
 import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
+import org.polyfrost.polyplus.client.gui.focusableOnController
 import org.polyfrost.oneconfig.api.ui.v1.components.playUiSound
 import org.polyfrost.oneconfig.api.ui.v1.components.withItemMoved
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
@@ -347,7 +348,8 @@ fun WidgetColumn(
                         .lift(list, widget.id, FRAME_RADIUS)
                         .shellWidgetGuard(widget.id)
                         .dragSource(list, widget.id)
-                        .contextMenu(entries = { widgetMenu(surface, widget.id, list.shown.filter { it in byId }, scope) }),
+                        .contextMenu(entries = { widgetMenu(surface, widget.id, list.shown.filter { it in byId }, scope) })
+                        .focusableOnController(),
                 ) {
                     ShellWidgetGuarded(widget.id) { widget.Content(scope) }
                 }

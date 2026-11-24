@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.multiplayer.ServerData
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
@@ -212,7 +213,7 @@ internal class SocialWindowState(val screen: Screen, openWorld: Boolean) {
 
     fun enter(): Boolean {
         val covered = SocialEscape.popupOpen || SocialPageState.dialogOpen || TextInputFocus.isTyping
-        if (covered || SocialChatLink.active == null) return false
+        if (covered || Controllers.isDispatching || SocialChatLink.active == null) return false
         return runCatching { composer.requestFocus() }.isSuccess
     }
 }

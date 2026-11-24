@@ -38,6 +38,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import org.polyfrost.compose.host.controller.ControllerButton
+import org.polyfrost.compose.host.controller.controllerAction
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -289,6 +292,8 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
     val theme = OneConfigTheme.current
     val hover = rememberHoverState()
     var confirmRemove by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    val revealed = hover.hovered || focused
     val busy = actions.refreshingId == account.id || state.pendingId == account.id
     val idle = actions.idle
     val shape = OneConfigTheme.shape(CustomizeKit.RowRadius)
@@ -305,6 +310,10 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
             .fillMaxWidth()
             .height(CustomizeKit.RowHeight)
             .graphicsLayer { alpha = if (idle || busy) 1f else theme.disabledAlpha }
+            .onFocusChanged { focused = it.hasFocus }
+            .controllerAction(ControllerButton.X, "Remove", enabled = idle && !busy && !confirmRemove) { confirmRemove = true }
+            .controllerAction(ControllerButton.Y, "Refresh", enabled = idle && !busy && !confirmRemove && account.refreshable) { state.refresh(account) }
+            .then(if (account.active) Modifier.focusableOnController() else Modifier)
             .hoverable(hover.interactionSource)
             .selectableRow(
                 false,
@@ -349,10 +358,10 @@ private fun AccountRow(state: AccountsPanelState, account: OneLauncherAccounts.A
             else -> {
                 if (account.expired && account.refreshable) {
                     TextButton(text = "Sign in again", onClick = { state.refresh(account) }, size = ControlSize.Compact, enabled = idle)
-                } else if (hover.hovered && account.refreshable) {
+                } else if (revealed && account.refreshable) {
                     RowIcon("refresh-cw-01", "Refresh ${account.username}", theme.textColorSecondary, idle) { state.refresh(account) }
                 }
-                if (hover.hovered) {
+                if (revealed) {
                     RowIcon("trash-01", "Remove ${account.username}", theme.textColorSecondary, idle) { confirmRemove = true }
                 } else if (account.active) {
                     LobbyIcon("check", OneConfigTheme.accent, 18.dp)

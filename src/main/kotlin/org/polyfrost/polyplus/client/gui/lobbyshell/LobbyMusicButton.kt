@@ -20,6 +20,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import org.polyfrost.compose.host.controller.ControllerButton
+import org.polyfrost.compose.host.controller.controllerAction
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -109,6 +111,7 @@ internal fun LobbyMusicButton(lobby: LobbyShell, first: Boolean, last: Boolean) 
     Box(
         Modifier
             .hoverable(tileHover.interactionSource)
+            .controllerAction(ControllerButton.X, "Sound settings") { settings() }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {

@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.polyfrost.compose.host.controller.focusWhenShown
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.BadgeTone
@@ -164,7 +165,7 @@ private fun ClassicGrid(screen: OneClientPauseScreen, layout: ClassicLayout) {
     Column(Modifier.fillMaxWidth().blockPointer(), verticalArrangement = Arrangement.spacedBy(CLASSIC_GAP)) {
         ClassicButton(
             capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game",
-            Modifier.fillMaxWidth().onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() },
+            Modifier.fillMaxWidth().focusWhenShown(true).onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() },
             accent = true,
             onClick = screen::resume,
         )

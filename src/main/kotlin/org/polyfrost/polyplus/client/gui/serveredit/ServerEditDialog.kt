@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -49,6 +48,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
 import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.resources.language.I18n
+import org.polyfrost.compose.host.controller.isFromController
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
@@ -65,6 +65,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.controllerFocusOnly
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 import org.polyfrost.polyplus.client.gui.SocialTextPrimary
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
@@ -223,7 +224,7 @@ private class DialogBodyPolicy(private val minHeight: Dp) : MultiContentMeasureP
 }
 
 private fun dialogKey(event: KeyEvent, save: () -> Unit): Boolean {
-    if (event.type != KeyEventType.KeyDown) return false
+    if (event.type != KeyEventType.KeyDown || event.isFromController) return false
     return when (event.key) {
         Key.Enter, Key.NumPadEnter -> {
             save()
@@ -244,7 +245,7 @@ private fun DialogHeader(title: String, onDismiss: () -> Unit) {
                 icon = LobbyIcons.CLOSE,
                 contentDescription = "Close",
                 onClick = onDismiss,
-                modifier = Modifier.focusProperties { canFocus = false },
+                modifier = Modifier.controllerFocusOnly(),
                 tooltip = null,
                 tooltipPlacement = TooltipPlacement.BelowStart,
                 tint = SocialTextPrimary,
@@ -314,7 +315,7 @@ private fun FolderField(form: ServerEditForm) {
                     AnchoredPopupButton(
                         icon = "down",
                         contentDescription = "Pick a folder",
-                        modifier = Modifier.focusProperties { canFocus = false },
+                        modifier = Modifier.controllerFocusOnly(),
                         placement = Placement.BelowEnd,
                     ) { close ->
                         MenuList(form.folderNames.map { name -> MenuAction(name, { form.folder = name }, checked = name.equals(form.folder.trim(), ignoreCase = true)) }, close)
@@ -333,7 +334,7 @@ private fun CaptureRow(form: ServerEditForm) {
         label = "Capture scenes here",
         checked = on,
         onCheckedChange = { form.captureDraft = it },
-        modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false },
+        modifier = Modifier.fillMaxWidth().controllerFocusOnly(),
         description = when {
             blocked -> "Blocked by this server"
             on -> "Saves good spots while you play here"
@@ -369,7 +370,7 @@ private fun RowScope.DialogFooter(
     onDismiss: () -> Unit,
     save: () -> Unit,
 ) {
-    val unfocusable = Modifier.focusProperties { canFocus = false }
+    val unfocusable = Modifier.controllerFocusOnly()
     if (canDelete) TextButton(text = "Delete", icon = LobbyIcons.TRASH, onClick = { form.confirmingDelete = true }, modifier = unfocusable, style = ControlStyle.Danger, size = ControlSize.Large, dangerColor = KitDangerColor)
     Spacer(Modifier.weight(1f))
     TextButton(text = "Cancel", onClick = onDismiss, modifier = unfocusable.widthIn(min = ButtonWidth), style = ControlStyle.Secondary, size = ControlSize.Large)

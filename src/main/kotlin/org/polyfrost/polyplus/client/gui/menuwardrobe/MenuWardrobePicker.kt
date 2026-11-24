@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.polyfrost.compose.host.controller.isFromController
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
@@ -195,6 +197,7 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
     var query by remember(model.type) { mutableStateOf("") }
     var filter by remember(model.type) { mutableStateOf(PickerFilter.All) }
     var cursor by remember(model.type) { mutableStateOf(model.selected?.key) }
+    var gridFocused by remember { mutableStateOf(false) }
     val grid = remember(model.type) { LazyGridState() }
     val focus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -204,21 +207,27 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
     LaunchedEffect(model.selected?.key) { model.selected?.key?.let { cursor = it } }
     LaunchedEffect(model.type) { runCatching { focus.requestFocus() } }
 
-    fun move(delta: Int) {
+    fun move(delta: Int): Boolean {
         val list = current.entries.filter { it.matches(filter, query) }
-        if (list.isEmpty()) return
+        if (list.isEmpty()) return false
         val from = list.indexOfFirst { it.key == (cursor ?: current.selected?.key ?: current.target?.key) }
         val next = if (from < 0) 0 else (from + delta).coerceIn(0, list.lastIndex)
+        if (next == from) return false
         val entry = list[next]
         cursor = entry.key
         if (!current.picksToWheel) current.onPick(entry)
         scope.revealItem(grid, next)
+        return true
     }
 
     fun confirm(): Boolean {
         val model = current
+        val entry = model.entries.firstOrNull { it.key == cursor }
         if (model.picksToWheel) {
-            val entry = model.entries.firstOrNull { it.key == cursor } ?: return false
+            model.onPick(entry ?: return false)
+            return true
+        }
+        if (entry != null && entry.key != model.selected?.key) {
             model.onPick(entry)
             return true
         }
@@ -230,11 +239,12 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
 
     fun onKey(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
+        val arrows = !event.isFromController || gridFocused
         return when (event.key) {
-            Key.DirectionLeft -> { move(-1); true }
-            Key.DirectionRight -> { move(1); true }
-            Key.DirectionUp -> { move(-GRID_COLUMNS); true }
-            Key.DirectionDown -> { move(GRID_COLUMNS); true }
+            Key.DirectionLeft -> arrows && move(-1)
+            Key.DirectionRight -> arrows && move(1)
+            Key.DirectionUp -> arrows && move(-GRID_COLUMNS)
+            Key.DirectionDown -> arrows && move(GRID_COLUMNS)
             Key.Enter, Key.NumPadEnter -> confirm()
             else -> false
         }
@@ -265,12 +275,13 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
                     .padding(top = CustomizeKit.SectionGap)
                     .focusRequester(focus)
                     .onPreviewKeyEvent(::onKey)
+                    .onFocusChanged { gridFocused = it.isFocused }
                     .focusable(),
             ) {
                 if (shown.isEmpty() && model.onMarketplace == null) {
                     NoMatches(Modifier.fillMaxSize())
                 } else {
-                    PickerGrid(model, shown, grid, cursor) { entry ->
+                    PickerGrid(model, shown, grid, cursor, onTileFocus = { cursor = it.key }) { entry ->
                         cursor = entry.key
                         runCatching { focus.requestFocus() }
                     }
@@ -296,7 +307,14 @@ private fun CoroutineScope.revealItem(grid: LazyGridState, index: Int) {
 }
 
 @Composable
-private fun PickerGrid(model: PickerModel, shown: List<PickerEntry>, grid: LazyGridState, cursor: String?, onTileClick: (PickerEntry) -> Unit) {
+private fun PickerGrid(
+    model: PickerModel,
+    shown: List<PickerEntry>,
+    grid: LazyGridState,
+    cursor: String?,
+    onTileFocus: (PickerEntry) -> Unit,
+    onTileClick: (PickerEntry) -> Unit,
+) {
     val current by rememberUpdatedState(model)
     var lastClickKey by remember { mutableStateOf<String?>(null) }
     var lastClickAt by remember { mutableLongStateOf(0L) }
@@ -334,6 +352,7 @@ private fun PickerGrid(model: PickerModel, shown: List<PickerEntry>, grid: LazyG
                     entry = entry,
                     model = model,
                     selected = entry.key == model.selected?.key || (model.picksToWheel && entry.key == cursor),
+                    onFocus = { onTileFocus(entry) },
                     onClick = { click(entry) },
                 )
             }
@@ -343,7 +362,7 @@ private fun PickerGrid(model: PickerModel, shown: List<PickerEntry>, grid: LazyG
 }
 
 @Composable
-private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean, onClick: () -> Unit) {
+private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean, onFocus: () -> Unit, onClick: () -> Unit) {
     val hover = rememberHoverState()
     TryOnWhileHovered(entry, hover.hovered, model.onHover)
     val theme = OneConfigTheme.current
@@ -353,6 +372,7 @@ private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean
             .fillMaxWidth()
             .then(if (entry.equipped && !selected) Modifier.border(1.5.dp, OneConfigTheme.accent, shape) else Modifier)
             .hoverable(hover.interactionSource)
+            .onFocusChanged { if (it.isFocused) onFocus() }
             .selectableRow(selected, onClick, entry.name, shape, style = ItemSelectionStyle.Accent, interactionSource = hover.interactionSource)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

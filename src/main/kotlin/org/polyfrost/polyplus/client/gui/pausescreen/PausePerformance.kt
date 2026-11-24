@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import org.polyfrost.compose.host.controller.Controllers
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -213,10 +215,11 @@ private fun PerfTool(closeHost: () -> Unit, trigger: @Composable (view: PerfView
     val interaction = hoverState.interactionSource
     val hovered = hoverState.hovered
     var menu by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
     val anchor = rememberWidgetAnchor()
-    Box(Modifier.fillMaxWidth().hoverable(interaction)) {
+    Box(Modifier.fillMaxWidth().hoverable(interaction).onFocusChanged { focused = it.hasFocus }) {
         trigger(current, { menu = !menu }, menu)
-        if (hovered && !menu) {
+        if ((hovered || focused && Controllers.isActive) && !menu) {
             Popup(popupPositionProvider = anchor, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
                 PerfPanel(current)
             }

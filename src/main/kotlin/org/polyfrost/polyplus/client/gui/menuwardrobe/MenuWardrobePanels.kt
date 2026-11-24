@@ -137,7 +137,8 @@ internal fun EquippedRail(
             current < 0 -> if (delta > 0) 0 else slots.lastIndex
             else -> (current + delta).coerceIn(0, slots.lastIndex)
         }
-        if (next != current) onSelect(slots[next].type)
+        if (next == current) return false
+        onSelect(slots[next].type)
         scope.launch {
             withFrameNanos {}
             withFrameNanos {}

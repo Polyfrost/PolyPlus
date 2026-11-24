@@ -80,6 +80,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import org.polyfrost.compose.backend.drawPoly
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.compose.render.FilterQuality
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.compose.render.PolyColor
@@ -2391,7 +2392,7 @@ internal object OnboardingKeyCapture {
     fun capture(key: Int): Boolean {
         val capture = pending ?: return false
         capture(
-            if (key == InputConstants.KEY_ESCAPE) {
+            if (key == InputConstants.KEY_ESCAPE || Controllers.isDispatching) {
                 null
             } else {
                 //? if >= 26.3 || = 1.8.9 {
@@ -2436,7 +2437,7 @@ internal object OnboardingKeys {
         when (key) {
             InputConstants.KEY_ESCAPE -> if (!BackStack.dispatch()) (back ?: return false)()
             InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
-                if (LobbyA11y.keyboardFocused()) return false
+                if (LobbyA11y.keyboardFocused() || Controllers.isDispatching) return false
                 if (System.currentTimeMillis() - pageAt < PAGE_SETTLE_MS) return true
                 val action = next
                 when {

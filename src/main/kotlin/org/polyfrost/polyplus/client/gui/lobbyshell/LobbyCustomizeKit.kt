@@ -34,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -43,6 +45,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import org.polyfrost.compose.host.controller.controllerFocusScope
+import org.polyfrost.compose.host.controller.focusEntry
+import org.polyfrost.compose.host.controller.focusWhenShown
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
@@ -111,10 +116,11 @@ internal fun DockedPanel(
                     if (open && root.width > 0f) LobbyFraming.panelInset = ((it.size.width + marginPx) / root.width).coerceIn(0f, MAX_INSET)
                 }
                 .panel(PANEL_RADIUS)
+                .controllerFocusScope(open)
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         ) {
             PanelHeader(title, onClose, onBack)
-            Box(Modifier.weight(1f).fillMaxWidth(), content = content)
+            Box(Modifier.weight(1f).fillMaxWidth().focusWhenShown(open, title), content = content)
         }
     }
 }
@@ -305,11 +311,13 @@ internal fun <T> Segmented(
     val theme = OneConfigTheme.current
     val perRow = columns.coerceAtLeast(1)
     val itemShape = OneConfigTheme.shape(8.dp)
+    val selectedFocus = remember { FocusRequester() }
     Column(
         modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else theme.disabledAlpha)
             .card(11.dp)
+            .focusEntry(selectedFocus, enabled && selected in options)
             .padding(3.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -322,6 +330,7 @@ internal fun <T> Segmented(
                         Modifier
                             .weight(1f)
                             .height(CustomizeKit.SegmentHeight)
+                            .then(if (on) Modifier.focusRequester(selectedFocus) else Modifier)
                             .selectableRow(on, { if (!on) onSelect(option) }, text, itemShape, enabled, ItemSelectionStyle.Accent, A11yRole.RadioButton),
                         contentAlignment = Alignment.Center,
                     ) {

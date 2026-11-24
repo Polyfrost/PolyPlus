@@ -334,6 +334,8 @@ private fun PartyPopupButton(icon: String, contentDescription: String, tint: Col
     )
 }
 
+private enum class FirstCard { Request, Hosted, Rejoin, LeaderMoved, Invite }
+
 @Composable
 internal fun PartyInviteCards(host: SocialHost) {
     val invites by PartyRepository.incomingInvites.collectAsState()
@@ -341,13 +343,26 @@ internal fun PartyInviteCards(host: SocialHost) {
     val rejoin = rejoinableWorld()?.takeUnless { hosted?.sessionId == it.sessionId }
     val requests = HostJoinRequests.pending
     if (invites.isEmpty() && LeaderFollow.card == null && rejoin == null && hosted == null && requests.isEmpty()) return
+    val shownRequests = requests.takeLast(MAX_INVITE_CARDS)
+    val shownInvites = invites.takeLast(MAX_INVITE_CARDS)
+    val first = when {
+        shownRequests.isNotEmpty() -> FirstCard.Request
+        hosted != null -> FirstCard.Hosted
+        rejoin != null -> FirstCard.Rejoin
+        LeaderFollow.card != null -> FirstCard.LeaderMoved
+        else -> FirstCard.Invite
+    }
     Popup(popupPositionProvider = rememberAbove(alignEnd = true), properties = PopupProperties(focusable = false)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            requests.takeLast(MAX_INVITE_CARDS).forEach { request -> key(request.id) { HostJoinRequestCard(request) } }
-            hosted?.let { LeaderHostingCard(it) }
-            rejoin?.let { RejoinWorldCard(it) }
-            LeaderMovedCard(host)
-            invites.takeLast(MAX_INVITE_CARDS).forEach { invite -> key(invite.id) { PartyInviteCard(invite) } }
+            shownRequests.forEachIndexed { index, request ->
+                key(request.id) { HostJoinRequestCard(request, shortcut = first == FirstCard.Request && index == 0) }
+            }
+            hosted?.let { LeaderHostingCard(it, shortcut = first == FirstCard.Hosted) }
+            rejoin?.let { RejoinWorldCard(it, shortcut = first == FirstCard.Rejoin) }
+            LeaderMovedCard(host, shortcut = first == FirstCard.LeaderMoved)
+            shownInvites.forEachIndexed { index, invite ->
+                key(invite.id) { PartyInviteCard(invite, shortcut = first == FirstCard.Invite && index == 0) }
+            }
         }
     }
 }

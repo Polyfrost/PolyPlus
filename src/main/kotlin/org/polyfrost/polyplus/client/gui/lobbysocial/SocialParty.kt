@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import org.polyfrost.compose.host.controller.ControllerButton
+import org.polyfrost.compose.host.controller.controllerAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
@@ -518,8 +520,14 @@ internal fun PartyCard(
     acceptEnabled: Boolean = true,
     dismissEnabled: Boolean = true,
     warning: String? = null,
+    shortcut: Boolean = false,
 ) {
-    Column(modifier.width(PartyCardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val frame = modifier
+        .controllerAction(ControllerButton.Y, acceptLabel, enabled = shortcut && acceptEnabled, requireFocus = false, onPress = onAccept)
+        .width(PartyCardWidth)
+        .popup()
+        .padding(12.dp)
+    Column(frame, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PlayerHead(seedOf(player), 34.dp, Modifier, shape = headShape(34.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -545,7 +553,7 @@ internal fun PartyCard(
 }
 
 @Composable
-internal fun PartyInviteCard(invite: PartyInvite, modifier: Modifier = Modifier) {
+internal fun PartyInviteCard(invite: PartyInvite, modifier: Modifier = Modifier, shortcut: Boolean = false) {
     val names by PlayerNamesRepository.names.collectAsState()
     PartyCard(
         invite.sender,
@@ -556,6 +564,7 @@ internal fun PartyInviteCard(invite: PartyInvite, modifier: Modifier = Modifier)
         PartyCardText.JOIN_PARTY,
         { PartyRepository.accept(invite) },
         modifier,
+        shortcut = shortcut,
     )
 }
 
