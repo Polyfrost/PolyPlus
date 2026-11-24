@@ -62,18 +62,25 @@ object PlayerNamesRepository {
 
     fun nameOr(uuid: String): String = _names.value[uuid] ?: shortId(uuid)
 
+    private suspend fun fetchName(uuid: String): String? {
+        repeat(5) { attempt ->
+            _names.value[uuid]?.let { return it }
+            resolve(listOf(uuid)).join()
+            _names.value[uuid]?.let { return it }
+            if (attempt < 4) delay(1500)
+        }
+        return null
+    }
+
+    fun whenResolved(uuid: String, block: (String) -> Unit) {
+        PolyPlusClient.SCOPE.launch { fetchName(uuid)?.let(block) }
+    }
+
     @Composable
     fun displayName(uuid: String): String {
         val resolvedNames by names.collectAsState()
         // keyed on presence too, so a name evicted while still shown is resolved again
-        LaunchedEffect(uuid, uuid in resolvedNames) {
-            repeat(5) { attempt ->
-                if (uuid in _names.value) return@LaunchedEffect
-                resolve(listOf(uuid)).join()
-                if (uuid in _names.value) return@LaunchedEffect
-                if (attempt < 4) delay(1500)
-            }
-        }
+        LaunchedEffect(uuid, uuid in resolvedNames) { fetchName(uuid) }
         return resolvedNames[uuid] ?: shortId(uuid)
     }
 }

@@ -57,14 +57,16 @@ object HostJoinRequests {
         val expiresAt = runCatching { Instant.parse(packet.expiresAt).toEpochMilli() }.getOrDefault(now + FALLBACK_MS)
         val request = Request(packet.requestId, packet.sessionId, packet.player, expiresAt)
         pending += request
+        val text = { name: String -> "$name wants to join your world" }
         request.notice = PartyNotices.send(
-            "${request.name} wants to join your world",
+            text(request.name),
             (expiresAt - now).coerceAtLeast(MIN_NOTICE_MS).toFloat(),
             "Allow",
             { allow(request.id) },
             "Deny",
             { deny(request.id) },
         )
+        PlayerNamesRepository.whenResolved(packet.player) { request.notice?.update(message = text(it)) }
     }
 
     fun allow(id: String) = answer(id, true)
