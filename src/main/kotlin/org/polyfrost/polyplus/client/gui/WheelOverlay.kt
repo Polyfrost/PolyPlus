@@ -22,6 +22,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuDefaults
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuInput
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuItem
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuState
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.compose.minecraft.hud.HudLayer
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeOptions
 import org.polyfrost.polyplus.client.ping.PingGraphics
@@ -67,12 +68,16 @@ fun HudRadialMenu(
 object WheelOverlay {
     private const val SCROLL_NOTCH = 1.0
     private const val PULL_GAIN = 1.9
+    private const val STICK_DEAD = 0.35f
+    private const val STICK_REACH = 10_000f
 
     private var session: WheelSession? = null
     private var shown by mutableStateOf<WheelSession?>(null)
     private var fadeEndsAt = 0L
     private var scrollAccum = 0.0
     private var started = false
+    private var look: AutoCloseable? = null
+    private var stickUsed = false
 
     private val layer = HudLayer("radial_wheel", OneConfigComposeOptions) { Content() }.apply { acceptsInput = false }
 
@@ -85,6 +90,8 @@ object WheelOverlay {
         scrollAccum = 0.0
         session = next
         shown = next
+        stickUsed = false
+        if (Controllers.isActive) look = Controllers.captureLook()
         return true
     }
 
@@ -168,12 +175,23 @@ object WheelOverlay {
             cancel()
             return
         }
+        if (look != null) steerWithStick(current)
         if (!current.held()) finish(true)
+    }
+
+    private fun steerWithStick(current: WheelSession) {
+        val stick = Controllers.rightStick
+        val deflected = stick.getDistance() >= STICK_DEAD
+        if (deflected) stickUsed = true
+        if (!stickUsed) return
+        if (deflected) current.state.aimAt(stick.x * STICK_REACH, stick.y * STICK_REACH) else current.state.aimAt(0f, 0f)
     }
 
     private fun finish(pick: Boolean) {
         val current = session ?: return
         session = null
+        look?.close()
+        look = null
         fadeEndsAt = System.currentTimeMillis() + if (Motion.reduced) 0L else RadialMenuDefaults.fadeMillis.toLong()
         if (!pick) {
             current.state.dismiss()

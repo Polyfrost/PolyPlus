@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.ping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.KeyInputEvent
 import org.polyfrost.oneconfig.api.event.v1.events.MouseInputEvent
@@ -50,6 +51,7 @@ object PingInput {
     private const val HINT_TEXT = 0xFFFFFFFF.toInt()
     private const val MIN_ALPHA = 0.05f
     private const val MS_PER_SECOND = 1000L
+    private const val STICK_OPEN = 0.6f
 
     @Volatile
     private var held = false
@@ -62,6 +64,7 @@ object PingInput {
 
     private var pickPress = false
     private var swallowPick = false
+    private var controllerHeld = false
 
     private val downKeys = HashSet<Int>()
     private val downMouse = HashSet<Int>()
@@ -96,6 +99,12 @@ object PingInput {
         if (pressed) press() else release()
     }
 
+    fun onControllerState(pressed: Boolean) {
+        ensureStarted()
+        controllerHeld = pressed
+        if (pressed) press(fromController = true) else release()
+    }
+
     private fun syncRaw() {
         val bind = PolyPlusConfig.pingKeybind
         var mods = KeyModifiers.NONE
@@ -117,7 +126,7 @@ object PingInput {
         pickPress = false
     }
 
-    private fun press() {
+    private fun press(fromController: Boolean = false) {
         held = true
         pending = false
         pickPress = false
@@ -127,7 +136,7 @@ object PingInput {
         pressedAt = System.currentTimeMillis()
         dragX = 0.0
         dragY = 0.0
-        if (!sharesPickInput(PolyPlusConfig.pingKeybind)) return
+        if (fromController || !sharesPickInput(PolyPlusConfig.pingKeybind)) return
         if (hoveredTarget() == null && crosshairInReach() && !usingItem()) pickPress = true else swallowPick = true
     }
 
@@ -224,7 +233,8 @@ object PingInput {
 
     private fun tick() {
         if (!held) swallowPick = false
-        if (pending && held && System.currentTimeMillis() - pressedAt >= HOLD_MS) {
+        val flicked = controllerHeld && Controllers.rightStick.getDistance() >= STICK_OPEN
+        if (pending && held && (flicked || System.currentTimeMillis() - pressedAt >= HOLD_MS)) {
             pending = false
             pickPress = false
             if (canPing() && !WheelOverlay.isOpen) openWheel()

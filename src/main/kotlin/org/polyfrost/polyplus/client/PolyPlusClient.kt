@@ -179,6 +179,7 @@ object PolyPlusClient {
         step("startup sounds") { StartupSounds.prepare() }
         step("cosmetics config preload") { PolyPlusCosmeticsConfig.preload() }
         step("pylon raw input") { PylonRawInput.initialize() }
+        step("controller actions") { PolyPlusControllers.initialize() }
         step("privacy enforcement") { PrivacyEnforcement.syncConfig() }
         step("legal documents") {
             if (PrivacyConsent.state() == PrivacyConsent.State.ACCEPTED && !PrivacyConsent.managedByLauncher) {

@@ -574,6 +574,7 @@ tasks.withType<ProcessResources>().configureEach {
         if (isOrnithe) filter { line ->
             line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"")
                 .replace("\"java\": \">=21\"", "\"java\": \">=25\"")
+                .replace("\"controlify\": \"*\"", "")
         }
         expand(
             mapOf(

@@ -41,6 +41,9 @@
         "oneconfigv1": ">=${oneconfig_version}",
         "polycompose": ">=${polycompose_version}"
     },
+    "suggests": {
+        "controlify": "*"
+    },
     "breaks": {
         "auto-reauth": "*",
         "wwaypoints": "<0.8.0"
