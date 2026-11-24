@@ -364,13 +364,13 @@ object GroupsRepository {
         if (sender == selfId) return
         if (!NotificationDedup.shouldNotify("group_message:$messageId")) return
 
-        PlayerNamesRepository.resolve(listOf(sender))
-        val name = PlayerNamesRepository.nameOr(sender)
-        val group = groups.value.firstOrNull { it.id == groupId }
-        val title = group?.takeIf { it.kind == GroupKind.Group }?.name?.let { "[$it] $name" } ?: name
+        val groupName = groups.value.firstOrNull { it.id == groupId }?.takeIf { it.kind == GroupKind.Group }?.name
+        val title = { name: String -> groupName?.let { "[$it] $name" } ?: name }
         val preview = if (content.length > 80) content.take(77) + "..." else content
+        val notice = Notifications.info(title(PlayerNamesRepository.nameOr(sender)), preview)
+        PlayerNamesRepository.whenResolved(sender) { notice.update(title = title(it)) }
         val toasts = messageToasts.computeIfAbsent(groupId) { CopyOnWriteArrayList() }
-        toasts.add(Notifications.info(title, preview))
+        toasts.add(notice)
         while (toasts.size > MAX_TRACKED_TOASTS) toasts.removeAt(0)
     }
 

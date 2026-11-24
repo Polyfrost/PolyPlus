@@ -108,8 +108,8 @@ object SessionsRepository {
     private fun notifyInviteReceived(inviteId: Int, sender: String) {
         if (SocialOverlay.isShowing()) return
         if (!NotificationDedup.shouldNotify("session_invite:$inviteId")) return
-        PlayerNamesRepository.resolve(listOf(sender))
-        val name = PlayerNamesRepository.nameOr(sender)
-        Notifications.info("PolyPlus", "$name invited you to their world")
+        val text = { name: String -> "$name invited you to their world" }
+        val notice = Notifications.info("PolyPlus", text(PlayerNamesRepository.nameOr(sender)))
+        PlayerNamesRepository.whenResolved(sender) { notice.update(message = text(it)) }
     }
 }

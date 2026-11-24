@@ -207,10 +207,9 @@ object PartyRepository {
         addInvite(_incomingInvites, invite)
         if (SocialOverlay.isShowing()) return
         if (!NotificationDedup.shouldNotify("party_invite:${invite.id}")) return
-        PlayerNamesRepository.resolve(listOf(invite.sender))
-        val name = PlayerNamesRepository.nameOr(invite.sender)
+        val text = { name: String -> "$name invited you to their party" }
         val notice = PartyNotices.send(
-            "$name invited you to their party",
+            text(PlayerNamesRepository.nameOr(invite.sender)),
             PartyNotices.INVITE_MS,
             "Join party",
             { acceptFromNotice(invite) },
@@ -218,6 +217,7 @@ object PartyRepository {
             { decline(invite) },
         )
         inviteNotices.put(invite.id, notice)?.let(PartyNotices::retire)
+        PlayerNamesRepository.whenResolved(invite.sender) { notice.update(message = text(it)) }
     }
 
     private fun retireNotice(inviteId: String) {

@@ -184,8 +184,8 @@ object FriendsRepository {
     private fun notifyFriendRequest(requestId: Int, sender: String) {
         if (SocialOverlay.isShowing()) return
         if (!NotificationDedup.shouldNotify("friend_request:$requestId")) return
-        PlayerNamesRepository.resolve(listOf(sender))
-        val name = PlayerNamesRepository.nameOr(sender)
-        Notifications.info("PolyPlus", "$name sent you a friend request")
+        val text = { name: String -> "$name sent you a friend request" }
+        val notice = Notifications.info("PolyPlus", text(PlayerNamesRepository.nameOr(sender)))
+        PlayerNamesRepository.whenResolved(sender) { notice.update(message = text(it)) }
     }
 }

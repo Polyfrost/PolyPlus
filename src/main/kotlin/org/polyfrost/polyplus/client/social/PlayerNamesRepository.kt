@@ -10,10 +10,13 @@ import org.polyfrost.polyplus.client.network.http.PlayersApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 object PlayerNamesRepository {
     private val LOGGER = LogManager.getLogger()
@@ -62,18 +65,28 @@ object PlayerNamesRepository {
 
     fun nameOr(uuid: String): String = _names.value[uuid] ?: shortId(uuid)
 
+    private suspend fun fetchName(uuid: String): String? {
+        repeat(5) { attempt ->
+            _names.value[uuid]?.let { return it }
+            resolve(listOf(uuid)).join()
+            _names.value[uuid]?.let { return it }
+            if (attempt < 4) delay(1500)
+        }
+        return null
+    }
+
+    fun whenResolved(uuid: String, block: (String) -> Unit) {
+        resolve(listOf(uuid))
+        PolyPlusClient.SCOPE.launch {
+            withTimeoutOrNull(5_000) { names.mapNotNull { it[uuid] }.first() }?.let(block)
+        }
+    }
+
     @Composable
     fun displayName(uuid: String): String {
         val resolvedNames by names.collectAsState()
         // keyed on presence too, so a name evicted while still shown is resolved again
-        LaunchedEffect(uuid, uuid in resolvedNames) {
-            repeat(5) { attempt ->
-                if (uuid in _names.value) return@LaunchedEffect
-                resolve(listOf(uuid)).join()
-                if (uuid in _names.value) return@LaunchedEffect
-                if (attempt < 4) delay(1500)
-            }
-        }
+        LaunchedEffect(uuid, uuid in resolvedNames) { fetchName(uuid) }
         return resolvedNames[uuid] ?: shortId(uuid)
     }
 }
