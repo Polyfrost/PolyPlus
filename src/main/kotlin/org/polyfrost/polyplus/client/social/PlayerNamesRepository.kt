@@ -10,10 +10,13 @@ import org.polyfrost.polyplus.client.network.http.PlayersApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 object PlayerNamesRepository {
     private val LOGGER = LogManager.getLogger()
@@ -73,7 +76,10 @@ object PlayerNamesRepository {
     }
 
     fun whenResolved(uuid: String, block: (String) -> Unit) {
-        PolyPlusClient.SCOPE.launch { fetchName(uuid)?.let(block) }
+        resolve(listOf(uuid))
+        PolyPlusClient.SCOPE.launch {
+            withTimeoutOrNull(5_000) { names.mapNotNull { it[uuid] }.first() }?.let(block)
+        }
     }
 
     @Composable
