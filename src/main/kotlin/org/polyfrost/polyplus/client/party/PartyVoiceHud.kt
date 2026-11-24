@@ -5,7 +5,6 @@ package org.polyfrost.polyplus.client.party
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import org.polyfrost.compose.backend.PolyImageBitmap
 import org.polyfrost.compose.composables.NodeBox
 import org.polyfrost.compose.composables.NodeCanvas
 import org.polyfrost.compose.composables.NodeColumn
@@ -18,6 +17,7 @@ import org.polyfrost.compose.composables.clip
 import org.polyfrost.compose.composables.padding
 import org.polyfrost.compose.composables.size
 import org.polyfrost.compose.layout.PolyAlign
+import org.polyfrost.compose.minecraft.mc.McPlayerFaces
 import org.polyfrost.compose.render.FilterQuality
 import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.compose.render.PolyColor
@@ -31,7 +31,6 @@ import org.polyfrost.oneconfig.api.hud.v1.Font
 import org.polyfrost.oneconfig.api.hud.v1.Hud
 import org.polyfrost.oneconfig.api.hud.v1.HudManager
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHeads
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
 import org.polyfrost.polyplus.client.network.http.responses.LocationKind
@@ -345,7 +344,7 @@ private fun liveRows(): List<VoiceRow> {
     return listOf(own) + members
 }
 
-private fun faceOf(player: String): PolyBitmap? = (PlayerHeads.face(seedOf(player)) as? PolyImageBitmap)?.bitmap
+private fun faceOf(player: String): PolyBitmap? = McPlayerFaces.face(seedOf(player))
 
 private fun iconStrokes(resource: String): List<FloatArray> = runCatching {
     val svg = VoiceRow::class.java.classLoader.getResourceAsStream(resource)!!.use { it.readBytes().decodeToString() }

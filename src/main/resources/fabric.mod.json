@@ -39,7 +39,7 @@
         "java": ">=21",
         "fabric-language-kotlin": ">=1.14.1",
         "oneconfigv1": ">=${oneconfig_version}",
-        "polycompose": ">=1.0.0"
+        "polycompose": ">=${polycompose_version}"
     },
     "breaks": {
         "auto-reauth": "*",

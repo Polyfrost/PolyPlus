@@ -1,12 +1,9 @@
-@file:OptIn(ExperimentalOneConfigUiApi::class)
-
 package org.polyfrost.polyplus.client.ping
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
-import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
-import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHeads
+import org.polyfrost.compose.minecraft.mc.McPlayerFaces
+import org.polyfrost.compose.render.PolyBitmap
 import org.polyfrost.polyplus.client.gui.lobbysocial.seedOf
 
 internal object PingFaces {
@@ -14,24 +11,23 @@ internal object PingFaces {
 
     private const val CACHE_LIMIT = 64
 
-    private class Sampled(val source: ImageBitmap, val pixels: IntArray)
+    private class Sampled(val source: PolyBitmap, val pixels: IntArray)
 
     private val sampled = HashMap<String, Sampled>()
 
-    fun bitmap(player: String): ImageBitmap? = PlayerHeads.face(seedOf(player))
-
     fun pixels(player: String): IntArray? {
-        val face = bitmap(player) ?: return null
+        val face = McPlayerFaces.face(seedOf(player)) ?: return null
         sampled[player]?.takeIf { it.source === face }?.let { return it.pixels }
         val width = face.width
         val height = face.height
         if (width <= 0 || height <= 0) return null
-        val full = IntArray(width * height)
-        runCatching { face.readPixels(full, 0, 0, width, height, 0, width) }.getOrElse { return null }
+        val px = face.pixels
         val result = IntArray(SIDE * SIDE) { i ->
             val x = ((i % SIDE) * 2 + 1) * width / (SIDE * 2)
             val y = ((i / SIDE) * 2 + 1) * height / (SIDE * 2)
-            full[y * width + x]
+            val o = (y * width + x) * 4
+            ((px[o + 3].toInt() and 0xFF) shl 24) or ((px[o].toInt() and 0xFF) shl 16) or
+                ((px[o + 1].toInt() and 0xFF) shl 8) or (px[o + 2].toInt() and 0xFF)
         }
         if (sampled.size >= CACHE_LIMIT) sampled.clear()
         sampled[player] = Sampled(face, result)

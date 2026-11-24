@@ -101,6 +101,7 @@ val testerBuild = (optionalProperty("polyplus.tester") ?: System.getenv("POLYPLU
 version = "${property("mod.version")}+${stonecutter.current.version}${if (testerBuild) "-tester" else ""}"
 base.archivesName = property("mod.id") as String
 val oneconfigVersion = property("deps.oneconfig") as String
+val polycomposeVersion = property("deps.polycompose") as String
 
 repositories {
     if (isOrnithe) {
@@ -415,6 +416,9 @@ dependencies {
         // Loom strips the nested Kotlin jars from a remapped copy, so the plain copy above must stay the only candidate
         exclude(group = "net.fabricmc", module = "fabric-language-kotlin")
     }
+    modImplementation("org.polyfrost:polycompose-$mcVersion-$loader:$polycomposeVersion") {
+        exclude(group = "net.fabricmc", module = "fabric-language-kotlin")
+    }
 
     sentryShade("io.sentry:sentry:$sentryVersion")
     implementation(files(relocateSentry.flatMap { it.archiveFile }))
@@ -561,11 +565,13 @@ tasks.withType<ProcessResources>().configureEach {
     val modVersion = project.property("mod.version") as String
     val minecraftPredicate = minecraftPredicate // required for configuration cache
     val oneconfigVersion = oneconfigVersion // required for configuration cache
+    val polycomposeVersion = polycomposeVersion
     inputs.property("modId", modId)
     inputs.property("modName", modName)
     inputs.property("modVersion", modVersion)
     inputs.property("minorMcVersion", minecraftPredicate)
     inputs.property("oneconfigVersion", oneconfigVersion)
+    inputs.property("polycomposeVersion", polycomposeVersion)
     filesMatching("fabric.mod.json") {
         if (isOrnithe) filter { line ->
             line.replace("\"fabric-api\": \"*\"", "\"osl-keybinds\": \"*\"")
@@ -579,6 +585,7 @@ tasks.withType<ProcessResources>().configureEach {
                 "mod_description" to "Various expansions for the OneClient 'modpack'",
                 "minor_mc_version" to minecraftPredicate,
                 "oneconfig_version" to oneconfigVersion,
+                "polycompose_version" to polycomposeVersion,
             ),
         )
     }
