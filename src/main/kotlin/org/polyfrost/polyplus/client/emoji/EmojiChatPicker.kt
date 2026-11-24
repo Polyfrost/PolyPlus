@@ -116,7 +116,7 @@ class EmojiChatPicker {
     }
 
     fun mouseClicked(mouseX: Double, mouseY: Double, button: Int, shiftDown: Boolean, onPick: Consumer<String>): Boolean {
-        if (!EmojiRegistry.enabled() || button != 0) return false
+        if (!EmojiRegistry.enabled() || button != InputConstants.MOUSE_BUTTON_LEFT) return false
         if (inRect(mouseX, mouseY, buttonX, buttonY, buttonSize, buttonSize)) {
             toggle()
             return true

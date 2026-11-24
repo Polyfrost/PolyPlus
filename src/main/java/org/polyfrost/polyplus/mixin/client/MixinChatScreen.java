@@ -428,7 +428,7 @@ public abstract class MixinChatScreen extends Screen {
     private void polyplus$mouseClicked(int mouseX, int mouseY, int button, CallbackInfo ci) {
         if (chatField == null || !EmojiRegistry.enabled()) return;
         polyplus$layout();
-        if (polyplus$picker.mouseClicked(mouseX, mouseY, button, Screen.isShiftDown(), this::polyplus$insertEmoji)) ci.cancel();
+        if (polyplus$picker.mouseClicked(mouseX, mouseY, KeyCodes.mouseFromLegacy(button), Screen.isShiftDown(), this::polyplus$insertEmoji)) ci.cancel();
     }
 
     @Inject(method = "handleMouse", at = @At("HEAD"), cancellable = true)
