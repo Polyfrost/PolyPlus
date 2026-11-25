@@ -5,11 +5,19 @@ All notable changes to PolyPlus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.1] - 2026-11-25
 
 ### Changed
 - Ping markers and the party voice HUD get player faces from PolyCompose's shared skin cache
 - Needs PolyCompose 3.0.7
+- Onboarding no longer recommends turning off motion blur when the main menu FPS is low
+- Skipping onboarding leaves your PolyBlur settings as they are
+
+### Fixed
+- Fixed lobby music starting late and without fading in when another mod loads sounds in the background (like RSLS)
+- Fixed lobby music sometimes not playing again after leaving the lobby during the startup sound
+- Fixed the emoji picker ignoring left clicks on 26.3
+- Social toasts now update with the sender's name once it loads
 
 ## [2.4.0] - 2026-11-23
 
