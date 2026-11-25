@@ -408,7 +408,7 @@ object LobbySnapshot {
     }
     *///?}
 
-    private const val MAX_NBT_BYTES = 64L * 1024L * 1024L
+    private const val MAX_NBT_BYTES = 128L * 1024L * 1024L
 
     fun withDimension(entry: LobbySceneEntry, root: CompoundTag): LobbySceneEntry {
         if (entry.dimension.isNotEmpty()) return entry

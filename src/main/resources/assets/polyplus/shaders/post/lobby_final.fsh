@@ -276,7 +276,12 @@ const vec3 LIGHT_DARK = vec3(0.22, 0.26, 0.4);
 const vec3 LIGHT_WARMTH = vec3(1.0, 0.8, 0.55);
 
 int revealMode() {
-    return int(Lens.z + 0.5);
+    return int(mod(Lens.z + 0.5, 4.0));
+}
+
+// Lens.z = reveal mode + 4 * user blur strength in percent (0 = blur off)
+float userBlur() {
+    return floor((Lens.z + 0.5) / 4.0) / 100.0;
 }
 
 float focusPullBlur(float z) {

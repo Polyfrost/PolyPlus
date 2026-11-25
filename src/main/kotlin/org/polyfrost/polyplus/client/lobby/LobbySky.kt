@@ -59,6 +59,7 @@ import org.polyfrost.polyplus.client.lobby.shader.LobbyShaderBridges
 import org.polyfrost.polyplus.mixin.client.access.PostChainAccessor
 //? if >= 1.21.8 || = 1.21.4
 import org.polyfrost.polyplus.mixin.client.access.PostPassAccessor
+import kotlin.math.roundToInt
 import kotlin.math.tan
 
 object LobbySky {
@@ -93,6 +94,9 @@ object LobbySky {
     private const val DEPTH_OF_FIELD = 0.9f
     private const val PACK_DEPTH_OF_FIELD = 0.35f
     private const val INTERIOR_DEPTH_OF_FIELD = 0.45f
+    private const val MAX_BLUR = 200f
+    private const val PERCENT = 100f
+    private const val REVEAL_STRIDE = 4f
     private const val DEPTH_FORWARD = 1
     private const val DEPTH_REVERSE = 2
     private const val DEPTH_UNKNOWN = 3
@@ -236,8 +240,11 @@ object LobbySky {
         }
         data.putFloat(mood.aurora).putFloat(mood.night).putFloat(mood.exposure).putFloat(mood.golden)
         val lens = if (pack && bridge.packDepthOfField()) DEPTH_OF_FIELD * PACK_DEPTH_OF_FIELD else DEPTH_OF_FIELD
-        val depthOfField = if (mood.interior) lens * INTERIOR_DEPTH_OF_FIELD else lens
-        data.putFloat(focus).putFloat(depthOfField).putFloat(LobbyReveal.shaderMode(LobbyScene.introProgress())).putFloat(LobbyScene.introProgress())
+        val strength = if (PolyPlusLobbyConfig.lobbyBlur) PolyPlusLobbyConfig.lobbyBlurStrength.coerceIn(0f, MAX_BLUR) else 0f
+        val depthOfField = (if (mood.interior) lens * INTERIOR_DEPTH_OF_FIELD else lens) * strength / PERCENT
+        // Lens.z packs the reveal mode (0-3) and 4 * the blur strength in percent; the shaders unpack both.
+        val revealAndBlur = LobbyReveal.shaderMode(LobbyScene.introProgress()) + REVEAL_STRIDE * strength.roundToInt()
+        data.putFloat(focus).putFloat(depthOfField).putFloat(revealAndBlur).putFloat(LobbyScene.introProgress())
         val wave = LobbyWaveState.vector()
         data.putFloat(wave.x).putFloat(wave.y).putFloat(wave.z).putFloat(wave.w)
         if (pack) {

@@ -170,7 +170,7 @@ object PolyPlusLobbyConfig : Config(
     @Dropdown(
         title = "Scene Size",
         description = "How much of the world new captures keep. Bigger scenes let you look around further, but use more memory and disk. Never more than your render distance.",
-        options = ["Normal", "Large", "Huge"],
+        options = ["Normal", "Large", "Huge", "Massive"],
         subcategory = "3D Lobby",
     )
     var lobbySceneSize: LobbySceneSize = LobbySceneSize.LARGE
@@ -191,6 +191,33 @@ object PolyPlusLobbyConfig : Config(
     )
     var lobbyFreeAvatar = true
 
+    @JvmStatic
+    @Switch(
+        title = "Background Blur",
+        description = "Blur the far and near parts of the 3D lobby like a camera lens.",
+        subcategory = "3D Lobby",
+    )
+    var lobbyBlur = true
+
+    @JvmStatic
+    @Slider(
+        title = "Blur Strength",
+        description = "How strong the 3D lobby blur is, in percent.",
+        min = 0f,
+        max = 200f,
+        step = 5f,
+        subcategory = "3D Lobby",
+    )
+    var lobbyBlurStrength = 100f
+
+    @JvmStatic
+    @Switch(
+        title = "Phase Through",
+        description = "Let the lobby camera move through roofs, walls and terrain when you look around or zoom out.",
+        subcategory = "3D Lobby",
+    )
+    var lobbyPhaseThrough = false
+
     init {
         preload()
         migrateFromSplitConfigs()
@@ -200,6 +227,7 @@ object PolyPlusLobbyConfig : Config(
         hideIf("lobbyMusicVolume") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("muteLobbyMusicUnfocused") { lobbyMusic == LobbyMusic.OFF || lobbyMusic == LobbyMusic.MINECRAFT }
         hideIf("quitClickTwice") { quitWithoutConfirmation }
+        hideIf("lobbyBlurStrength") { !lobbyBlur }
         hideIf("muteAmbienceDuringMedia") { !Mods.evergreenHud }
         inheritMusicVolume()
     }
@@ -231,7 +259,8 @@ object PolyPlusLobbyConfig : Config(
 enum class LobbySceneSize(private val label: String, val radius: Int) {
     NORMAL("Normal", 6),
     LARGE("Large", 8),
-    HUGE("Huge", 10);
+    HUGE("Huge", 10),
+    MASSIVE("Massive", 12);
 
     override fun toString(): String = label
 }

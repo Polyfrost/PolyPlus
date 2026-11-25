@@ -38,6 +38,8 @@ private const val HIGHLIGHT_MILLIS = 1400
 private const val HIGHLIGHT_ALPHA = 0.14f
 private const val VOLUME_STEP = 5f
 private const val SYNC_MILLIS = 300L
+private const val BLUR_STEP = 5f
+private const val MAX_BLUR = 200f
 
 private val TIME_ORDER = listOf(LobbyTime.CAPTURED, LobbyTime.REAL, LobbyTime.THEME, LobbyTime.DAY, LobbyTime.SUNSET, LobbyTime.NIGHT)
 
@@ -130,6 +132,7 @@ private fun HomePage(lobby: LobbyShell, state: CustomizeState) {
     val party by PartyRepository.party.collectAsState()
     PanelPageColumn(scroll = state.homeScroll) {
         PanelSection("Scene", divider = false) { SceneSection(lobby, state) }
+        CameraSection()
         AmbienceSection(state)
         TimeSection(state)
         if (PartyScene.isMember(party)) PartySection()
@@ -203,6 +206,47 @@ private fun AmbienceSection(state: CustomizeState) {
             valueText = { "${it.roundToInt()}%" },
         )
         DrillRow("headphones-02", "Music", music.toString(), { state.open(CustomizePage.Music) })
+    }
+}
+
+@Composable
+private fun CameraSection() {
+    var blur by remember { mutableStateOf(PolyPlusLobbyConfig.lobbyBlur) }
+    var strength by remember { mutableFloatStateOf(PolyPlusLobbyConfig.lobbyBlurStrength) }
+    var phase by remember { mutableStateOf(PolyPlusLobbyConfig.lobbyPhaseThrough) }
+    PanelSection("Camera & blur") {
+        PanelToggle(
+            "Background blur",
+            blur,
+            { on ->
+                blur = on
+                PolyPlusLobbyConfig.lobbyBlur = on
+                PolyPlusLobbyConfig.save()
+            },
+        )
+        PanelSlider(
+            "Blur strength",
+            strength,
+            {
+                strength = it
+                PolyPlusLobbyConfig.lobbyBlurStrength = it
+            },
+            PolyPlusLobbyConfig::save,
+            range = 0f..MAX_BLUR,
+            step = BLUR_STEP,
+            enabled = blur,
+            valueText = { "${it.roundToInt()}%" },
+        )
+        PanelToggle(
+            "Phase through",
+            phase,
+            { on ->
+                phase = on
+                PolyPlusLobbyConfig.lobbyPhaseThrough = on
+                PolyPlusLobbyConfig.save()
+            },
+            description = "Camera goes through roofs and walls",
+        )
     }
 }
 

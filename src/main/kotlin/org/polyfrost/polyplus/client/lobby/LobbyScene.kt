@@ -110,6 +110,7 @@ import org.polyfrost.polyplus.api.lobby.LobbyMode
 import org.polyfrost.polyplus.api.lobby.LobbyPhase
 import org.polyfrost.polyplus.api.lobby.LobbyState
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.cosmetics.CosmeticAssetCache
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
@@ -1846,7 +1847,10 @@ object LobbyScene {
         val yawRad = Math.toRadians(yaw)
         val pitchRad = Math.toRadians(pitch)
         var look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
-        if (stage.interior) {
+        if (PolyPlusLobbyConfig.lobbyPhaseThrough) {
+            // Phase Through: the camera goes through roofs, walls and terrain
+            wallReach = Double.POSITIVE_INFINITY
+        } else if (stage.interior) {
             distance = wallClamp(scene, aim, look, distance, elapsed)
         } else if (LobbyLook.active()) {
             // turned around, the camera stays in front of hills and trees instead of inside them

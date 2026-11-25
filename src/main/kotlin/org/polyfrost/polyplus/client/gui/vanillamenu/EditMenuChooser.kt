@@ -33,5 +33,15 @@ class EditMenuChooser(private val parent: Screen?) : Screen(Component.literal("E
     companion object {
         @JvmStatic
         fun open() = ClientPlatform.setScreen(EditMenuChooser(ClientPlatform.currentScreen()))
+
+        /** "Edit main menu" from inside a menu: straight into that menu's editor, no chooser. */
+        @JvmStatic
+        fun editLobby() { MenuLayoutEditor.start("lobby"); MainMenuReplacement.switchToLobby() }
+
+        @JvmStatic
+        fun editPolyPlus() { MenuLayoutEditor.start("polyplus"); MainMenuReplacement.switchToPolyPlusMenu() }
+
+        @JvmStatic
+        fun editVanilla() { MenuLayoutEditor.start(VanillaTitleMenu.scope()); MainMenuReplacement.switchToVanilla() }
     }
 }

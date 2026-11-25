@@ -607,7 +607,7 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions) {
         MenuIconButton(ASSETS + "logo.svg", "Switch to the lobby", onClick = MainMenuReplacement::switchToLobby)
         MenuIconButton(ASSETS + "minecraft-block.svg", "Switch to vanilla main menu", onClick = MainMenuReplacement::switchToVanilla)
         ThemeToggleButton()
-        MenuIconButton(ASSETS + "edit-02.svg", "Edit main menu", onClick = EditMenuChooser::open)
+        MenuIconButton(ASSETS + "edit-02.svg", "Edit main menu", onClick = EditMenuChooser::editPolyPlus)
         NotificationBell()
         if (!ClientPlatform.isMac) {
             MenuIconButton("maximise", "Toggle fullscreen", onClick = actions.fullscreen)

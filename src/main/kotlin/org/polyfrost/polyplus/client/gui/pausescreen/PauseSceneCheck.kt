@@ -232,7 +232,7 @@ private fun verdict(spot: LobbySpotState, shown: LobbySpotState.Done?): Verdict 
         report.passed && shown.action == LobbySpotAction.CAPTURE -> Verdict(shown.message, Tone.FAIL)
         report.passed && total >= GREAT_SCORE -> Verdict("Great spot", Tone.PASS)
         report.passed -> Verdict("Good spot", Tone.PASS)
-        else -> Verdict("Not good enough yet: ${mainReason(shown)}", Tone.FAIL)
+        else -> Verdict("Low score: ${mainReason(shown)}. You can still capture it.", Tone.FAIL)
     }
 }
 

@@ -28,6 +28,10 @@ import kotlin.io.path.deleteIfExists
 import kotlin.math.hypot
 import kotlin.math.pow
 
+/** A camera angle saved for one scene: added yaw and pitch in degrees, and the zoom. */
+@Serializable
+data class LobbySceneView(val yaw: Double = 0.0, val pitch: Double = 0.0, val zoom: Double = 1.0)
+
 @Serializable
 data class LobbySceneEntry(
     val id: String,
@@ -90,6 +94,7 @@ object LobbySceneStore {
         val mode: String = "AUTOMATIC",
         val lastWorld: String? = null,
         val serverScenes: Map<String, String> = emptyMap(),
+        val views: Map<String, LobbySceneView> = emptyMap(),
     )
 
     private const val SERVER_PREFIX = "server:"
@@ -226,6 +231,18 @@ object LobbySceneStore {
 
     fun recordLeave(world: String) {
         lastWorld = world
+    }
+
+    /** The camera angle saved for this scene, or null when it uses the scene's own view. */
+    fun view(id: String?): LobbySceneView? {
+        ensureLoaded()
+        return id?.let { state.views[it] }
+    }
+
+    fun setView(id: String, view: LobbySceneView?) {
+        ensureLoaded()
+        if (state.views[id] == view) return
+        update { copy(views = if (view == null) views - id else views + (id to view)) }
     }
 
     fun serverScene(address: String): String? {

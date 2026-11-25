@@ -17,15 +17,18 @@ object LobbyLook {
     private const val MAX_PITCH = 60.0
     private const val ZOOM_STEP = 1.12
     private const val MIN_ZOOM = 0.45
-    private const val MAX_ZOOM = 2.6
+    private const val MAX_ZOOM = 4.0
     private const val RATE = 10.0
     private const val SETTLED = 0.01
     private const val LOWEST_VIEW = -20.0
     private const val HIGHEST_VIEW = 80.0
+    private const val FULL_TURN = 360.0
+    private const val HALF_TURN = 180.0
 
     private var targetYaw = 0.0
     private var targetPitch = 0.0
     private var targetZoom = 1.0
+    private var held = false
 
     /** Degrees added to the scene's yaw and pitch, and how much farther (or closer) the camera sits. */
     var yaw = 0.0
@@ -54,19 +57,32 @@ object LobbyLook {
         targetZoom = (targetZoom * ZOOM_STEP.pow(-steps)).coerceIn(MIN_ZOOM, MAX_ZOOM)
     }
 
+    /** Goes back to the scene's home view: the angle saved for it, or the scene's own view. */
     fun reset(instant: Boolean = false) {
-        targetYaw = 0.0
-        targetPitch = 0.0
-        targetZoom = 1.0
+        val home = LobbySceneStore.view(LobbyScene.currentId) ?: LobbySceneView()
+        // the short way round to the saved yaw
+        targetYaw = yaw + wrapped(home.yaw - yaw)
+        targetPitch = home.pitch.coerceIn(MIN_PITCH, MAX_PITCH)
+        targetZoom = home.zoom.coerceIn(MIN_ZOOM, MAX_ZOOM)
         if (!instant) return
-        yaw = 0.0
-        pitch = 0.0
-        zoom = 1.0
+        yaw = targetYaw
+        pitch = targetPitch
+        zoom = targetZoom
     }
+
+    /** Where the camera is being put right now, to save as the scene's home view. */
+    fun current(): LobbySceneView = LobbySceneView(wrapped(targetYaw), targetPitch, targetZoom)
+
+    private fun wrapped(degrees: Double): Double = (degrees + HALF_TURN).mod(FULL_TURN) - HALF_TURN
 
     /** Eases toward the target; [elapsed] in seconds since the last frame. */
     fun settle(elapsed: Double) {
-        if (!enabled()) reset(instant = true)
+        if (!enabled() && !held) {
+            held = true
+            reset(instant = true)
+        } else if (enabled()) {
+            held = false
+        }
         val share = 1.0 - exp(-RATE * elapsed)
         yaw += (targetYaw - yaw) * share
         pitch += (targetPitch - pitch) * share

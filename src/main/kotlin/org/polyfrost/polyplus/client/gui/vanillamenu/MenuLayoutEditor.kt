@@ -152,7 +152,19 @@ object MenuLayoutEditor {
 
     internal fun resetPieces(scope: String, ids: Collection<String>) {
         MenuLayoutStore.checkpoint(scope)
-        ids.forEach { MenuLayoutStore.remove(scope, it) }
+        for (id in ids) {
+            val element = MenuLayoutStore.element(scope, id)
+            if (scope == "lobby" && element != null && !element.builtin) {
+                // an added element: back to its default size and place, but keep it
+                element.x = 0f
+                element.y = -150f
+                element.scale = 1f
+                element.opacity = 1f
+                element.visible = true
+            } else {
+                MenuLayoutStore.remove(scope, id)
+            }
+        }
         MenuLayoutStore.save()
     }
 
@@ -289,6 +301,7 @@ fun BoxScope.MenuEditorBar(scope: String) {
     if (!MenuLayoutEditor.isEditing(scope)) return
     MenuLayoutStore.revision.intValue
     val prefs = MenuLayoutStore.prefs()
+    var adding by remember { mutableStateOf(false) }
     Row(
         Modifier
             .align(Alignment.TopCenter)
@@ -314,9 +327,35 @@ fun BoxScope.MenuEditorBar(scope: String) {
         })
         TextButton(text = "Undo", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = MenuLayoutStore.canUndo(scope), onClick = { MenuLayoutStore.undo(scope) })
         TextButton(text = "Redo", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = MenuLayoutStore.canRedo(scope), onClick = { MenuLayoutStore.redo(scope) })
+        //? if >= 26.1 {
+        if (scope == LobbyHud.SCOPE) {
+            TextButton(text = if (adding) "Close list" else "Add element", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = { adding = !adding })
+        }
+        //?}
         TextButton(text = "Reset all", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = { MenuLayoutEditor.reset(scope) })
         TextButton(text = "Done", size = ControlSize.Compact, style = ControlStyle.Primary, enabled = true, onClick = { MenuLayoutEditor.stop() })
     }
+    //? if >= 26.1 {
+    if (adding && scope == LobbyHud.SCOPE) {
+        Column(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 112.dp)
+                .width(300.dp)
+                .background(Color(0xF8101216), RoundedCornerShape(6.dp))
+                .border(1.dp, Accent, RoundedCornerShape(6.dp))
+                .padding(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            for ((kind, name) in LobbyHud.kinds) {
+                TextButton(text = name, size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = {
+                    adding = false
+                    LobbyHud.add(kind)
+                })
+            }
+        }
+    }
+    //?}
     val (target, at) = MenuLayoutEditor.menu ?: return
     if (!target.startsWith("$scope/")) return
     val ids = MenuLayoutEditor.selected(scope).ifEmpty { listOf(target.substringAfter('/')) }
@@ -347,6 +386,13 @@ fun BoxScope.MenuEditorBar(scope: String) {
             item("Ungroup", groups.any { it != null }) { MenuLayoutEditor.regroup(scope, ids, false) }
         }
         item("Reset this element") { MenuLayoutEditor.resetPieces(scope, ids) }
+        //? if >= 26.1 {
+        if (scope == LobbyHud.SCOPE && ids.any { LobbyHud.isHud(MenuLayoutStore.element(scope, it)) }) {
+            item("Edit...", ids.size == 1) { LobbyHud.edit(ids.first()) }
+            item("Duplicate") { LobbyHud.duplicate(ids) }
+            item("Delete") { LobbyHud.delete(ids) }
+        }
+        //?}
         item("Close") {}
     }
 }

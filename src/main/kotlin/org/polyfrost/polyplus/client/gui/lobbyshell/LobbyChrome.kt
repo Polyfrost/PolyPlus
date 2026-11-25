@@ -6,6 +6,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.polyplus.client.gui.KitDangerColor
 import org.polyfrost.polyplus.client.gui.vanillamenu.EditMenuChooser
 import org.polyfrost.polyplus.client.gui.vanillamenu.EditableBlock
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyAddedElements
 import org.polyfrost.polyplus.client.gui.vanillamenu.MenuEditorBar
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
@@ -350,23 +351,27 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
                 val widgetRoom = stackHeight - LobbyLayout.Top - LobbyLayout.Gap - STACK_ROW_GAP - with(density) { stackRest.toDp() }
                 val widgetScope = remember(lobby, screen, stackWidth) { LobbyWidgetScope(lobby, screen, stackWidth) }
                 if (widgetRoom > 0.dp) {
-                    WidgetColumn(WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope, Modifier.padding(bottom = STACK_ROW_GAP))
+                    EditableBlock("lobby", "widgets", "Widgets") {
+                        WidgetColumn(WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope, Modifier.padding(bottom = STACK_ROW_GAP))
+                    }
                 }
             }
             Column(Modifier.onSizeChanged { stackRest = it.height }) {
                 if (home && LinkedModMenus.entries.isNotEmpty()) {
-                    LinkedModButton(Modifier.width(stackWidth))
+                    EditableBlock("lobby", "modbutton", "Mod menus button") { LinkedModButton(Modifier.width(stackWidth)) }
                     Spacer(Modifier.height(STACK_ROW_GAP))
                 }
                 if (stackChat > 0f) {
-                    ChatDock(lobby, stackWidth * stackChat, stackWidth, fill = true)
+                    EditableBlock("lobby", "chat", "Chat") { ChatDock(lobby, stackWidth * stackChat, stackWidth, fill = true) }
                     Spacer(Modifier.height(STACK_ROW_GAP))
                 }
                 if (home) {
-                    Row(Modifier.width(stackWidth), verticalAlignment = Alignment.Bottom) {
-                        key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f), fill = true) }
-                        Spacer(Modifier.width(LobbyLayout.Gap))
-                        LobbyDock(lobby) { dockTiles = it }
+                    EditableBlock("lobby", "playerbar", "Player bar") {
+                        Row(Modifier.width(stackWidth), verticalAlignment = Alignment.Bottom) {
+                            key(lobby.profileVersion) { PlayerBar(lobby, Modifier.weight(1f), fill = true) }
+                            Spacer(Modifier.width(LobbyLayout.Gap))
+                            LobbyDock(lobby) { dockTiles = it }
+                        }
                     }
                 } else {
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -404,6 +409,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     }
     PlayTogetherBanner(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top + LobbyLayout.Gap, start = LobbyLayout.Margin, end = LobbyLayout.Margin).a11yRegion(A11yRegion.Banner))
     PlayTogetherHooks(lobby)
+    if (home) LobbyAddedElements(screen)
     MenuEditorBar("lobby")
     lobby.hostWorldId?.let { worldId -> HostWorldDialog(worldId, screen) { lobby.hostWorldId = null } }
     lobby.editing?.let { edit ->
@@ -782,7 +788,7 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
         add(MenuAction("Replay tour", { onClose(); lobby.replayTour() }, icon = SOCIAL_ASSETS + "play-circle.svg", size = MenuItemSize.Regular))
         add(MenuAction("Switch to OneClient v1 main menu", { onClose(); MainMenuReplacement.switchToPolyPlusMenu() }, icon = SOCIAL_ASSETS + "logo.svg", size = MenuItemSize.Regular))
         add(MenuAction("Switch to vanilla main menu", { onClose(); MainMenuReplacement.switchToVanilla() }, icon = SOCIAL_ASSETS + "minecraft-block.svg", size = MenuItemSize.Regular))
-        add(MenuAction("Edit main menu", { onClose(); EditMenuChooser.open() }, icon = SOCIAL_ASSETS + "edit-02.svg", size = MenuItemSize.Regular))
+        add(MenuAction("Edit main menu", { onClose(); EditMenuChooser.editLobby() }, icon = SOCIAL_ASSETS + "edit-02.svg", size = MenuItemSize.Regular))
         if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
             ModIntegrationButtons.withoutModMenu().forEach { button ->
                 add(MenuAction(button.tooltip, { onClose(); button.onClick(screen) }, icon = button.icon, size = MenuItemSize.Regular))

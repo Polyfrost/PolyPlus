@@ -41,6 +41,8 @@ data class LobbyStage(
     val background: List<LobbySlot> = emptyList(),
     val cranePitch: Double = CRANE_PITCH,
     val interior: Boolean = false,
+    /** Saved with "Capture this spot" on ground the solver could not use: only you, no party. */
+    val forced: Boolean = false,
 ) {
     fun forward(): Vec3 {
         val radians = Math.toRadians(yaw.toDouble())
@@ -79,11 +81,12 @@ data class LobbyStage(
         putFloat("pitch", pitch)
         putDouble("distance", distance)
         if (interior) putByte("interior", 1)
+        if (forced) putByte("forced", 1)
     }
 
-    private class Solver(val level: BlockGetter, val interior: Boolean = false) {
-        /** Any Terrain: party on different heights, ledges, drops and slopes are fine. */
-        val anyTerrain = PolyPlusLobbyConfig.lobbyAnyTerrain
+    private class Solver(val level: BlockGetter, val interior: Boolean = false, val forced: Boolean = false) {
+        /** Any Terrain: party on different heights, ledges, drops and slopes are fine. A forced capture always uses it. */
+        val anyTerrain = forced || PolyPlusLobbyConfig.lobbyAnyTerrain
 
         /** Second try with Any Terrain: a busy backdrop (a hill right behind the group) no longer rules a view out. */
         var lenientBackdrop = false
@@ -252,6 +255,7 @@ data class LobbyStage(
         private const val AIM_SHIFT = 2.0
         private const val AIM_LATERAL = 1.0
         private const val YAW_CANDIDATES = 24
+        private val PLAIN_SCALES = listOf(1.0, 0.75, 0.5, 0.35, 0.22)
         private const val BACKDROP_REACH = 72.0
         private const val SPOT_SEARCH_RADIUS = 18
         private const val SPOT_STEP = 2
@@ -393,7 +397,65 @@ data class LobbyStage(
             8.5 to 8.0,
         )
 
-        fun build(level: BlockGetter, anchor: BlockPos, interior: Boolean = false): LobbyStage? = build(Solver(level, interior), anchor)
+        fun build(level: BlockGetter, anchor: BlockPos, interior: Boolean = false, forced: Boolean = false): LobbyStage? {
+            val solver = Solver(level, interior, forced)
+            val built = build(solver, anchor)
+            if (built != null || !forced) return built
+            // "Capture this spot" always saves: stand right where you are with the best clear camera
+            return plain(solver, anchor)?.let { safeFinish(solver, it) }
+        }
+
+        /** A bare stage: only you, standing on the spot, the camera wherever it has the most room. */
+        private fun plain(solver: Solver, spot: BlockPos): LobbyStage? {
+            val level = solver.level
+            val feet = feetOf(level, spot)
+            var best: Frame? = null
+            var bestRoom = -1.0
+            for (index in 0 until YAW_CANDIDATES) {
+                val heading = index * Math.PI * 2.0 / YAW_CANDIDATES
+                for ((pitch, distance) in solver.shots) {
+                    for (scale in PLAIN_SCALES) {
+                        val frame = Frame(spot, heading, pitch, distance * scale, solver.base)
+                        val aim = frame.aim(feet.y)
+                        val camera = frame.camera(aim)
+                        if (!clearAir(level, camera)) continue
+                        val room = reach(level, camera, aim) + distance * scale
+                        if (room > bestRoom) {
+                            bestRoom = room
+                            best = frame
+                        }
+                        break
+                    }
+                }
+            }
+            val frame = best ?: Frame(spot, 0.0, solver.shots.first().first, solver.shots.first().second, solver.base)
+            return plainStage(solver, frame, feet)
+        }
+
+        private fun plainStage(solver: Solver, frame: Frame, feet: Vec3): LobbyStage {
+            val aim = frame.aim(feet.y)
+            val camera = frame.camera(aim)
+            val spot = frame.spot
+            return LobbyStage(
+                Vec3(spot.x + 0.5, spot.y.toDouble(), spot.z + 0.5),
+                aim,
+                yawOf(frame).toFloat(),
+                frame.pitchDegrees.toFloat(),
+                frame.distance,
+                listOf(LobbySlot(feet, lookYaw(feet, camera))),
+                emptyList(),
+                0.0,
+                frame.distance,
+                0.0,
+                spot,
+                frame.heading,
+                interior = solver.interior,
+                forced = true,
+            )
+        }
+
+        private fun safeFinish(solver: Solver, stage: LobbyStage): LobbyStage =
+            runCatching { finish(solver, stage) }.getOrDefault(stage)
 
         /** Party members you need room for: 4 normally, with Any Terrain only you (the rest fill in where they can). */
         private fun required(solver: Solver): Int = if (solver.anyTerrain) 1 else PARTY_MIN
@@ -425,7 +487,8 @@ data class LobbyStage(
 
         fun restore(level: BlockGetter, tag: CompoundTag): LobbyStage? {
             val spot = tag.optIntArray("spot") ?: return null
-            val solver = Solver(level, tag.optByte("interior") == 1.toByte())
+            val forced = tag.optByte("forced") == 1.toByte()
+            val solver = Solver(level, tag.optByte("interior") == 1.toByte(), forced)
             val frame = Frame(
                 BlockPos(spot[0], spot[1], spot[2]),
                 tag.getDoubleOr("heading", 0.0),
@@ -433,7 +496,9 @@ data class LobbyStage(
                 tag.getDoubleOr("distance", 18.5),
                 solver.base,
             )
-            return solve(solver, frame, 1, true)?.let { finish(solver, it) }
+            solve(solver, frame, 1, true)?.let { return finish(solver, it).copy(forced = forced) }
+            if (!forced) return null
+            return safeFinish(solver, plainStage(solver, frame, feetOf(level, frame.spot)))
         }
 
         private fun solve(solver: Solver, frame: Frame, required: Int, complete: Boolean): LobbyStage? {

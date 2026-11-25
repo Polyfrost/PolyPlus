@@ -176,8 +176,13 @@ float dofRadius() {
     return DOF_RADIUS * pixelScale();
 }
 
+// Lens.z = reveal mode + 4 * user blur strength in percent (0 = blur off)
+float userBlur() {
+    return floor((Lens.z + 0.5) / 4.0) / 100.0;
+}
+
 float skyRadius() {
-    return SKY_RADIUS * pixelScale();
+    return SKY_RADIUS * pixelScale() * userBlur();
 }
 
 float focusDistance() {
@@ -193,7 +198,7 @@ float lensCoc(float z) {
 }
 
 int revealMode() {
-    return int(Lens.z + 0.5);
+    return int(mod(Lens.z + 0.5, 4.0));
 }
 
 float focusPullBlur(float z) {

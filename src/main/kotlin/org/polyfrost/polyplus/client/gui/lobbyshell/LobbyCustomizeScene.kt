@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,6 +44,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
+import org.polyfrost.polyplus.client.lobby.LobbyLook
 import org.polyfrost.polyplus.client.lobby.LobbyPacks
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbySceneEntry
@@ -100,6 +103,7 @@ internal fun SceneSection(lobby: LobbyShell, state: CustomizeState) {
         SceneGroupLabel("Polyfrost scenes")
         SceneTileGrid(bundled, selected, !following)
     }
+    ViewRows()
     DrillRow("image-01", "See all", plural(LobbySceneStore.captures.size + LobbySceneStore.bundledScenes.size, "scene"), { state.open(CustomizePage.AllScenes) })
     DrillRow("globe-01", "Server scenes", if (serverCount == 0) "None set" else "$serverCount set", { state.open(CustomizePage.ServerScenes) })
     DrillRow("video-recorder", "Capture", if (LobbySceneStore.captureEnabled) "On" else "Off", { state.open(CustomizePage.Capture) })
@@ -111,6 +115,33 @@ internal fun SceneSection(lobby: LobbyShell, state: CustomizeState) {
         },
         enabled = mode != SceneMode.AUTOMATIC || pinned != null || serverCount > 0,
     )
+}
+
+@Composable
+private fun ViewRows() {
+    val current = LobbyScene.currentId ?: return
+    var saved by remember(current) { mutableStateOf(LobbySceneStore.view(current) != null) }
+    SceneGroupLabel("Camera angle")
+    DrillRow(
+        "video-recorder",
+        if (saved) "Update saved angle" else "Save this angle",
+        if (saved) "Saved" else null,
+        {
+            LobbySceneStore.setView(current, LobbyLook.current())
+            saved = true
+        },
+    )
+    if (saved) {
+        ResetRow(
+            {
+                LobbySceneStore.setView(current, null)
+                saved = false
+                LobbyLook.reset()
+            },
+            label = "Use the scene's own angle",
+        )
+    }
+    PanelHint("Drag and scroll the lobby to aim the camera. The lobby always opens on the saved angle; double click goes back to it.")
 }
 
 private fun modeHint(mode: SceneMode, pinned: String?, following: Boolean): String = when {

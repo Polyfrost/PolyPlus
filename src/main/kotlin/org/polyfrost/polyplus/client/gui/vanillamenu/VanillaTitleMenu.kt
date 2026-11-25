@@ -387,7 +387,7 @@ object VanillaTitleMenu {
             { Component.literal("PolyPlus Menu") } to { MainMenuReplacement.switchToPolyPlusMenu() },
             { Component.literal("Notifications") } to { MenuPanelScreen.open(MenuPanelScreen.Panel.Notifications) },
             { themeLabel() } to { toggleTheme() },
-            { Component.literal("Edit Main Menu") } to { EditMenuChooser.open() },
+            { Component.literal("Edit Main Menu") } to { EditMenuChooser.editVanilla() },
             { Component.literal("OneClient Settings") } to { PolyPlusOneConfigIntegration.openSettings() },
         )
         val toggleX = screen.width - SIZE - MARGIN

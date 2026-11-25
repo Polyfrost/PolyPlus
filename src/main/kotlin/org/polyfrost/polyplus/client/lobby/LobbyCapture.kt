@@ -132,6 +132,7 @@ object LobbyCapture {
         val minSection: Int,
         val keptTop: Int,
         val weaker: Boolean = false,
+        val forced: Boolean = false,
     ) {
         val timing = Timing()
         val chunks = ArrayList<LobbyChunkCopy>()
@@ -953,14 +954,16 @@ object LobbyCapture {
         val left = job.source.left
         val level = left ?: mc.level
         val action = job.source.action
-        val verdict = if (judged.rejection != null || action == LobbySpotAction.CHECK) judged else pickView(job.source, judged)
+        val picked = if (judged.rejection != null || action == LobbySpotAction.CHECK) judged else pickView(job.source, judged)
+        val forced = action == LobbySpotAction.CAPTURE && (picked.rejection != null || picked.anchor == null) && picked.rejection !in HARD_REJECTIONS
+        val verdict = if (forced) forcedVerdict(picked, job.origin) else picked
         val anchor = verdict.anchor
         val rejection = verdict.rejection
         if (level == null || level !== surveyed || (left == null && level !== trackedLevel)) {
             if (action != null) spot = LobbySpotState.Idle
             return
         }
-        indoorRetry(level, job, verdict)?.let {
+        (if (forced) null else indoorRetry(level, job, verdict))?.let {
             report(job.source, job.origin, "outdoor ${rejection?.name}, trying indoors")
             if (left != null) {
                 busy = true
@@ -1005,7 +1008,8 @@ object LobbyCapture {
         val below = if (size.radius > LobbySnapshot.DEFAULT_RADIUS) LobbySnapshot.BELOW_ANCHOR_LARGE else LobbySnapshot.BELOW_ANCHOR
         val minSection = maxOf(level.minSectionY, SectionPos.blockToSectionCoord(anchor.y - below))
         val keptTop = minOf(level.maxSectionY, SectionPos.blockToSectionCoord(anchor.y + LobbySnapshot.ABOVE_ANCHOR))
-        val copy = Copying(job.source, verdict, anchor, radius, job.timing, minSection, keptTop, weaker)
+        if (forced) report(job.source, anchor, "forced capture (was ${picked.rejection?.name})")
+        val copy = Copying(job.source, verdict, anchor, radius, job.timing, minSection, keptTop, weaker, forced)
         if (action != null) spot = LobbySpotState.Saving(0f)
         val center = LobbyCompat.chunkOf(anchor)
         for (x in center.x - radius..center.x + radius) {
@@ -1019,6 +1023,18 @@ object LobbyCapture {
             copying = copy
         }
     }
+
+    /** Rejections even "Capture this spot" can't get past: wrong dimension, outside the world, nothing loaded. */
+    private val HARD_REJECTIONS = setOf(
+        LobbySceneScore.Rejection.DIMENSION,
+        LobbySceneScore.Rejection.HEIGHT,
+        LobbySceneScore.Rejection.ROOF,
+        LobbySceneScore.Rejection.UNLOADED,
+    )
+
+    /** "Capture this spot" on a spot the checks don't like: save it anyway, standing where you are. */
+    private fun forcedVerdict(verdict: LobbySceneScore.Verdict, origin: BlockPos): LobbySceneScore.Verdict =
+        verdict.copy(anchor = verdict.anchor ?: origin, score = maxOf(verdict.score, LobbySceneScore.MIN_SCORE), rejection = null)
 
     private fun pickView(source: Source, verdict: LobbySceneScore.Verdict): LobbySceneScore.Verdict {
         val manual = source.action != null
@@ -1158,7 +1174,7 @@ object LobbyCapture {
         return Runnable {
             try {
                 val solveStart = Util.getNanos()
-                val stage = LobbyStage.build(LobbyCopyView(job.chunks, minY, height), anchor, job.verdict.profile.interior)
+                val stage = LobbyStage.build(LobbyCopyView(job.chunks, minY, height), anchor, job.verdict.profile.interior, job.forced)
                 val solveMillis = (Util.getNanos() - solveStart) / 1_000_000L
                 if (stage == null) {
                     landed.add(
