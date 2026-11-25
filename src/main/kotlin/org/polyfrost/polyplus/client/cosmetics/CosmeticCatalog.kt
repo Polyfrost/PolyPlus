@@ -21,6 +21,7 @@ import org.polyfrost.polyplus.client.network.http.responses.EquippedCosmetics
 import org.polyfrost.polyplus.client.network.http.responses.PartialEquippedCosmetics
 import org.polyfrost.polyplus.client.network.http.responses.PlayerCosmetics
 import org.polyfrost.polyplus.client.network.http.responses.SetEquippedCosmeticsRequest
+import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -72,7 +73,10 @@ object CosmeticCatalog {
         particleColors.remove(uuid)
     }
 
-    fun isPolyPlusUser(uuid: UUID): Boolean = accountId(uuid) in polyPlusUsers
+    fun isPolyPlusUser(uuid: UUID): Boolean {
+        val id = accountId(uuid)
+        return id in polyPlusUsers || (id == ClientPlatform.localPlayerUuid() && PolyConnection.isConnected)
+    }
 
     fun setPolyPlusUser(uuid: UUID, online: Boolean) {
         if (online) polyPlusUsers.add(uuid) else polyPlusUsers.remove(uuid)
