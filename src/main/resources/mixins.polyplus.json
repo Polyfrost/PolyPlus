@@ -240,10 +240,6 @@
     //? if > 1.8.9 && < 1.21.11
     //"client.access.ScreenBindAccessor",
     //? if > 1.8.9
-    "client.access.SoundEngineAccessor",
-    //? if > 1.8.9
-    "client.access.SoundManagerAccessor",
-    //? if > 1.8.9
     "client.access.SpriteIconButtonAccessor",
     //? if = 1.8.9
     //"client.access.TitleScreenInvoker",
@@ -271,6 +267,8 @@
     "client.lobby.MixinLobbyCamera",
     //? if > 1.8.9
     "client.lobby.MixinChannel",
+    //? if > 1.8.9
+    "client.lobby.MixinSoundEngine",
     //? if >= 1.21.8
     "client.lobby.MixinChunkSectionLayer",
     //? if < 1.21.11 && > 1.8.9

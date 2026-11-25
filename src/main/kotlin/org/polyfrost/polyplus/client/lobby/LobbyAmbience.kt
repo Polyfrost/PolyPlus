@@ -9,14 +9,10 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.exp
 
 //? if > 1.8.9 {
-import com.mojang.blaze3d.audio.Channel
 import net.minecraft.client.resources.sounds.AbstractSoundInstance
 import net.minecraft.client.resources.sounds.SoundInstance
 import net.minecraft.client.resources.sounds.TickableSoundInstance
 import net.minecraft.sounds.SoundSource
-import org.polyfrost.polyplus.mixin.client.access.ChannelHandleAccessor
-import org.polyfrost.polyplus.mixin.client.access.SoundEngineAccessor
-import org.polyfrost.polyplus.mixin.client.access.SoundManagerAccessor
 //?} else {
 /*import net.minecraft.client.sound.SoundCategory
 import net.minecraft.client.sound.instance.AbstractTickableSoundInstance
@@ -174,14 +170,20 @@ object LobbyAmbience {
         val sound = AmbienceSound(event(STARTUP), false)
         sound.gain = volume()
         presence = 1f
-        mc.soundManager.play(sound)
         //? if > 1.8.9
-        if (!active(mc, sound)) return
+        val gate = LobbySoundGate.hold(listOf(sound))
+        mc.soundManager.play(sound)
+        //? if > 1.8.9 {
+        if (!active(mc, sound)) {
+            LobbySoundGate.cancel(gate)
+            return
+        }
+        //?}
         intro = sound
         introBorn = clock
         val delay = (minOf(seconds, HANDOFF_SECONDS) * 1_000_000_000.0).toLong()
         //? if > 1.8.9 {
-        introGate = channelOf(mc, sound)?.let { LobbySoundGate.hold(listOf(it)) }
+        introGate = gate
         introDelay = delay
         begin(mc, true)
         //?} else {
@@ -289,26 +291,38 @@ object LobbyAmbience {
 
     private fun join(mc: Minecraft, layers: List<Layer>, initial: FloatArray?) {
         val have = voices.mapTo(HashSet()) { it.layer }
+        val fresh = layers.filter { it !in have }.map { layer ->
+            Voice(layer, AmbienceSound(event(layer.key), true), clock).also {
+                it.weight = initial?.get(layer.ordinal) ?: 0f
+                it.sound.gain = presence * volume() * it.weight
+            }
+        }
+        if (fresh.isEmpty()) return
+        //? if > 1.8.9
+        val gate = LobbySoundGate.hold(fresh.map { it.sound }, introGate, introDelay)
         val added = ArrayList<Voice>()
-        for (layer in layers) {
-            if (layer in have) continue
-            val voice = Voice(layer, AmbienceSound(event(layer.key), true), clock)
-            voice.weight = initial?.get(layer.ordinal) ?: 0f
-            voice.sound.gain = presence * volume() * voice.weight
+        for (voice in fresh) {
             mc.soundManager.play(voice.sound)
             //? if > 1.8.9 {
             if (!active(mc, voice.sound)) {
                 voice.sound.ended = true
-                failedAt[layer] = clock
+                failedAt[voice.layer] = clock
+                LobbySoundGate.forget(gate, voice.sound)
                 continue
             }
             //?}
             added += voice
         }
-        if (added.isEmpty()) return
+        //? if > 1.8.9 {
+        if (added.isEmpty()) {
+            LobbySoundGate.cancel(gate)
+            return
+        }
+        layerGates += gate
+        //?} else {
+        /*if (added.isEmpty()) return
+        *///?}
         voices = voices + added
-        //? if > 1.8.9
-        layerGates += LobbySoundGate.hold(added.mapNotNull { channelOf(mc, it.sound) }, introGate, introDelay)
     }
 
     private fun drop(mc: Minecraft, voice: Voice, failed: Boolean) {
@@ -444,13 +458,6 @@ object LobbyAmbience {
         *///?}
     }.getOrNull()
 
-    //? if > 1.8.9 {
-    private fun channelOf(mc: Minecraft, sound: SoundInstance): Channel? {
-        val engine = (mc.soundManager as SoundManagerAccessor).`polyplus$engine`() as SoundEngineAccessor
-        val handle = engine.`polyplus$channels`()[sound] ?: return null
-        return (handle as ChannelHandleAccessor).`polyplus$channel`()
-    }
-    //?}
 
     private fun oggSeconds(bytes: ByteArray): Double? {
         val header = indexOf(bytes, VORBIS)
