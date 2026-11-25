@@ -422,6 +422,7 @@ object OnboardingFeatures {
 
     fun applyMotionBlur(mode: Int, strength: Int): Boolean {
         if (mode == MOTION_BLUR_UNSET) return false
+        if (mode == MOTION_BLUR_KEEP) return true
         return runCatching {
             val config = Class.forName(POLYBLUR_CONFIG)
             val instance = config.getField("INSTANCE").get(null)
@@ -857,6 +858,7 @@ object OnboardingFeatures {
     const val MOTION_BLUR_DISABLED = 0
     const val MOTION_BLUR_PERFORMANCE = 1
     const val MOTION_BLUR_QUALITY = 2
+    const val MOTION_BLUR_KEEP = 3
 
     private const val UNITY_BLUR_TYPE = 1  // blurType dropdown 0 Phosphor 1 Unity 2 Hybrid
     private const val HYBRID_BLUR_TYPE = 2

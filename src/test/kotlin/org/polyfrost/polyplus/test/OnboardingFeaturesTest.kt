@@ -254,6 +254,12 @@ class OnboardingFeaturesTest {
         save()
         assertTrue(ModernOverlayConfig.saved)
     }
+
+    @Test
+    fun `skipped motion blur choice counts as applied without touching PolyBlur`() {
+        assertTrue(OnboardingFeatures.applyMotionBlur(OnboardingFeatures.MOTION_BLUR_KEEP, 3))
+        assertFalse(OnboardingFeatures.applyMotionBlur(OnboardingFeatures.MOTION_BLUR_UNSET, 3))
+    }
 }
 
 class LegacyOverlayConfig {
