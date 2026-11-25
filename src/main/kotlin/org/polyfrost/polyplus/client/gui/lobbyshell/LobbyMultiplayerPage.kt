@@ -467,10 +467,7 @@ private fun ServerActions(
                 val invites = LobbyRealms.invites
                 NavIconButton(REALM_ICON, if (invites > 0) "Realms, $invites ${if (invites == 1) "invite" else "invites"}" else "Realms", lobby::openRealms)
             }
-            NavIconButton(LobbyIcons.REFRESH, "Refresh", {
-                lobby.servers.refresh()
-                LobbyRealms.refresh(force = true)
-            })
+            NavIconButton(LobbyIcons.REFRESH, "Refresh", lobby::refreshServers)
             if (sortable) SortMenu(lobby.servers)
             NavIconButton(if (listView) GRID_ICON else LIST_ICON, if (listView) "Show as grid" else "Show as list", { onLayout(!listView) })
         }

@@ -407,6 +407,11 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
 
     private fun covered(): Boolean = accountsOpen || BackStack.hasOpen || hostWorldId != null || editing != null || deleting != null || directOpen
 
+    fun refreshServers() {
+        servers.refresh()
+        LobbyRealms.refresh(force = true)
+    }
+
     fun calm(): Boolean = !setup && tour == null && !customizeOpen && !covered() && !SocialPageState.dialogOpen && !TextInputFocus.isTyping
 
     fun openSocial(): Boolean {

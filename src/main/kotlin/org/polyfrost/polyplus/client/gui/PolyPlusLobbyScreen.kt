@@ -84,6 +84,10 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
             /*return true
             *///?}
         }
+        if (key == InputConstants.KEY_F5 && lobby.page == LobbyPage.Multiplayer && lobby.calm()) {
+            lobby.refreshServers()
+            return true
+        }
         val enter = key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER
         if (enter && (lobby.tour != null || !keyNavigated || !LobbyA11y.keyboardFocused()) && lobby.openSocial()) return true
         return super.handleKeyPressed(key, modifiers)
