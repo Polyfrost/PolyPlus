@@ -39,6 +39,7 @@ sealed interface ClientboundPacket {
         @SerialName("active_emotes") val activeEmotes: Map<String, Int>,
         @SerialName("particle_colors") val particleColors: Map<String, Int> = emptyMap(),
         val users: List<String> = emptyList(),
+        val badges: List<String>? = null,
         val rejected: List<String> = emptyList(),
         @SerialName("request_id") val requestId: Long? = null,
     ) : ClientboundPacket
@@ -49,6 +50,7 @@ sealed interface ClientboundPacket {
         val player: String,
         val online: Boolean,
         val status: PlayerStatus = PlayerStatus.Unknown,
+        val badge: Boolean? = null,
     ) : ClientboundPacket
 
     @Serializable
