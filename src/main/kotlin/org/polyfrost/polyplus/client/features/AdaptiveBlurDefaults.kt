@@ -22,6 +22,7 @@ object AdaptiveBlurDefaults {
     private const val WINDOW_MILLIS = 5_000L
     private const val WARMUP_MILLIS = 1_000L
 
+    private const val LOW_FPS_MARGIN = 10
     private const val HEADROOM_MARGIN = 30
     private const val HEADROOM_MARGIN_HI = 75
     private const val UNITY_BLUR_TYPE = 1
@@ -100,16 +101,16 @@ object AdaptiveBlurDefaults {
         abortWindow()
         if (sampled) return
         val refreshRate = refreshRate()
-        recommendedMode = recommendedMode(averageFps, refreshRate)
+        recommendedMode = when {
+            averageFps < refreshRate - LOW_FPS_MARGIN -> OnboardingFeatures.MOTION_BLUR_DISABLED
+            averageFps < refreshRate + HEADROOM_MARGIN -> OnboardingFeatures.MOTION_BLUR_PERFORMANCE
+            else -> OnboardingFeatures.MOTION_BLUR_QUALITY
+        }
         if (!PolyPlusConfig.adaptiveBlurApplied && !OnboardingFeatures.needsMotionBlurChoice()) {
             apply(averageFps, refreshRate)
         }
         sampled = true
     }
-
-    internal fun recommendedMode(averageFps: Float, refreshRate: Int): Int =
-        if (averageFps < refreshRate + HEADROOM_MARGIN) OnboardingFeatures.MOTION_BLUR_PERFORMANCE
-        else OnboardingFeatures.MOTION_BLUR_QUALITY
 
     private fun apply(averageFps: Float, refreshRate: Int) {
         val instance = polyBlurInstance() ?: return

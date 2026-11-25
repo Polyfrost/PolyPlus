@@ -441,8 +441,8 @@ internal fun OnboardingFlow(
     }
 
     val skipSetup = {
-        if (needsBlurChoice && blurMode == OnboardingFeatures.MOTION_BLUR_UNSET && AdaptiveBlurDefaults.sampled) {
-            blurMode = AdaptiveBlurDefaults.recommendedMode
+        if (needsBlurChoice && blurMode == OnboardingFeatures.MOTION_BLUR_UNSET) {
+            blurMode = OnboardingFeatures.MOTION_BLUR_KEEP
         }
         finish()
     }

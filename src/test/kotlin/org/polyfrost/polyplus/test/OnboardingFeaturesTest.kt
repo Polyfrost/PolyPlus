@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.betterGrassPreviewPath
 import org.polyfrost.polyplus.client.gui.gammaPreviewPaths
@@ -257,10 +256,9 @@ class OnboardingFeaturesTest {
     }
 
     @Test
-    fun `low main-menu FPS never recommends turning motion blur off`() {
-        assertEquals(OnboardingFeatures.MOTION_BLUR_PERFORMANCE, AdaptiveBlurDefaults.recommendedMode(5f, 60))
-        assertEquals(OnboardingFeatures.MOTION_BLUR_PERFORMANCE, AdaptiveBlurDefaults.recommendedMode(80f, 60))
-        assertEquals(OnboardingFeatures.MOTION_BLUR_QUALITY, AdaptiveBlurDefaults.recommendedMode(200f, 60))
+    fun `skipped motion blur choice counts as applied without touching PolyBlur`() {
+        assertTrue(OnboardingFeatures.applyMotionBlur(OnboardingFeatures.MOTION_BLUR_KEEP, 3))
+        assertFalse(OnboardingFeatures.applyMotionBlur(OnboardingFeatures.MOTION_BLUR_UNSET, 3))
     }
 }
 
