@@ -1,4 +1,4 @@
-PolyPlus, Swylow edition (2.4.0-swylow.5, Minecraft 26.2, Fabric)
+PolyPlus, Swylow edition (2.4.0-swylow.6, Minecraft 26.2, Fabric)
 Based on PolyPlus 2.4.0, the version OneClient ships now, with all the Swylow changes on top.
 
 INSTALL
@@ -7,7 +7,7 @@ INSTALL
    (the folder that has "mods" in it).
 3. In "mods", delete the old PolyPlus jar (polyplus-2.4.x+26.2.jar or an older swylow one).
 4. Put both jars from mod/ in "mods":
-   - polyplus-2.4.0-swylow.5+26.2.jar  (the mod)
+   - polyplus-2.4.0-swylow.6+26.2.jar  (the mod)
    - PolyPlus-Swylow-Guard-1.0.0.jar    (tiny helper, see below)
 5. Start the game.
 
@@ -20,7 +20,7 @@ updates the instance. Your menu then looks like the normal one again.
   "PolyPlus was replaced by the launcher". Your menu layout is NOT lost, it is
   saved in config/polyplus/menu-layout.json.
 - Fix: close the game, delete the official polyplus jar from "mods", put
-  polyplus-2.4.0-swylow.5+26.2.jar back, start again.
+  polyplus-2.4.0-swylow.6+26.2.jar back, start again.
 - If your launcher has a setting to stop updating mods / the OneClient bundle for
   this instance, turn it off, then it stops happening.
 - It never happens in a launcher that doesn't manage the mods for you (for example
@@ -36,6 +36,32 @@ Want Essential's own buttons back? OneConfig > Main Menu (OneClient) > Vanilla
 Style > turn off "Hide Essential's Title Screen Buttons".
 (Essential also has its own setting: Essential settings > Appearance >
 "Essential menu layout" > Off hides its buttons everywhere, also in the pause menu.)
+
+NEW IN swylow.6
+- Pan: hold RIGHT click on an empty part of the lobby and drag to slide the
+  camera around. Left drag still turns it, scroll zooms.
+- Far zoom: zoom much further in and out, and pan far across the scene, so a
+  capture from up high (like y 100) can show the whole area.
+- Your character on any block: drag it anywhere you can see, also high up. It
+  no longer jumps back to where it started.
+- Turn your character: hold SHIFT and left drag on your character. A ring shows
+  around its feet and you can turn it a full 360 degrees, on any block.
+- Right click your character: Hide username, Edit animation. The animation
+  panel previews each one on your character when you hover it, click to keep it:
+  Wave, Superman, Flying, Meditate, Sit, T-pose, Salute, Arms crossed, Dab,
+  Dance, Cheer, Zombie, Think, Spin, Lie down.
+- Size: the edit panel has a Size control, or hover an element in the editor
+  and use the scroll wheel to make it bigger or smaller.
+- Cleaner editor: editing (also in the vanilla style menu) opens a
+  OneClient-style side panel instead of switching screens.
+- Top bar split up: the logo, the ONECLIENT text and each nav item / icon at
+  the top are their own elements now. Move, hide or edit each one.
+- Right click a widget (clock, FPS, text...) right on the lobby, no editor
+  needed: Edit... lets you change the text, text colour, font, size and add
+  your own image.
+- Profiles: the editor bar has a "Profiles" button. Save your current layout
+  (menu, lobby elements, hidden name and animation) under a name, and load it
+  back any time from "Saved profiles", for example after a reset.
 
 NEW IN swylow.5
 - Capture any spot: scenes no longer need flat ground, so your own spot on

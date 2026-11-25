@@ -23,13 +23,13 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TabBadgePlacement
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
 import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
+import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.ModIntegrationButton
 import org.polyfrost.polyplus.client.gui.ModIntegrationButtons
 import org.polyfrost.polyplus.client.gui.Outfit
 import org.polyfrost.polyplus.client.lobby.StartupOverlay
-import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private val NAV_UNDERLINE_WIDTH = 27.dp
 private val NAV_UNDERLINE_HEIGHT = 2.dp
@@ -38,8 +38,13 @@ private val NAV_UNDERLINE_HEIGHT = 2.dp
 internal fun Wordmark(modifier: Modifier = Modifier, mark: Modifier = Modifier, word: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(mark) { LobbyIcon("logo", size = 28.dp) }
-        Box(word) { Text("ONECLIENT", style = OneConfigTheme.current.typography.body.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = Outfit), maxLines = 1, softWrap = false) }
+        Box(word) { WordmarkText() }
     }
+}
+
+@Composable
+internal fun WordmarkText() {
+    Text("ONECLIENT", style = OneConfigTheme.current.typography.body.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.5.sp, fontFamily = Outfit), maxLines = 1, softWrap = false)
 }
 
 @Composable

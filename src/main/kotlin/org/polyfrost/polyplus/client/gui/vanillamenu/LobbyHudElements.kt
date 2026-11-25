@@ -3,43 +3,57 @@
 package org.polyfrost.polyplus.client.gui.vanillamenu
 
 //? if >= 26.1 {
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sun.management.OperatingSystemMXBean
 import kotlinx.coroutines.delay
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.components.Button
-import net.minecraft.client.gui.components.EditBox
-import net.minecraft.client.gui.components.StringWidget
 import net.minecraft.client.gui.screens.Screen
-import net.minecraft.network.chat.CommonComponents
-import net.minecraft.network.chat.Component
 import org.polyfrost.oneconfig.api.config.v1.ConfigManager
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigDestination
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
+import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
-import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
+import org.polyfrost.polyplus.client.gui.lobbyshell.MenuRow
+import org.polyfrost.polyplus.client.gui.lobbyshell.POPUP_MENU_WIDTH
+import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import java.lang.management.ManagementFactory
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -148,7 +162,7 @@ internal object LobbyHud {
     }
 
     fun edit(id: String) {
-        if (isHud(MenuLayoutStore.element(SCOPE, id))) ClientPlatform.setScreen(LobbyElementScreen(ClientPlatform.currentScreen(), id))
+        if (isHud(MenuLayoutStore.element(SCOPE, id))) LobbyElementPanel.open(id)
     }
 
     /** Every mod with a OneConfig config, id to name. */
@@ -173,6 +187,80 @@ internal object LobbyHud {
     fun color(hex: String): Color = Color(0xFF000000.toInt() or (hex.trim().removePrefix("#").toIntOrNull(16)?.and(0xFFFFFF) ?: 0xFFFFFF))
 
     private const val MB = 1024L * 1024L
+}
+
+/** Right-click on a lobby widget outside the editor: a small Edit / Hide menu. */
+internal object LobbyHudMenu {
+    var id by mutableStateOf<String?>(null)
+    var at by mutableStateOf(Offset.Zero)
+
+    fun open(id: String, at: Offset) {
+        this.id = id
+        this.at = at
+    }
+
+    fun close() {
+        id = null
+    }
+
+    fun hide(id: String) {
+        MenuLayoutStore.checkpoint(LobbyHud.SCOPE)
+        MenuLayoutStore.edit(LobbyHud.SCOPE, id).visible = false
+        MenuLayoutStore.save()
+    }
+}
+
+@Composable
+internal fun BoxScope.LobbyHudMenuHost() {
+    val id = LobbyHudMenu.id ?: return
+    val at = LobbyHudMenu.at
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == PointerEventType.Press) {
+                        event.changes.forEach { it.consume() }
+                        LobbyHudMenu.close()
+                    }
+                }
+            }
+        },
+    )
+    Column(
+        Modifier
+            .align(Alignment.TopStart)
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                layout(0, 0) {
+                    val x = at.x.roundToInt().coerceIn(0, (constraints.maxWidth - placeable.width).coerceAtLeast(0))
+                    val y = at.y.roundToInt().coerceIn(0, (constraints.maxHeight - placeable.height).coerceAtLeast(0))
+                    placeable.place(x, y)
+                }
+            }
+            .width(POPUP_MENU_WIDTH)
+            .panel(12.dp)
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        MenuRow("Edit") {
+            LobbyHudMenu.close()
+            LobbyElementPanel.open(id)
+        }
+        MenuRow("Hide") {
+            LobbyHudMenu.close()
+            LobbyHudMenu.hide(id)
+        }
+        MenuRow("Duplicate") {
+            LobbyHudMenu.close()
+            LobbyHud.duplicate(listOf(id))
+            MenuLayoutEditor.selection.clear()
+        }
+        MenuRow("Delete") {
+            LobbyHudMenu.close()
+            LobbyHud.delete(listOf(id))
+        }
+    }
 }
 
 /** The added lobby elements, drawn on top of the lobby (home page). */
@@ -201,132 +289,50 @@ internal fun BoxScope.LobbyAddedElements(screen: Screen) {
 private fun LobbyHudPill(element: MenuElement, editing: Boolean, screen: Screen) {
     val color = LobbyHud.color(element.prop("color", "FFFFFF"))
     val icon = element.prop("icon")
+    val size = (element.prop("size", "14").toFloatOrNull() ?: 14f).coerceIn(6f, 64f)
+    val image = element.prop("image").takeIf { it.isNotEmpty() }?.let { LobbyImages.get(it) }
     val shape = RoundedCornerShape(8.dp)
-    var modifier: Modifier = Modifier
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var modifier: Modifier = Modifier.onGloballyPositioned { coords = it }
     if (element.prop("bg", "true") == "true") modifier = modifier.background(Color(0xB0101216), shape)
     if (element.type == "button" && !editing) modifier = modifier.clickable { LobbyHud.click(element, screen) }
+    if (!editing) modifier = modifier.pointerInput(element.id) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                    val change = event.changes.firstOrNull() ?: continue
+                    change.consume()
+                    val at = coords?.takeIf { it.isAttached }?.localToRoot(change.position) ?: change.position
+                    LobbyHudMenu.open(element.id, at)
+                }
+            }
+        }
+    }
     Row(
         modifier.padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon.isNotEmpty() && icon in LobbyHud.icons) LobbyIcon(icon, color, 16.dp)
+        if (image != null) {
+            val height = (size * 1.3f).dp
+            Image(image, null, Modifier.height(height).width(height * (image.width.toFloat() / image.height.coerceAtLeast(1))))
+        }
+        if (icon.isNotEmpty() && icon in LobbyHud.icons) LobbyIcon(icon, color, (size * 1.15f).dp)
         val text = LobbyHud.text(element)
-        if (text.isNotEmpty()) MenuText(text, 14.sp, color = color, fontWeight = FontWeight.Medium)
-    }
-}
-
-/** Edit an added lobby element: what it shows or does, color, icon, background, size and group. */
-internal class LobbyElementScreen(private val parent: Screen?, private val id: String) : Screen(Component.literal("Edit element")) {
-    private interface Field {
-        val label: String
-    }
-
-    private class Text(override val label: String, initial: String) : Field {
-        var value = initial
-    }
-
-    private class Choice(override val label: String, val options: List<Pair<String, String>>, initial: String) : Field {
-        var value = options.firstOrNull { it.first == initial }?.first ?: options.firstOrNull()?.first.orEmpty()
-        fun shown() = options.firstOrNull { it.first == value }?.second ?: value
-    }
-
-    private val element = MenuLayoutStore.element(LobbyHud.SCOPE, id)
-    private val type = element?.type.orEmpty()
-    private val props = LinkedHashMap(element?.props ?: emptyMap<String, String>())
-    private val mods = LobbyHud.mods()
-
-    private val content = when (type) {
-        "text" -> Text("Text (\\n = new line)", props["text"].orEmpty())
-        "button" -> Text("Label", props["label"].orEmpty())
-        else -> null
-    }
-    private val seconds = if (type == "clock") Choice("Seconds", listOf("false" to "Off", "true" to "On"), props["seconds"] ?: "false") else null
-    private val action = if (type == "button") Choice("Action", LobbyHud.buttonActions, props["action"] ?: "screen") else null
-    private val mod = if (type == "button") Choice("Mod", listOf("" to "(pick a mod)") + mods, if (props["action"] == "mod") props["value"].orEmpty() else "") else null
-    private val screenChoice = if (type == "button") Choice("Screen", CustomAction.screens, if (props["action"] == "screen") props["value"].orEmpty() else "mods") else null
-    private val address = if (type == "button") Text("Server / URL", if (props["action"] == "server" || props["action"] == "url") props["value"].orEmpty() else "") else null
-    private val color = Text("Color (hex)", props["color"] ?: "FFFFFF")
-    private val icon = Choice("Icon", listOf("" to "(none)") + LobbyHud.icons.map { it to it }, props["icon"].orEmpty())
-    private val background = Choice("Background", listOf("true" to "On", "false" to "Off"), props["bg"] ?: "true")
-    private val scale = Text("Size", "%.2f".format(element?.scale ?: 1f))
-    private val opacity = Text("Opacity %", ((element?.opacity ?: 1f) * 100).roundToInt().toString())
-    private val visible = Choice("Visible", listOf("true" to "Shown", "false" to "Hidden"), (element?.visible ?: true).toString())
-    private val group = Text("Group", element?.group.orEmpty())
-
-    private val fields: List<Field> = listOfNotNull(content, seconds, action, mod, screenChoice, address, color, icon, background, scale, opacity, visible, group)
-
-    override fun init() {
-        val access = this as ScreenAccessor
-        val rowHeight = 22
-        val perColumn = ((height - 70) / rowHeight).coerceAtLeast(4)
-        val columns = (fields.size + perColumn - 1) / perColumn
-        val columnWidth = 250
-        val left = width / 2 - columns * columnWidth / 2
-        val heading = Component.literal("Edit: ${element?.let { LobbyHud.label(it) } ?: id}")
-        access.polyplusAddRenderableWidget(StringWidget(width / 2 - font.width(heading) / 2, 12, font.width(heading), 9, heading, font))
-        fields.forEachIndexed { index, field ->
-            val cx = left + (index / perColumn) * columnWidth
-            val cy = 30 + (index % perColumn) * rowHeight
-            access.polyplusAddRenderableWidget(StringWidget(cx, cy + 6, 90, 9, Component.literal(field.label), font))
-            when (field) {
-                is Text -> {
-                    val box = EditBox(font, cx + 94, cy, 150, 18, Component.literal(field.label))
-                    box.setMaxLength(256)
-                    box.value = field.value
-                    box.setResponder { field.value = it }
-                    access.polyplusAddRenderableWidget(box)
-                }
-                is Choice -> {
-                    lateinit var button: Button
-                    button = Button.builder(Component.literal(field.shown())) {
-                        val at = field.options.indexOfFirst { it.first == field.value }
-                        val step = if (Minecraft.getInstance().hasShiftDown()) -1 else 1
-                        field.value = field.options[(at + step + field.options.size) % field.options.size].first
-                        button.message = Component.literal(field.shown())
-                    }.bounds(cx + 94, cy, 150, 18).build()
-                    access.polyplusAddRenderableWidget(button)
-                }
-            }
+        if (text.isNotEmpty()) {
+            val shadow = if (element.prop("shadow") == "true") Shadow(Color.Black.copy(alpha = 0.6f), Offset(1f, 1f), 2f) else null
+            BasicText(
+                text,
+                style = TextStyle(
+                    color = color,
+                    fontSize = size.sp,
+                    fontWeight = if (element.prop("bold") == "true") FontWeight.Bold else FontWeight.Medium,
+                    fontFamily = LobbyElementPanel.font(element.prop("font", "default")) ?: OneConfigTheme.current.fontFamily,
+                    shadow = shadow,
+                ),
+            )
         }
-        val hint = Component.literal("Shift+click a choice to go back")
-        access.polyplusAddRenderableWidget(StringWidget(width / 2 - font.width(hint) / 2, height - 42, font.width(hint), 9, hint, font))
-        val bottom = height - 28
-        access.polyplusAddRenderableWidget(Button.builder(CommonComponents.GUI_DONE) { done() }.bounds(width / 2 - 104, bottom, 100, 20).build())
-        access.polyplusAddRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL) { onClose() }.bounds(width / 2 + 4, bottom, 100, 20).build())
     }
-
-    private fun done() {
-        if (element == null) return onClose()
-        MenuLayoutStore.checkpoint(LobbyHud.SCOPE)
-        when (type) {
-            "text" -> props["text"] = content?.value.orEmpty()
-            "button" -> {
-                props["label"] = content?.value.orEmpty()
-                val chosen = action?.value ?: "screen"
-                props["action"] = chosen
-                props["value"] = when (chosen) {
-                    "mod" -> mod?.value.orEmpty()
-                    "screen" -> screenChoice?.value ?: "mods"
-                    else -> address?.value?.trim().orEmpty()
-                }
-            }
-            "clock" -> props["seconds"] = seconds?.value ?: "false"
-        }
-        props["color"] = color.value.trim().removePrefix("#").ifEmpty { "FFFFFF" }
-        props["icon"] = icon.value
-        props["bg"] = background.value
-        val stored = MenuLayoutStore.edit(LobbyHud.SCOPE, id)
-        stored.props.clear()
-        stored.props.putAll(props)
-        scale.value.trim().replace(',', '.').toFloatOrNull()?.let { stored.scale = it.coerceIn(0.25f, 4f) }
-        opacity.value.trim().toFloatOrNull()?.let { stored.opacity = (it / 100f).coerceIn(0f, 1f) }
-        stored.visible = visible.value == "true"
-        stored.group = group.value.trim().ifEmpty { null }
-        MenuLayoutStore.save()
-        onClose()
-    }
-
-    override fun onClose() = ClientPlatform.setScreen(parent)
 }
 //?}

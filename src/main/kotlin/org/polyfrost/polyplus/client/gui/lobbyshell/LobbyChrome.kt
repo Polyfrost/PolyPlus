@@ -7,6 +7,8 @@ import org.polyfrost.polyplus.client.gui.KitDangerColor
 import org.polyfrost.polyplus.client.gui.vanillamenu.EditMenuChooser
 import org.polyfrost.polyplus.client.gui.vanillamenu.EditableBlock
 import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyAddedElements
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanelHost
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyHudMenuHost
 import org.polyfrost.polyplus.client.gui.vanillamenu.MenuEditorBar
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
@@ -420,6 +422,8 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     PlayTogetherHooks(lobby)
     if (home) LobbyAddedElements(screen)
     MenuEditorBar("lobby")
+    if (home) LobbyHudMenuHost()
+    LobbyElementPanelHost()
     lobby.hostWorldId?.let { worldId -> HostWorldDialog(worldId, screen) { lobby.hostWorldId = null } }
     lobby.editing?.let { edit ->
         ServerEditDialog(
@@ -496,12 +500,14 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(NAV_SIDE.dp)) {
-            EditableBlock("lobby", "nav.logo", "Logo", group = NAV_GROUP) {
-                Wordmark(
-                    Modifier,
-                    mark = Modifier.onGloballyPositioned { StartupOverlay.navMark = StartupOverlay.place(it) },
-                    word = Modifier.onGloballyPositioned { StartupOverlay.navWord = StartupOverlay.place(it) },
-                )
+            // logo icon and the ONECLIENT text are separate pieces in the menu editor
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                EditableBlock("lobby", "nav.logo", "Logo icon") {
+                    Box(Modifier.onGloballyPositioned { StartupOverlay.navMark = StartupOverlay.place(it) }) { LobbyIcon("logo", size = 28.dp) }
+                }
+                EditableBlock("lobby", "nav.word", "Logo text") {
+                    Box(Modifier.onGloballyPositioned { StartupOverlay.navWord = StartupOverlay.place(it) }) { WordmarkText() }
+                }
             }
         }
         val density = LocalDensity.current
@@ -521,41 +527,45 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
             TabItem(tab.page, tab.label, badge = navTabBadge(dot != null), modifier = modifier, badgeDescription = dot)
         }
         Box(Modifier.weight(1f).a11yRegion(A11yRegion.Nav), contentAlignment = Alignment.Center) {
-            EditableBlock("lobby", "nav.tabs", "Tabs", group = NAV_GROUP) {
+            EditableBlock("lobby", "nav.tabs", "Tabs") {
                 NavTabRow(items, visible.firstOrNull { it.activeOn(lobby.page) }?.page ?: lobby.page, lobby::show)
             }
         }
         Box(Modifier.width(NAV_SIDE.dp), contentAlignment = Alignment.CenterEnd) {
-            key(lobby.profileVersion) { EditableBlock("lobby", "nav.tools", "Account and tools", group = NAV_GROUP) { ProfileCluster(lobby, screen) } }
+            key(lobby.profileVersion) { ProfileCluster(lobby, screen) }
         }
     }
 }
 
 private const val NAV_SIDE = 490
-private const val NAV_GROUP = "navbar"
 private const val INVITE_PENDING = "pending"
 
 @Composable
 private fun ProfileCluster(lobby: LobbyShell, screen: Screen) {
     Row(Modifier.tourAnchor(lobby.anchors, TourAnchor.Tools).a11yRegion(A11yRegion.Tools), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val mc = Minecraft.getInstance()
-        ServiceStatusButton()
-        NavIconButton(SOCIAL_ASSETS + "discord.svg", "Join our Discord", { ClientPlatform.openUri(PolyPlusConstants.DISCORD_URL) })
-        NotificationsButton()
-        ModMenuSlot(screen)
-        NavIconButton("settings", "Mods", { PolyPlusOneConfigIntegration.openMods() })
-        NavIconButton("cog", "Minecraft settings", {
-            //? if >= 26.3 || < 26.1 {
-            ClientPlatform.setScreen(OptionsScreen(screen, mc.options))
-            //?} else {
-            /*ClientPlatform.setScreen(OptionsScreen(screen, mc.options, false))
-            *///?}
-        })
-        MoreButton(lobby, screen)
+        // every icon is its own piece in the menu editor
+        EditableBlock("lobby", "nav.status", "Service status") { ServiceStatusButton() }
+        EditableBlock("lobby", "nav.discord", "Discord button") {
+            NavIconButton(SOCIAL_ASSETS + "discord.svg", "Join our Discord", { ClientPlatform.openUri(PolyPlusConstants.DISCORD_URL) })
+        }
+        EditableBlock("lobby", "nav.notifications", "Notifications") { NotificationsButton() }
+        EditableBlock("lobby", "nav.modmenu", "Mod menu button") { ModMenuSlot(screen) }
+        EditableBlock("lobby", "nav.mods", "Mods button") { NavIconButton("settings", "Mods", { PolyPlusOneConfigIntegration.openMods() }) }
+        EditableBlock("lobby", "nav.settings", "Settings button") {
+            NavIconButton("cog", "Minecraft settings", {
+                //? if >= 26.3 || < 26.1 {
+                ClientPlatform.setScreen(OptionsScreen(screen, mc.options))
+                //?} else {
+                /*ClientPlatform.setScreen(OptionsScreen(screen, mc.options, false))
+                *///?}
+            })
+        }
+        EditableBlock("lobby", "nav.more", "More button") { MoreButton(lobby, screen) }
         Spacer(Modifier.width(2.dp))
-        ProfileChip(lobby, Modifier.weight(1f, fill = false))
-        if (!ClientPlatform.isMac) NavIconButton("maximise", "Toggle fullscreen", ::toggleFullscreen)
-        QuitButton()
+        Box(Modifier.weight(1f, fill = false)) { EditableBlock("lobby", "nav.profile", "Name and skin") { ProfileChip(lobby, Modifier) } }
+        if (!ClientPlatform.isMac) EditableBlock("lobby", "nav.fullscreen", "Fullscreen button") { NavIconButton("maximise", "Toggle fullscreen", ::toggleFullscreen) }
+        EditableBlock("lobby", "nav.quit", "Quit button") { QuitButton() }
     }
 }
 

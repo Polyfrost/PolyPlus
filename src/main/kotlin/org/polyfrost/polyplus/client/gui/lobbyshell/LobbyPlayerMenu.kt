@@ -71,7 +71,7 @@ internal object LobbyPlayerMenu {
     }
 }
 
-private val MENU_WIDTH = 190.dp
+internal val POPUP_MENU_WIDTH = 190.dp
 private val MENU_ROW = 34.dp
 
 @Composable
@@ -103,7 +103,7 @@ internal fun BoxScope.LobbyPlayerMenuHost() {
                         placeable.place(x, y)
                     }
                 }
-                .width(MENU_WIDTH)
+                .width(POPUP_MENU_WIDTH)
                 .panel(12.dp)
                 .padding(4.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -122,7 +122,7 @@ internal fun BoxScope.LobbyPlayerMenuHost() {
 }
 
 @Composable
-private fun MenuRow(label: String, value: String? = null, onClick: () -> Unit) {
+internal fun MenuRow(label: String, value: String? = null, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
     Row(
         Modifier

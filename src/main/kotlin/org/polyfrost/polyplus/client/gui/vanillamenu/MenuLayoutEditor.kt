@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +44,9 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlSize
 import org.polyfrost.oneconfig.api.ui.v1.components.ControlStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
+import org.polyfrost.polyplus.client.gui.lobbyshell.MenuRow
+import org.polyfrost.polyplus.client.gui.lobbyshell.POPUP_MENU_WIDTH
+import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import kotlin.math.roundToInt
 
 /**
@@ -114,6 +118,21 @@ object MenuLayoutEditor {
         val grid = prefs.gridSize.coerceAtLeast(1).toFloat()
         return Offset((value.x / grid).roundToInt() * grid, (value.y / grid).roundToInt() * grid)
     }
+
+    private var lastScroll = 0L
+
+    /** Scroll wheel over a piece: one notch is 5% bigger or smaller; a burst of notches is one undo step. */
+    internal fun scrollScale(scope: String, id: String, notches: Int) {
+        val now = System.currentTimeMillis()
+        if (now - lastScroll > SCROLL_UNDO_GAP) MenuLayoutStore.checkpoint(scope)
+        lastScroll = now
+        val element = MenuLayoutStore.edit(scope, id)
+        element.scale = ((element.scale + notches * SCROLL_STEP) * 100f).roundToInt().div(100f).coerceIn(0.25f, 4f)
+        MenuLayoutStore.save()
+    }
+
+    private const val SCROLL_STEP = 0.05f
+    private const val SCROLL_UNDO_GAP = 600L
 
     internal fun commitDrag(scope: String) {
         val ids = dragIds
@@ -224,6 +243,15 @@ fun EditableBlock(scope: String, id: String, label: String, modifier: Modifier =
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Scroll) {
+                                // scroll wheel over a piece: bigger / smaller
+                                val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                                if (delta != 0f) {
+                                    event.changes.forEach { it.consume() }
+                                    MenuLayoutEditor.scrollScale(scope, id, if (delta < 0) 1 else -1)
+                                }
+                                continue
+                            }
                             if (event.type != PointerEventType.Press) continue
                             val position = event.changes.firstOrNull()?.position ?: continue
                             val shift = Minecraft.getInstance().hasShiftDown()
@@ -302,6 +330,7 @@ fun BoxScope.MenuEditorBar(scope: String) {
     MenuLayoutStore.revision.intValue
     val prefs = MenuLayoutStore.prefs()
     var adding by remember { mutableStateOf(false) }
+    var profilesOpen by remember { mutableStateOf(false) }
     Row(
         Modifier
             .align(Alignment.TopCenter)
@@ -329,29 +358,36 @@ fun BoxScope.MenuEditorBar(scope: String) {
         TextButton(text = "Redo", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = MenuLayoutStore.canRedo(scope), onClick = { MenuLayoutStore.redo(scope) })
         //? if >= 26.1 {
         if (scope == LobbyHud.SCOPE) {
-            TextButton(text = if (adding) "Close list" else "Add element", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = { adding = !adding })
+            TextButton(text = if (adding) "Close list" else "Add element", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = {
+                adding = !adding
+                profilesOpen = false
+            })
         }
+        TextButton(text = if (profilesOpen) "Close profiles" else "Profiles", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = {
+            profilesOpen = !profilesOpen
+            adding = false
+        })
         //?}
         TextButton(text = "Reset all", size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = { MenuLayoutEditor.reset(scope) })
         TextButton(text = "Done", size = ControlSize.Compact, style = ControlStyle.Primary, enabled = true, onClick = { MenuLayoutEditor.stop() })
     }
     //? if >= 26.1 {
+    if (profilesOpen) ProfilesDropdown { profilesOpen = false }
     if (adding && scope == LobbyHud.SCOPE) {
         Column(
             Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 112.dp)
                 .width(300.dp)
-                .background(Color(0xF8101216), RoundedCornerShape(6.dp))
-                .border(1.dp, Accent, RoundedCornerShape(6.dp))
+                .panel(12.dp)
                 .padding(4.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             for ((kind, name) in LobbyHud.kinds) {
-                TextButton(text = name, size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = true, onClick = {
+                MenuRow(name) {
                     adding = false
                     LobbyHud.add(kind)
-                })
+                }
             }
         }
     }
@@ -365,19 +401,26 @@ fun BoxScope.MenuEditorBar(scope: String) {
     Column(
         Modifier
             .align(Alignment.TopStart)
-            .offset { IntOffset(at.x.roundToInt(), at.y.roundToInt()) }
-            .width(170.dp)
-            .background(Color(0xF8101216), RoundedCornerShape(6.dp))
-            .border(1.dp, Accent, RoundedCornerShape(6.dp))
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                layout(0, 0) {
+                    val x = at.x.roundToInt().coerceIn(0, (constraints.maxWidth - placeable.width).coerceAtLeast(0))
+                    val y = at.y.roundToInt().coerceIn(0, (constraints.maxHeight - placeable.height).coerceAtLeast(0))
+                    placeable.place(x, y)
+                }
+            }
+            .width(POPUP_MENU_WIDTH)
+            .panel(12.dp)
             .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         @Composable
         fun item(text: String, enabled: Boolean = true, action: () -> Unit) {
-            TextButton(text = text, size = ControlSize.Compact, style = ControlStyle.Secondary, enabled = enabled, onClick = {
+            if (!enabled) return
+            MenuRow(text) {
                 MenuLayoutEditor.menu = null
                 action()
-            })
+            }
         }
         item(if (allHidden) "Show" else "Hide") { MenuLayoutEditor.setShown(scope, ids, allHidden) }
         if (join) {

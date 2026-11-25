@@ -10,6 +10,8 @@ import org.polyfrost.polyplus.client.VanillaMenuLayout
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.nameWithoutExtension
 
 /**
  * One piece of a menu. Built-in pieces only store what the player changed (a null anchor means "where the template
@@ -57,6 +59,12 @@ class MenuEditorPrefs(
     var barX: Int = Int.MIN_VALUE,
     var barY: Int = Int.MIN_VALUE,
     var panelOpen: Boolean = true,
+)
+
+/** A saved copy of every menu layout, plus a few lobby settings ([extra]), in config/polyplus/menu-profiles. */
+class MenuProfile(
+    var scopes: MutableMap<String, MenuScopeLayout> = LinkedHashMap(),
+    var extra: MutableMap<String, String> = LinkedHashMap(),
 )
 
 class MenuLayoutFile(
@@ -252,5 +260,47 @@ object MenuLayoutStore {
         file().scopes[scope] = layout
         save()
         return true
+    }
+
+    // ---------------------------------------------------------------- profiles
+
+    val profileDir: Path get() = FabricLoader.getInstance().configDir.resolve("polyplus").resolve("menu-profiles")
+
+    /** Letters, digits, spaces, dashes and underscores, at most 32; empty when nothing usable is left. */
+    fun profileName(name: String): String = name.filter { it.isLetterOrDigit() || it == ' ' || it == '-' || it == '_' }.trim().take(32)
+
+    fun profiles(): List<String> = runCatching {
+        if (!Files.isDirectory(profileDir)) emptyList() else profileDir.listDirectoryEntries("*.json").map { it.nameWithoutExtension }.sortedBy { it.lowercase() }
+    }.getOrDefault(emptyList())
+
+    /** Saves every layout (and [extra]) as profile [name], overwriting one with the same name. */
+    fun saveProfile(name: String, extra: Map<String, String>): Boolean {
+        val clean = profileName(name)
+        if (clean.isEmpty()) return false
+        val profile = MenuProfile(LinkedHashMap(file().scopes), LinkedHashMap(extra))
+        return runCatching {
+            Files.createDirectories(profileDir)
+            Files.writeString(profileDir.resolve("$clean.json"), gson.toJson(profile))
+            changed()
+        }.onFailure { LOGGER.error("Couldn't save profile {}", clean, it) }.isSuccess
+    }
+
+    /** Puts profile [name] on (undoable per menu) and returns its extra settings, or null when it can't be read. */
+    fun loadProfile(name: String): Map<String, String>? {
+        val path = profileDir.resolve("${profileName(name)}.json")
+        val profile = runCatching { gson.fromJson(Files.readString(path), MenuProfile::class.java) }
+            .onFailure { LOGGER.error("Couldn't read profile {}", path, it) }.getOrNull() ?: return null
+        @Suppress("SENSELESS_COMPARISON")
+        val scopes = if (profile.scopes == null) LinkedHashMap() else profile.scopes
+        for (scope in (file().scopes.keys + scopes.keys).toSet()) checkpoint(scope)
+        file().scopes = LinkedHashMap(scopes)
+        save()
+        @Suppress("SENSELESS_COMPARISON")
+        return if (profile.extra == null) emptyMap() else profile.extra
+    }
+
+    fun deleteProfile(name: String) {
+        runCatching { Files.deleteIfExists(profileDir.resolve("${profileName(name)}.json")) }
+        changed()
     }
 }
