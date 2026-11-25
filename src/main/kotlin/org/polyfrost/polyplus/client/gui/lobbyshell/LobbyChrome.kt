@@ -4,6 +4,9 @@ package org.polyfrost.polyplus.client.gui.lobbyshell
 
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.polyplus.client.gui.KitDangerColor
+import org.polyfrost.polyplus.client.gui.vanillamenu.EditMenuChooser
+import org.polyfrost.polyplus.client.gui.vanillamenu.EditableBlock
+import org.polyfrost.polyplus.client.gui.vanillamenu.MenuEditorBar
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -48,6 +51,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
@@ -149,6 +153,7 @@ import org.polyfrost.polyplus.client.gui.toggleFullscreen
 import org.polyfrost.polyplus.client.lobby.LobbyAntics
 import org.polyfrost.polyplus.client.lobby.LobbyGlass
 import org.polyfrost.polyplus.client.lobby.LobbyGrab
+import org.polyfrost.polyplus.client.lobby.LobbyLook
 import org.polyfrost.polyplus.client.lobby.LobbyHologram
 import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.lobby.LobbyWardrobe
@@ -177,6 +182,7 @@ private const val FROST_MILLIS = 220
 private const val REVEAL_MILLIS = 700
 private const val PLAY_SLIDE_MILLIS = 240
 private const val AVATAR_HOLD_MS = 250L
+private const val DOUBLE_TAP_MS = 350L
 
 private class LobbyTab(val label: String, val page: LobbyPage)
 
@@ -302,7 +308,9 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         LobbyPage.Home -> {
             Box(Modifier.fillMaxSize().avatarTaps(lobby, notch))
             SceneTags(feed, root, notch)
-            LobbyCornerCard(lobby, Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top))
+            EditableBlock("lobby", "corner", "News card", Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top)) {
+                LobbyCornerCard(lobby, Modifier)
+            }
         }
         LobbyPage.Wardrobe -> WardrobePage(onBack = { lobby.show(LobbyPage.Home) }, onMarketplace = { lobby.show(LobbyPage.Marketplace) })
         LobbyPage.Multiplayer -> MultiplayerPage(lobby)
@@ -374,17 +382,17 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     }
     val playAway by Motion.animateFloatAsState(if (((lobby.customizeOpen || lobby.accountsOpen) && home) || lobby.page == LobbyPage.Wardrobe || lobby.page == LobbyPage.Settings) 1f else 0f, tween(PLAY_SLIDE_MILLIS, easing = FastOutSlowInEasing))
     if (playAway < 1f) {
-        PlayUnit(
-            lobby,
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = LobbyLayout.Margin, bottom = LobbyLayout.Margin)
-                .width(LobbyLayout.UnitWidth)
-                .offset { IntOffset((playAway * (LobbyLayout.UnitWidth + LobbyLayout.Margin).toPx()).roundToInt(), 0) }
-                .graphicsLayer { alpha = 1f - playAway }
-                .tourAnchor(lobby.anchors, TourAnchor.Play)
-                .a11yRegion(A11yRegion.Play),
-        )
+        EditableBlock("lobby", "play", "Play", Modifier.align(Alignment.BottomEnd).padding(end = LobbyLayout.Margin, bottom = LobbyLayout.Margin)) {
+            PlayUnit(
+                lobby,
+                Modifier
+                    .width(LobbyLayout.UnitWidth)
+                    .offset { IntOffset((playAway * (LobbyLayout.UnitWidth + LobbyLayout.Margin).toPx()).roundToInt(), 0) }
+                    .graphicsLayer { alpha = 1f - playAway }
+                    .tourAnchor(lobby.anchors, TourAnchor.Play)
+                    .a11yRegion(A11yRegion.Play),
+            )
+        }
     }
     Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Scene)) {
         CustomizePanel(lobby)
@@ -396,6 +404,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     }
     PlayTogetherBanner(Modifier.align(Alignment.TopCenter).padding(top = LobbyLayout.Top + LobbyLayout.Gap, start = LobbyLayout.Margin, end = LobbyLayout.Margin).a11yRegion(A11yRegion.Banner))
     PlayTogetherHooks(lobby)
+    MenuEditorBar("lobby")
     lobby.hostWorldId?.let { worldId -> HostWorldDialog(worldId, screen) { lobby.hostWorldId = null } }
     lobby.editing?.let { edit ->
         ServerEditDialog(
@@ -471,11 +480,15 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
             .padding(horizontal = LobbyLayout.Margin),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Wordmark(
-            Modifier.width(NAV_SIDE.dp),
-            mark = Modifier.onGloballyPositioned { StartupOverlay.navMark = StartupOverlay.place(it) },
-            word = Modifier.onGloballyPositioned { StartupOverlay.navWord = StartupOverlay.place(it) },
-        )
+        Box(Modifier.width(NAV_SIDE.dp)) {
+            EditableBlock("lobby", "nav.logo", "Logo", group = NAV_GROUP) {
+                Wordmark(
+                    Modifier,
+                    mark = Modifier.onGloballyPositioned { StartupOverlay.navMark = StartupOverlay.place(it) },
+                    word = Modifier.onGloballyPositioned { StartupOverlay.navWord = StartupOverlay.place(it) },
+                )
+            }
+        }
         val density = LocalDensity.current
         val visible = TABS.filterNot { it.page.hidden }
         val items = visible.map { tab ->
@@ -493,15 +506,18 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
             TabItem(tab.page, tab.label, badge = navTabBadge(dot != null), modifier = modifier, badgeDescription = dot)
         }
         Box(Modifier.weight(1f).a11yRegion(A11yRegion.Nav), contentAlignment = Alignment.Center) {
-            NavTabRow(items, visible.firstOrNull { it.activeOn(lobby.page) }?.page ?: lobby.page, lobby::show)
+            EditableBlock("lobby", "nav.tabs", "Tabs", group = NAV_GROUP) {
+                NavTabRow(items, visible.firstOrNull { it.activeOn(lobby.page) }?.page ?: lobby.page, lobby::show)
+            }
         }
         Box(Modifier.width(NAV_SIDE.dp), contentAlignment = Alignment.CenterEnd) {
-            key(lobby.profileVersion) { ProfileCluster(lobby, screen) }
+            key(lobby.profileVersion) { EditableBlock("lobby", "nav.tools", "Account and tools", group = NAV_GROUP) { ProfileCluster(lobby, screen) } }
         }
     }
 }
 
 private const val NAV_SIDE = 490
+private const val NAV_GROUP = "navbar"
 private const val INVITE_PENDING = "pending"
 
 @Composable
@@ -766,6 +782,7 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
         add(MenuAction("Replay tour", { onClose(); lobby.replayTour() }, icon = SOCIAL_ASSETS + "play-circle.svg", size = MenuItemSize.Regular))
         add(MenuAction("Switch to OneClient v1 main menu", { onClose(); MainMenuReplacement.switchToPolyPlusMenu() }, icon = SOCIAL_ASSETS + "logo.svg", size = MenuItemSize.Regular))
         add(MenuAction("Switch to vanilla main menu", { onClose(); MainMenuReplacement.switchToVanilla() }, icon = SOCIAL_ASSETS + "minecraft-block.svg", size = MenuItemSize.Regular))
+        add(MenuAction("Edit main menu", { onClose(); EditMenuChooser.open() }, icon = SOCIAL_ASSETS + "edit-02.svg", size = MenuItemSize.Regular))
         if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
             ModIntegrationButtons.withoutModMenu().forEach { button ->
                 add(MenuAction(button.tooltip, { onClose(); button.onClick(screen) }, icon = button.icon, size = MenuItemSize.Regular))
@@ -776,15 +793,56 @@ private fun MoreMenu(lobby: LobbyShell, screen: Screen, onClose: () -> Unit) {
 }
 
 private fun Modifier.avatarTaps(lobby: LobbyShell, notch: Int): Modifier = pointerInput(lobby, notch) {
+    var lastTap = 0L
     awaitPointerEventScope {
         while (true) {
             val event = awaitPointerEvent()
+            if (event.type == PointerEventType.Scroll) {
+                // the 3D lobby: scroll zooms the camera in and out
+                val scroll = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                if (scroll != 0f && LobbyLook.enabled() && lobby.calm()) {
+                    LobbyLook.zoomBy(-scroll.toDouble())
+                    event.changes.forEach { it.consume() }
+                }
+                continue
+            }
             if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed || size.width <= 0 || size.height <= 0) continue
             val at = event.changes.firstOrNull()?.position ?: continue
-            if (!lobby.calm() || !LobbyGrab.touches(sceneX(at), sceneY(at, notch))) continue
-            event.changes.forEach { it.consume() }
-            avatarGesture(lobby, at, notch)
+            if (!lobby.calm()) continue
+            if (LobbyGrab.touches(sceneX(at), sceneY(at, notch))) {
+                event.changes.forEach { it.consume() }
+                avatarGesture(lobby, at, notch)
+                continue
+            }
+            if (!LobbyLook.enabled()) continue
+            val now = System.currentTimeMillis()
+            if (lookGesture(at)) {
+                lastTap = 0L
+            } else if (now - lastTap < DOUBLE_TAP_MS) {
+                // a double click on the scene goes back to its own view
+                LobbyLook.reset()
+                lastTap = 0L
+            } else {
+                lastTap = now
+            }
         }
+    }
+}
+
+/** Drags on an empty part of the lobby turn the camera around the scene; true when it was a drag, false for a click. */
+private suspend fun AwaitPointerEventScope.lookGesture(press: Offset): Boolean {
+    var last = press
+    var turning = false
+    while (true) {
+        val event = awaitPointerEvent()
+        val at = event.changes.firstOrNull()?.position ?: return turning
+        if (event.type == PointerEventType.Release || !event.buttons.isPrimaryPressed) return turning
+        if (!turning && (at - press).getDistance() > viewConfiguration.touchSlop) turning = true
+        if (turning && size.width > 0 && size.height > 0) {
+            LobbyLook.turn((at.x - last.x) / size.width.toDouble(), (at.y - last.y) / size.height.toDouble())
+            event.changes.forEach { it.consume() }
+        }
+        last = at
     }
 }
 
@@ -877,6 +935,8 @@ internal class LobbyFeed {
             spot.at.longValue = (label.pixelX(root.width).toLong() shl 32) or (label.pixelY(root.height).toLong() and 0xFFFFFFFFL)
         }
         if (spots.size > labels.size) spots.keys.retainAll { name -> labels.any { it.name == name } }
+        // the 3D lobby camera keeps easing after the mouse stops; without this the name tags would wait for the next input
+        if (LobbyLook.moving()) Snapshot.sendApplyNotifications()
     }
 
     fun push() {

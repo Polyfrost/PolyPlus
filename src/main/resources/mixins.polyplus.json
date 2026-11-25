@@ -147,6 +147,16 @@
     "client.MixinJoinMultiplayerScreen",
     //? if >= 26.3
     "client.MixinWorldOptionsScreen",
+    //? if >= 26.1
+    "client.MixinWorldSelectionList",
+    //? if >= 26.1
+    "client.MixinWorldListEntry",
+    //? if >= 26.1
+    "client.MixinAbstractButtonDark",
+    //? if >= 26.1
+    "client.MixinTitleScreenVanillaMenu",
+    //? if >= 26.1
+    "client.MixinAbstractWidgetScale",
     //? if = 1.8.9
     //"client.MixinInventoryMenuScreen",
     //? if = 1.8.9
@@ -401,6 +411,8 @@
     //? if < 1.21.8 && > 1.8.9
     //"compat.confirmdisconnect.MixinConfirmDisconnectScreen",
     "compat.dynamicfps.MixinDynamicFPSMod",
+    //? if >= 26.1
+    "compat.essential.MixinEssentialTitleMenu",
     //? if > 1.8.9
     "compat.essential.MixinEssentialPartner",
     //? if > 1.8.9

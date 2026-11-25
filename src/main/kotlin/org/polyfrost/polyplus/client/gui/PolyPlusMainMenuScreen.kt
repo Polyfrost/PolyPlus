@@ -2,6 +2,9 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.polyplus.client.gui.vanillamenu.EditMenuChooser
+import org.polyfrost.polyplus.client.gui.vanillamenu.EditableBlock
+import org.polyfrost.polyplus.client.gui.vanillamenu.MenuEditorBar
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -388,45 +391,34 @@ private fun MainMenu(
                             .align(Alignment.Center)
                             .requiredSize(BASE_WIDTH.dp, BASE_HEIGHT.dp),
                     ) {
-                        CenterColumn(
-                            Modifier.align(Alignment.BottomCenter).padding(bottom = COLUMN_INSET.dp),
-                            actions,
-                        )
+                        EditableBlock("polyplus", "center", "Buttons", Modifier.align(Alignment.BottomCenter).padding(bottom = COLUMN_INSET.dp)) {
+                            CenterColumn(Modifier, actions)
+                        }
                     }
                     val sideTop = ((innerHeight - BASE_HEIGHT) / 2f + COLUMN_INSET).coerceAtLeast(0f).dp
                     val swapped = PolyPlusMainMenuConfig.swapMainMenuSideColumns
                     val quickplaySide = if (swapped) Alignment.TopEnd else Alignment.TopStart
                     val previewSide = if (swapped) Alignment.TopStart else Alignment.TopEnd
-                    Column(
-                        modifier = Modifier
-                            .align(quickplaySide)
-                            .padding(top = sideTop, start = edgeX(50f), end = edgeX(50f)),
+                    EditableBlock("polyplus", "quickplay", "Quickplay", Modifier.align(quickplaySide).padding(top = sideTop, start = edgeX(50f), end = edgeX(50f))) { Column(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         FeaturedServerCard(Modifier, pingTick, actions)
                         if (!PolyPlusMainMenuConfig.hideMainMenuQuickplay) {
                             LeftColumn(Modifier, quickplay, pingTick, actions)
                         }
+                    } }
+                    EditableBlock("polyplus", "player", "Player", Modifier.align(previewSide).padding(top = sideTop, start = edgeX(50f), end = edgeX(50f))) {
+                        RightColumn(Modifier, screen, onAccounts = { accountsOpen = true })
                     }
-                    RightColumn(
-                        Modifier
-                            .align(previewSide)
-                            .padding(top = sideTop, start = edgeX(50f), end = edgeX(50f)),
-                        screen,
-                        onAccounts = { accountsOpen = true },
-                    )
-                    WindowControls(
-                        Modifier.align(Alignment.TopEnd).padding(horizontal = edgeX(16f), vertical = edgeY(16f)),
-                        actions,
-                    )
+                    EditableBlock("polyplus", "controls", "Top buttons", Modifier.align(Alignment.TopEnd).padding(horizontal = edgeX(16f), vertical = edgeY(16f))) {
+                        WindowControls(Modifier, actions)
+                    }
                     if (!PolyPlusMainMenuConfig.hideMainMenuModButtons) {
-                        ModIntegrationBar(
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = edgeY(18f)),
-                            screen,
-                        )
+                        EditableBlock("polyplus", "mods", "Mod buttons", Modifier.align(Alignment.BottomCenter).padding(bottom = edgeY(18f))) {
+                            ModIntegrationBar(Modifier, screen)
+                        }
                     }
+                    MenuEditorBar("polyplus")
                     if (!PolyPlusMainMenuConfig.hideMainMenuFooter) Footer(Modifier.fillMaxSize(), screen, edgeX, edgeY)
                 }
             }
@@ -615,6 +607,7 @@ private fun WindowControls(modifier: Modifier, actions: MenuActions) {
         MenuIconButton(ASSETS + "logo.svg", "Switch to the lobby", onClick = MainMenuReplacement::switchToLobby)
         MenuIconButton(ASSETS + "minecraft-block.svg", "Switch to vanilla main menu", onClick = MainMenuReplacement::switchToVanilla)
         ThemeToggleButton()
+        MenuIconButton(ASSETS + "edit-02.svg", "Edit main menu", onClick = EditMenuChooser::open)
         NotificationBell()
         if (!ClientPlatform.isMac) {
             MenuIconButton("maximise", "Toggle fullscreen", onClick = actions.fullscreen)

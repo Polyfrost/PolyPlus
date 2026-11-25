@@ -1,0 +1,93 @@
+PolyPlus, Swylow edition (2.4.0-swylow.4, Minecraft 26.2, Fabric)
+Based on PolyPlus 2.4.0, the version OneClient ships now, with all the Swylow changes on top.
+
+INSTALL
+1. Close Minecraft.
+2. In the OneClient launcher open your 26.2 instance and open its folder
+   (the folder that has "mods" in it).
+3. In "mods", delete the old PolyPlus jar (polyplus-2.4.x+26.2.jar or an older swylow one).
+4. Put both jars from mod/ in "mods":
+   - polyplus-2.4.0-swylow.4+26.2.jar  (the mod)
+   - PolyPlus-Swylow-Guard-1.0.0.jar    (tiny helper, see below)
+5. Start the game.
+
+Only one PolyPlus jar may be in the mods folder (two of them = crash).
+
+IF THE LAUNCHER RESETS IT
+The OneClient launcher can swap our jar back to the official PolyPlus when it
+updates the instance. Your menu then looks like the normal one again.
+- The guard jar notices this and shows a message in game:
+  "PolyPlus was replaced by the launcher". Your menu layout is NOT lost, it is
+  saved in config/polyplus/menu-layout.json.
+- Fix: close the game, delete the official polyplus jar from "mods", put
+  polyplus-2.4.0-swylow.4+26.2.jar back, start again.
+- If your launcher has a setting to stop updating mods / the OneClient bundle for
+  this instance, turn it off, then it stops happening.
+- It never happens in a launcher that doesn't manage the mods for you (for example
+  a plain Fabric 26.2 instance with Fabric API, Fabric Language Kotlin, OneConfig
+  and this jar).
+
+ESSENTIAL
+With Essential installed you'd get two of everything on the title screen.
+While the vanilla menu is on, Essential's own title screen buttons are hidden
+and only ours show. Essential's Social, Wardrobe, Pictures and Settings can be
+added as buttons in the menu editor (Elements > Add element > Essential: ...).
+Want Essential's own buttons back? OneConfig > Main Menu (OneClient) > Vanilla
+Style > turn off "Hide Essential's Title Screen Buttons".
+(Essential also has its own setting: Essential settings > Appearance >
+"Essential menu layout" > Off hides its buttons everywhere, also in the pause menu.)
+
+3D LOBBY (new in swylow.4)
+Settings: OneConfig > Lobby (OneClient) > 3D Lobby (all on by default).
+- Look around: drag on an empty part of the lobby to turn the camera around
+  the scene, scroll to zoom in and out, double click to go back to the normal view.
+- Place your character anywhere: hold your character, drag it to any spot you can
+  see (also up on hills and ledges) and let go. It stays there.
+- Any terrain: scenes on hills, slopes and uneven ground can be captured now,
+  and you and your party can stand at different heights.
+- Scene size: Normal / Large / Huge. Bigger scenes keep more of the world so
+  there is more to look at when you turn around. Only new captures get bigger,
+  and never bigger than your render distance.
+
+SETTINGS
+OneConfig > Main Menu (OneClient) > Vanilla Style.
+Pick "Vanilla" as Main Menu to get the vanilla menu with the OneClient buttons.
+
+SPIN YOUR SKIN
+Drag your skin left or right to turn it, let go to give it a spin.
+Double click puts it back.
+
+EDIT THE MENU
+Vanilla menu: sliders button at the top right > Edit Main Menu > Vanilla Menu.
+- Click to select, Shift+click adds, drag on empty space selects with a box.
+- Drag to move. Arrow keys move 1 px, Shift+arrows 10 px.
+- The white squares resize. Shift keeps the shape, Alt resizes from the middle.
+- Ctrl+scroll over a piece scales it.
+- Snaps to the grid, to other pieces and to the middle of the screen.
+  Hold Ctrl to place freely. Grid on/off and size are in the bar.
+- Right click: Hide/Show, Group/Ungroup, Bring to front, Send to back,
+  Duplicate, Reset this element, Delete, Properties.
+- Alt+click picks one piece inside a group. Ctrl+G groups, Ctrl+Shift+G ungroups.
+- Double click opens Properties (exact position, size, scale, opacity, text...).
+- Elements (in the bar): every piece with an eye to hide/show it (hidden pieces
+  stay in the list) and drag rows to change what's on top. "Add element" adds a
+  picture, text, the music volume slider, mute when unfocused, music track,
+  a custom button (join a server, open a website or open a screen), a panel,
+  your skin, Quickplay, a clock, FPS and Essential's buttons.
+- Pictures: put PNG, JPG or GIF files in config/polyplus/menu-images
+  (Properties has an "Open images folder" button). GIFs show their first frame.
+- Ctrl+Z / Ctrl+Y undo and redo. Esc deselects, Esc again saves and closes.
+- Preset: Centered, Essential style or OneClient style (replaces your layout),
+  plus Copy/Paste layout code to share a layout.
+- Drag the bar by its = handle if it's in the way.
+Lobby and PolyPlus menu: Edit Main Menu > Lobby / PolyPlus Menu.
+  Drag to move (grid snap, Ctrl = free), drag the white corner to scale,
+  right click to hide/show, group/ungroup or reset. The lobby top bar
+  (logo, Play, Wardrobe, ... and your account) is now separate pieces in one
+  group: right click > Ungroup to move them one by one.
+
+GO BACK TO NORMAL
+Delete both jars and put the official PolyPlus jar back (or let the launcher reinstall it).
+
+The source code is on GitHub:
+https://github.com/S1mpleDimplee/PolyPlus-Swylow

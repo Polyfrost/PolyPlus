@@ -100,7 +100,8 @@ object LobbySceneStore {
     /*private const val BUNDLED_ROOT = "/assets/polyplus/lobby/scenes_legacy/"
     *///?}
     private const val MAX_PER_WORLD = 4
-    private const val MAX_TOTAL_BYTES = 16L * 1024L * 1024L
+    // room for the bigger 3D lobby scenes (Scene Size)
+    private const val MAX_TOTAL_BYTES = 64L * 1024L * 1024L
     private const val SAME_SPOT_BLOCKS = 48.0
     private const val RECENCY_HALF_LIFE_DAYS = 14.0
     private const val RECENCY_FLOOR = 0.3

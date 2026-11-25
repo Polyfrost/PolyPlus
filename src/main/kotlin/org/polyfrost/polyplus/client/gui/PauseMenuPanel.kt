@@ -489,6 +489,10 @@ object PauseMenuPanel {
         // 26.3 numbers buttons the SDL way, where left is 1 rather than 0
         if (button == InputConstants.MOUSE_BUTTON_LEFT) leftButtonDown = action == 1
     }
+
+    /** Whether the left mouse button is held right now, also while a screen is open. */
+    @JvmStatic
+    fun leftDown(): Boolean = leftButtonDown
     //?}
 
     /** The mouse position as a fraction of the window, top-left origin. */

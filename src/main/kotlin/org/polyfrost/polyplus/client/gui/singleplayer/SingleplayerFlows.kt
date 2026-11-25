@@ -21,6 +21,7 @@ import net.minecraft.world.level.storage.LevelStorageSource
 import net.minecraft.world.level.storage.LevelSummary
 import net.minecraft.world.level.validation.ContentValidationException
 import org.polyfrost.polyplus.client.lobby.LobbyScene
+import org.polyfrost.polyplus.client.gui.vanillamenu.OtherVersionConfirm
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.io.IOException
 
@@ -73,7 +74,8 @@ internal class SingleplayerFlows {
             showSymlinkNotice(back)
             return
         }
-        LobbyScene.depart { mc.createWorldOpenFlows().openWorld(world.id, back) }
+        val open = Runnable { LobbyScene.depart { mc.createWorldOpenFlows().openWorld(world.id, back) } }
+        if (world.otherVersion) OtherVersionConfirm.show(world.name, world.version, open, back) else open.run()
     }
 
     fun edit(world: SingleplayerWorld) {

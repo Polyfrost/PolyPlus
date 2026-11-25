@@ -10,6 +10,10 @@ import net.minecraft.resources.Identifier
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.gui.screens.options.OptionsScreen
 import org.polyfrost.polyplus.client.PolyPlusBadge
+//? if >= 26.1 {
+import org.polyfrost.polyplus.client.gui.vanillamenu.MultiplayerTabs
+import org.polyfrost.polyplus.client.gui.vanillamenu.VanillaTitleMenu
+//?}
 import org.polyfrost.polyplus.mixin.client.access.ScreenAccessor
 //?} else
 //import net.minecraft.client.gui.widget.ButtonWidget
@@ -22,6 +26,11 @@ object VanillaMenuButton {
     private val LATE_PHASE: Identifier = Identifier.fromNamespaceAndPath("polyplus", "late_screen_widgets")
 
     fun register() {
+        //? if >= 26.1 {
+        VanillaTitleMenu.register()
+        MultiplayerTabs.register()
+        if (true) return
+        //?}
         ScreenEvents.AFTER_INIT.addPhaseOrdering(Event.DEFAULT_PHASE, LATE_PHASE)
         ScreenEvents.AFTER_INIT.register(LATE_PHASE) { _, screen, _, _ ->
             val button = when {

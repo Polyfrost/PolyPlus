@@ -9,6 +9,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 
 class LobbySurvey(val origin: BlockPos, val minY: Int, val realm: LobbyRealm = LobbyRealm.OVERWORLD) {
     val ground = IntArray(CELLS)
@@ -132,6 +133,7 @@ object LobbySceneScore {
     private const val CANDIDATE_STEP = 3
     private const val CANDIDATE_REACH = 20
     private const val PLAYER_RISE = 10
+    private const val ANY_TERRAIN_PLAYER_RISE = 24
     private const val STAGE_RADIUS = 4
     private const val PAD_RADIUS = 8
     private const val VIEW_RADIUS = 16
@@ -306,16 +308,18 @@ object LobbySceneScore {
         val feet = survey.origin.y
         val height = survey.ground[center] + 1
         if (kind != LobbySurvey.NATURAL && kind != LobbySurvey.BUILT) return Verdict(null, 0.0, reject(survey, cellX, cellZ, kind))
-        if (abs(height - feet) > PLAYER_RISE) return null
+        // with Any Terrain on, hills and slopes are fine: they only score a little lower than flat ground
+        val anyTerrain = PolyPlusLobbyConfig.lobbyAnyTerrain
+        if (abs(height - feet) > if (anyTerrain) ANY_TERRAIN_PLAYER_RISE else PLAYER_RISE) return null
 
         val stage = stageShape(survey, cellX, cellZ, height)
-        if (stage.first < MIN_FLAT) return Verdict(null, 0.0, Rejection.SMALL)
+        if (!anyTerrain && stage.first < MIN_FLAT) return Verdict(null, 0.0, Rejection.SMALL)
         if (stage.second < MIN_SKY) return Verdict(null, 0.0, Rejection.CEILING)
         val pad = padShape(survey, cellX, cellZ, height)
-        if (pad < MIN_PAD) return Verdict(null, 0.0, Rejection.SMALL)
+        if (!anyTerrain && pad < MIN_PAD) return Verdict(null, 0.0, Rejection.SMALL)
 
         val area = view(survey, cellX, cellZ)
-        val rejection = rejection(area)
+        val rejection = rejection(area)?.takeUnless { anyTerrain && it == Rejection.UNEVEN }
         if (rejection != null) return Verdict(null, 0.0, rejection)
         val end = survey.realm == LobbyRealm.END
         if (end && nearEdge(survey, cellX, cellZ)) return Verdict(null, 0.0, Rejection.VOID)

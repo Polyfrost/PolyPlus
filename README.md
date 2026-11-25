@@ -1,3 +1,25 @@
+# PolyPlus, Swylow edition
+
+A fork of [PolyPlus](https://github.com/Polyfrost/PolyPlus) 2.0.11 (the OneClient companion mod) with a vanilla style main menu and a menu editor. Built for Minecraft 26.2 on Fabric. Download: https://swylow.simplemcnetwork.net
+
+What's different:
+
+- **Intro**: the OneClient logo rises while the screen opens like a curtain, then the menu slides in row by row (also into the vanilla and PolyPlus menus).
+- **Vanilla menu presets**: Centered, Essential style (your skin left, buttons right, account top left) and OneClient style (Quickplay left, skin, account and buttons right).
+- **Menu editor** for the lobby, the PolyPlus menu and the vanilla menu: "Edit main menu" asks which menu, then drag pieces anywhere. In the vanilla one, right click hides or shows a piece and you can switch presets and edit from there. Reset puts everything back.
+- **Quickplay panel**: your last servers with icon and players online, folds open and closed.
+- **Top right**: notifications bell and a settings dropdown (Lobby, PolyPlus menu, Notifications, Light/Dark theme, Edit main menu, Settings). Can be turned off to show them all in a row.
+- **Dark theme for vanilla buttons**, switched together with the OneConfig theme.
+- **Singleplayer**: worlds for your version and worlds from other versions in their own sections, plus a confirm screen before opening a world from another version.
+- **Multiplayer**: Servers, Friends and Discover tabs. Servers adds a "Recent direct connects" section (last 3). Friends shows worlds your friends are hosting for you. Discover lists OneClient's server catalog to join or add.
+- Option to use the vanilla style Singleplayer and Multiplayer screens from the lobby too.
+
+All of it can be turned on and off in OneConfig: Main Menu (OneClient) > Vanilla Style.
+
+Build: `./gradlew :26.2-fabric:build` (JDK 25), jar in `versions/26.2-fabric/build/libs/`.
+
+---
+
 # PolyPlus
 
 [![Modrinth downloads](https://img.shields.io/modrinth/dt/Iw9mZi4a?style=flat&logo=modrinth&label=Modrinth&color=1bd96a)](https://modrinth.com/mod/polyplus)

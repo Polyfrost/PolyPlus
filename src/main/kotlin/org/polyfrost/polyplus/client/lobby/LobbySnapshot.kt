@@ -140,6 +140,8 @@ object LobbySnapshot {
     const val DEFAULT_RADIUS = 6
     const val MIN_RADIUS = 4
     const val BELOW_ANCHOR = 16
+    // larger scenes keep more below the spot too, so looking down a hill doesn't show the void
+    const val BELOW_ANCHOR_LARGE = 40
     const val ABOVE_ANCHOR = 48
     //? if > 1.8.9 {
     private const val FALLBACK_BIOME = "minecraft:plains"

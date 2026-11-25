@@ -11,6 +11,7 @@ import org.polyfrost.polyplus.client.PolyPlusPauseConfig
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
+import org.polyfrost.polyplus.client.gui.vanillamenu.VanillaListScreens
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseScreenStyle
 import org.polyfrost.polyplus.client.lobby.LOBBY_LOGGER
@@ -129,12 +130,12 @@ object MainMenuReplacement {
         //?}
         when (screen?.javaClass) {
             JoinMultiplayerScreen::class.java -> {
-                if (!left && keepsVanillaServerList()) return screen
+                if (!left && (keepsVanillaServerList() || VanillaListScreens.enabled())) return screen
                 if (!left) return lobbyPage(LobbyPage.Multiplayer)
                 playing = false
                 return lobbyPage(LobbyPage.Home)
             }
-            SelectWorldScreen::class.java -> return lobbyPage(LobbyPage.Singleplayer)
+            SelectWorldScreen::class.java -> return if (VanillaListScreens.enabled()) screen else lobbyPage(LobbyPage.Singleplayer)
         }
         return screen
     }

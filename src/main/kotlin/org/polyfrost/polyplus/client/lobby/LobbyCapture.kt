@@ -986,7 +986,9 @@ object LobbyCapture {
             report(job.source, anchor, "rejected ${LobbySceneScore.Rejection.WEAKER.name} (score ${verdict.score})")
             return
         }
-        val radius = minOf(LobbySnapshot.DEFAULT_RADIUS, mc.options.effectiveRenderDistance)
+        // Scene Size: a bigger capture gives the 3D lobby more to look at
+        val size = PolyPlusLobbyConfig.lobbySceneSize
+        val radius = minOf(size.radius, mc.options.effectiveRenderDistance)
         if (radius < LobbySnapshot.MIN_RADIUS) {
             report(job.source, anchor, "rejected ${LobbySceneScore.Rejection.UNLOADED.name} (render distance)")
             if (action != null) {
@@ -1000,7 +1002,8 @@ object LobbyCapture {
             spot = LobbySpotState.Done(action, LobbySceneScore.report(verdict.breakdown, null, true, weaker, false, realm = verdict.realm), false, message)
             return
         }
-        val minSection = maxOf(level.minSectionY, SectionPos.blockToSectionCoord(anchor.y - LobbySnapshot.BELOW_ANCHOR))
+        val below = if (size.radius > LobbySnapshot.DEFAULT_RADIUS) LobbySnapshot.BELOW_ANCHOR_LARGE else LobbySnapshot.BELOW_ANCHOR
+        val minSection = maxOf(level.minSectionY, SectionPos.blockToSectionCoord(anchor.y - below))
         val keptTop = minOf(level.maxSectionY, SectionPos.blockToSectionCoord(anchor.y + LobbySnapshot.ABOVE_ANCHOR))
         val copy = Copying(job.source, verdict, anchor, radius, job.timing, minSection, keptTop, weaker)
         if (action != null) spot = LobbySpotState.Saving(0f)

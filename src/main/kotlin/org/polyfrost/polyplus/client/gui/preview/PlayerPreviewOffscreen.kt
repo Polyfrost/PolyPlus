@@ -22,6 +22,8 @@ import org.polyfrost.compose.minecraft.render.OffscreenTarget
 import org.polyfrost.compose.minecraft.render.TextureRenderer
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.slf4j.LoggerFactory
+import kotlin.math.abs
+import kotlin.math.exp
 
 object PlayerPreviewOffscreen {
     private val LOG = LoggerFactory.getLogger("polyplus/preview-offscreen")
@@ -47,6 +49,47 @@ object PlayerPreviewOffscreen {
         var fh = 0f
         var lastDrawNanos = 0L
 
+        /** Degrees per second the model keeps turning after a drag is let go, slowing down every frame. */
+        var spinVelocity = 0f
+        private var lastDragNanos = 0L
+        private var pendingYaw = 0f
+
+        /** Turns the model by a drag and remembers how fast it went, for the spin after letting go. */
+        fun dragBy(deltaYaw: Float) {
+            val now = System.nanoTime()
+            dragYaw += deltaYaw
+            if (lastDragNanos == 0L) {
+                lastDragNanos = now
+                spinVelocity = 0f
+                pendingYaw = 0f
+                return
+            }
+            pendingYaw += deltaYaw
+            val dt = (now - lastDragNanos) / 1_000_000_000f
+            // several drag events can come in one frame, so the speed is only measured every few milliseconds
+            if (dt < MIN_VELOCITY_STEP_SEC) return
+            val measured = (pendingYaw / dt).coerceIn(-MAX_SPIN_VELOCITY, MAX_SPIN_VELOCITY)
+            spinVelocity = if (dt > MAX_VELOCITY_STEP_SEC) 0f else spinVelocity * VELOCITY_SMOOTHING + measured * (1f - VELOCITY_SMOOTHING)
+            pendingYaw = 0f
+            lastDragNanos = now
+        }
+
+        /** Lets go of a drag: the model keeps the speed it had, unless it was held still before letting go. */
+        fun endDrag() {
+            dragging = false
+            if (lastDragNanos == 0L || System.nanoTime() - lastDragNanos > STILL_BEFORE_RELEASE_NANOS) spinVelocity = 0f
+            lastDragNanos = 0L
+            pendingYaw = 0f
+        }
+
+        /** Back to the angle it started at. */
+        fun resetYaw() {
+            dragYaw = 0f
+            dragPitch = 0f
+            spinAccum = 0f
+            spinVelocity = 0f
+        }
+
         internal var offscreen: OffscreenTarget? = null
         internal var contentWidth = 0
         internal var contentHeight = 0
@@ -56,6 +99,14 @@ object PlayerPreviewOffscreen {
     internal const val MAX_DIM = 1024
     private const val SPIN_DEG_PER_SEC = 37.5f
     private const val MAX_SPIN_STEP_SEC = 0.1
+    private const val MIN_VELOCITY_STEP_SEC = 0.004f
+    private const val MAX_VELOCITY_STEP_SEC = 0.12f
+    private const val VELOCITY_SMOOTHING = 0.5f
+    private const val MAX_SPIN_VELOCITY = 1080f
+    private const val STILL_BEFORE_RELEASE_NANOS = 90_000_000L
+    // how quickly the spin after a drag slows down, per second
+    private const val SPIN_FRICTION = 3.2
+    private const val SPIN_STOP_VELOCITY = 3f
 
     private const val IDLE_NANOS = 250_000_000L
     private const val RELEASE_NANOS = 1_000_000_000L
@@ -110,6 +161,11 @@ object PlayerPreviewOffscreen {
             val dtSec = if (e.lastSpinNanos == 0L) 0.0 else ((now - e.lastSpinNanos) / 1_000_000_000.0).coerceAtMost(MAX_SPIN_STEP_SEC)
             e.lastSpinNanos = now
             if (e.autoSpin && !e.dragging) e.spinAccum += (dtSec * SPIN_DEG_PER_SEC).toFloat()
+            if (!e.dragging && e.spinVelocity != 0f) {
+                e.dragYaw += (e.spinVelocity * dtSec).toFloat()
+                e.spinVelocity *= exp(-SPIN_FRICTION * dtSec).toFloat()
+                if (abs(e.spinVelocity) < SPIN_STOP_VELOCITY) e.spinVelocity = 0f
+            }
             val yaw = e.initialYaw + e.dragYaw + e.spinAccum
 
             val offscreen = e.offscreen ?: OffscreenTarget().also { e.offscreen = it }

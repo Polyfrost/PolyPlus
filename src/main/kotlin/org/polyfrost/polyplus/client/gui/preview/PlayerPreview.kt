@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.client.gui.preview
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -23,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -115,8 +118,8 @@ private fun PlayerPreviewLive(
             Modifier.pointerInput(entry, rotation) {
                 detectDragGestures(
                     onDragStart = { entry.dragging = true },
-                    onDragEnd = { entry.dragging = false },
-                    onDragCancel = { entry.dragging = false },
+                    onDragEnd = { entry.endDrag() },
+                    onDragCancel = { entry.endDrag() },
                 ) { change, drag ->
                     if (rotation != null) {
                         rotation.yaw -= drag.x * DRAG_YAW_SENSITIVITY
@@ -126,13 +129,17 @@ private fun PlayerPreviewLive(
                         entry.initialYaw = rotation.yaw
                         entry.dragPitch = rotation.pitch
                     } else {
-                        entry.dragYaw -= drag.x * DRAG_YAW_SENSITIVITY
+                        // keeps spinning a little after letting go, like Essential's
+                        entry.dragBy(-drag.x * DRAG_YAW_SENSITIVITY)
                         entry.dragPitch = (entry.dragPitch + drag.y * DRAG_PITCH_SENSITIVITY)
                             .coerceIn(-MAX_PITCH, MAX_PITCH)
                     }
                     change.consume()
                 }
-            }
+            }.pointerInput(entry, rotation) {
+                // a double click turns it back to where it started
+                detectTapGestures(onDoubleTap = { if (rotation == null) entry.resetYaw() })
+            }.pointerHoverIcon(PointerIcon.Hand)
         } else {
             Modifier
         }

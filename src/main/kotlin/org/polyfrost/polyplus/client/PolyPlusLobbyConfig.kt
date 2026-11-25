@@ -158,6 +158,39 @@ object PolyPlusLobbyConfig : Config(
     )
     var sceneCaptureLimit = 0f
 
+    @JvmStatic
+    @Switch(
+        title = "Any Terrain",
+        description = "Capture scenes on hills, slopes and uneven ground too, and let you and your party stand at different heights.",
+        subcategory = "3D Lobby",
+    )
+    var lobbyAnyTerrain = true
+
+    @JvmStatic
+    @Dropdown(
+        title = "Scene Size",
+        description = "How much of the world new captures keep. Bigger scenes let you look around further, but use more memory and disk. Never more than your render distance.",
+        options = ["Normal", "Large", "Huge"],
+        subcategory = "3D Lobby",
+    )
+    var lobbySceneSize: LobbySceneSize = LobbySceneSize.LARGE
+
+    @JvmStatic
+    @Switch(
+        title = "Look Around",
+        description = "Drag on an empty part of the lobby to turn the camera around the scene, scroll to zoom. Double click to reset the view.",
+        subcategory = "3D Lobby",
+    )
+    var lobbyLookAround = true
+
+    @JvmStatic
+    @Switch(
+        title = "Place Your Character Anywhere",
+        description = "Pick up your character and put it on any spot you can see, also up on hills. It stays where you drop it.",
+        subcategory = "3D Lobby",
+    )
+    var lobbyFreeAvatar = true
+
     init {
         preload()
         migrateFromSplitConfigs()
@@ -192,6 +225,15 @@ object PolyPlusLobbyConfig : Config(
         widgetsMigrated = true
         save()
     }
+}
+
+/** How many chunks around the spot a new capture keeps (capped by render distance). */
+enum class LobbySceneSize(private val label: String, val radius: Int) {
+    NORMAL("Normal", 6),
+    LARGE("Large", 8),
+    HUGE("Huge", 10);
+
+    override fun toString(): String = label
 }
 
 enum class LobbyMediaSize(private val label: String) {

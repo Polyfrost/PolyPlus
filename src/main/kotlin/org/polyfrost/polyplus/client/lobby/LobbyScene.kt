@@ -256,6 +256,17 @@ object LobbyScene {
     *///?}
 
     private const val VIEW_DISTANCE = 8
+    private const val CHUNK_BLOCKS = 16f
+    private const val POINT_REACH = 220.0
+    private const val SIGHT_HEAD_SHARE = 0.85
+    private const val SIGHT_STEP = 1.0
+
+    // chunks around the spot of the scene showing now; bigger scenes (Scene Size) draw and fog further out
+    private var sceneRadius = LobbySnapshot.DEFAULT_RADIUS
+
+    private fun viewDistance(): Int = maxOf(VIEW_DISTANCE, sceneRadius + 1)
+
+    private fun extraFog(): Float = (sceneRadius - LobbySnapshot.DEFAULT_RADIUS).coerceAtLeast(0) * CHUNK_BLOCKS
     private const val SHADOW_REACH = 0.08
     private const val TEAM = "lobby"
     private const val FRIEND_SYNC_TICKS = 40
@@ -800,7 +811,7 @@ object LobbyScene {
 
     private fun attach(mc: Minecraft, level: ClientLevel?, scene: Live?) {
         val reach = reach(mc)
-        if (scene != null) setReach(mc, VIEW_DISTANCE)
+        if (scene != null) setReach(mc, viewDistance())
         try {
             //? if > 1.8.9 {
             LobbyCompat.levelSink(mc).setLevel(level)
@@ -947,6 +958,7 @@ object LobbyScene {
         if (embedded) created.particles = ParticleEngine(created.level, (mc.particleEngine as ParticleEngineAccessor).`polyplus$resources`())
         if (driven != null) created.started = true
         live = created
+        LobbyLook.reset(instant = true)
         sceneLevel = created.level
         phase = Phase.READY
         session?.markBuilt()
@@ -1093,6 +1105,7 @@ object LobbyScene {
         val bottom = dimension.value().minY()
         check(anchor.y >= bottom && anchor.y < bottom + dimension.value().height()) { "Scene ${loaded.entry.id} is outside the world height" }
         val radius = root.getIntOr("radius", LobbySnapshot.DEFAULT_RADIUS)
+        sceneRadius = radius
         val level = ClientLevel(
             listener,
             ClientLevel.ClientLevelData(Difficulty.PEACEFUL, false, false),
@@ -1110,7 +1123,7 @@ object LobbyScene {
         )
         sceneLevel = level
         if (!embedded) {
-            setReach(mc, VIEW_DISTANCE)
+            setReach(mc, viewDistance())
             LobbyCompat.levelSink(mc).setLevel(level)
             mc.particleEngine.setLevel(level)
             //? if >= 1.21.8
@@ -1647,7 +1660,7 @@ object LobbyScene {
             mc.level = scene.level
             mc.player = scene.rig
             mc.gameMode = scene.gameMode
-            setReach(mc, VIEW_DISTANCE)
+            setReach(mc, viewDistance())
             //? if = 1.8.9
             /*mc.options.fancyGraphics = true*/
             mc.setCameraEntity(scene.rig)
@@ -1703,6 +1716,21 @@ object LobbyScene {
 
     private fun still(): Boolean = driven == null && Motion.reduced
 
+    /**
+     * The point in the scene under a spot on the lobby ([x], [y] as shares of the window, top left 0,0): the first block
+     * a line from the camera through that spot hits. Null when it hits nothing (the sky, outside the scene).
+     */
+    fun pointAt(x: Double, y: Double): Vec3? {
+        val scene = live ?: return null
+        val rig = scene.rig
+        val eye = Vec3(rig.x, rig.y + rig.eyeHeight, rig.z)
+        val view = LobbyEntrance.view(eye, rig.yRot.toDouble(), rig.xRot.toDouble(), currentFov, viewAspect(Minecraft.getInstance()))
+        val ndcX = x * 2.0 - 1.0
+        val ndcY = 1.0 - y * 2.0
+        val direction = view.look.add(view.right.scale(ndcX * view.tanHalf * view.aspect)).add(view.up.scale(ndcY * view.tanHalf)).normalize()
+        return LobbyStage.hit(scene.level, eye, eye.add(direction.scale(POINT_REACH)))
+    }
+
     fun strollHome(avatar: LobbyAvatar): Boolean {
         val scene = live ?: return false
         val mc = Minecraft.getInstance()
@@ -1739,6 +1767,11 @@ object LobbyScene {
         var pitch = Mth.lerp(eased, stage.cranePitch, stage.pitch.toDouble()) + sin(time * 0.23 + 2.0) * SWAY_PITCH_DEGREES * sway + parallaxY.value * PARALLAX_PITCH_DEGREES * parallaxShare
         var yaw = stage.yaw + Mth.lerp(eased, stage.craneOrbit, 0.0) + sin(time * 0.17) * SWAY_YAW_DEGREES * sway + parallaxX.value * PARALLAX_YAW_DEGREES * parallaxShare
         var aim = stage.aim.add(Vec3(focusAimX.value, focusAimY.value, focusAimZ.value))
+        // the 3D lobby: where the player turned and zoomed the camera
+        LobbyLook.settle(elapsed)
+        yaw += LobbyLook.yaw
+        pitch = LobbyLook.pitched(pitch)
+        distance *= LobbyLook.zoom
         val framed = LobbyFraming.frame(time, elapsed, eased, OPENING_SECONDS)
         scene.avatars.firstOrNull { it.isLocal }?.takeIf { framed > 0.0 }?.let { star ->
             pitch += (LobbyFraming.PITCH - scene.stage.pitch) * framed
@@ -1813,7 +1846,17 @@ object LobbyScene {
         val yawRad = Math.toRadians(yaw)
         val pitchRad = Math.toRadians(pitch)
         var look = Vec3(-sin(yawRad) * cos(pitchRad), -sin(pitchRad), cos(yawRad) * cos(pitchRad))
-        if (stage.interior) distance = wallClamp(scene, aim, look, distance, elapsed)
+        if (stage.interior) {
+            distance = wallClamp(scene, aim, look, distance, elapsed)
+        } else if (LobbyLook.active()) {
+            // turned around, the camera stays in front of hills and trees instead of inside them
+            val reach = LobbyStage.reach(scene.level, aim, aim.subtract(look.scale(distance + WALL_MARGIN))) - WALL_MARGIN
+            distance = minOf(distance, reach.coerceAtLeast(MIN_WALL_DISTANCE))
+            // and in front of whatever would hide your character (a house between it and the camera)
+            scene.avatars.firstOrNull { it.isLocal }?.let { star ->
+                distance = inSight(scene, aim, look, distance, star.position().add(0.0, star.bbHeight * SIGHT_HEAD_SHARE, 0.0))
+            }
+        }
         val camera = aim.subtract(look.scale(distance))
         val nudge = LobbyFraming.insetYaw(currentFov.toDouble(), viewAspect(mc), (1.0 - portrait) * (1.0 - plunge))
         if (nudge != 0.0) {
@@ -1854,6 +1897,16 @@ object LobbyScene {
         skyBase = rest.add(0.0, room.coerceIn(0.0, SKY_RISE), 0.0)
         skyYaw = stage.yaw.toDouble()
         skyNanos = Util.getNanos()
+    }
+
+    /** The farthest distance up to [distance] from which the camera still sees [head]. */
+    private fun inSight(scene: Live, aim: Vec3, look: Vec3, distance: Double, head: Vec3): Double {
+        var reach = distance
+        while (reach > MIN_WALL_DISTANCE) {
+            if (LobbyStage.hit(scene.level, head, aim.subtract(look.scale(reach))) == null) return reach
+            reach -= SIGHT_STEP
+        }
+        return MIN_WALL_DISTANCE
     }
 
     private fun wallClamp(scene: Live, aim: Vec3, look: Vec3, distance: Double, elapsed: Double): Double {
@@ -2100,10 +2153,10 @@ object LobbyScene {
 
     //? if > 1.8.9 {
     private fun fogStart(scene: Live): Float =
-        currentDistance + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_START else Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)
+        currentDistance + extraFog() + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_START else Mth.lerp(scene.mood.night, DAY_FOG_START, FOG_START_MARGIN)
 
     private fun fogEnd(scene: Live): Float =
-        currentDistance + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_END else Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN)
+        currentDistance + extraFog() + if (scene.mood.realm == LobbyRealm.NETHER) NETHER_FOG_END else Mth.lerp(scene.mood.night, DAY_FOG_END, FOG_END_MARGIN)
     //?}
 
     //? if >= 1.21.8 {

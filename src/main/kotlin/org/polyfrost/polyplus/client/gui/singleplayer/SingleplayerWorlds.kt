@@ -79,6 +79,9 @@ internal class SingleplayerWorld(val summary: LevelSummary) {
     *///?}
     private val currentDataVersion = LobbyCompat.dataVersion()
 
+    /** Saved in another Minecraft version than the one running, shown in its own section and confirmed before opening. */
+    val otherVersion: Boolean = !broken && dataVersion != currentDataVersion
+
     val canPlay = summary.primaryActionActive()
     val canEdit = summary.canEdit()
     val canRecreate = summary.canRecreate()

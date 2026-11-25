@@ -5,6 +5,10 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ServerData;
+import org.polyfrost.polyplus.client.gui.vanillamenu.JoinMultiplayerScreenParent;
+import org.polyfrost.polyplus.client.gui.vanillamenu.RecentDirectConnects;
+import org.spongepowered.asm.mixin.Final;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.network.chat.Component;
@@ -23,13 +27,15 @@ import java.util.ArrayList;
 import java.util.Comparator;
 
 @Mixin(JoinMultiplayerScreen.class)
-public abstract class MixinJoinMultiplayerScreen extends Screen {
+public abstract class MixinJoinMultiplayerScreen extends Screen implements JoinMultiplayerScreenParent {
     @Unique private static final int BUTTON_ROW_WIDTH = 308;
     @Unique private static final int BUTTON_GAP = 4;
     @Unique private static final int VANILLA_BUTTON_WIDTH = 74;
     @Unique private static final int LABEL_PADDING = 8;
     @Unique private static final int SCREEN_MARGIN = 10;
 
+    @Shadow @Final private Screen lastScreen;
+    @Shadow private ServerData editingServer;
     @Shadow protected ServerSelectionList serverSelectionList;
     @Shadow private Button editButton;
     //? if >= 26.3 {
@@ -80,9 +86,23 @@ public abstract class MixinJoinMultiplayerScreen extends Screen {
         }
     }
 
+    @Override
+    public Screen polyplus$lastScreen() {
+        return lastScreen;
+    }
+
+    @Inject(method = "directJoinCallback", at = @At("HEAD"))
+    private void polyplus$rememberDirectConnect(boolean result, CallbackInfo ci) {
+        if (result && editingServer != null) RecentDirectConnects.record(editingServer.ip);
+    }
+
     @Inject(method = "deleteCallback", at = @At("HEAD"))
     private void polyplus$demoteDeletedFeaturedServer(boolean result, CallbackInfo ci) {
         if (!result || serverSelectionList == null) return;
+        var recentRow = FeaturedServerRowRegistry.get(serverSelectionList.getSelected());
+        if (recentRow != null && recentRow.server() == null && !recentRow.header()) {
+            RecentDirectConnects.remove(recentRow.data().ip);
+        }
         if (serverSelectionList.getSelected() instanceof ServerSelectionList.OnlineServerEntry entry) {
             FeaturedServers.dismissMultiplayerByAddress(entry.getServerData().ip);
             if (FeaturedServerRowRegistry.get(entry) == null) polyplus$forgetFolder(entry);

@@ -9,6 +9,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import net.minecraft.client.Minecraft
 import org.polyfrost.oneconfig.internal.ThemeConfig
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.gui.PolyPlusLobbyScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.onboardingPending
 import org.polyfrost.polyplus.client.gui.screens.ScreenRouter
@@ -277,6 +278,7 @@ object StartupOverlay {
         val lobby = ClientPlatform.currentScreen() is PolyPlusLobbyScreen
         val failed = LobbyScene.phase == LobbyScene.Phase.FAILED
         val timedOut = holding && seconds(holdNanos, now) > HOLD_LIMIT_SECONDS
+        if (holding && !lobby && !failed && !timedOut && startNanos == 0L && menuIntro()) return menuReveal(canvas, now)
         if (holding && (!lobby || failed || timedOut) && startNanos == 0L) return fadeOnly(canvas, now)
         val started = holding && LobbyScene.revealStarted()
         if (started && startNanos == 0L) {
@@ -298,6 +300,41 @@ object StartupOverlay {
         val hero = hero(canvas)
         canvas.brand(hero.mark, hero.word, tint(WHITE, alpha))
         return t >= 1f
+    }
+
+    private fun menuIntro(): Boolean =
+        PolyPlusMainMenuConfig.introAnimation && !Motion.reduced
+
+    /**
+     * Into the vanilla or PolyPlus menu: the logo rises and shrinks toward the top while the dark backdrop
+     * opens like a curtain from the middle, uncovering the menu behind it.
+     */
+    private fun menuReveal(canvas: StartupCanvas, now: Long): Boolean {
+        cardGrow = 1f
+        if (fallbackNanos == 0L) fallbackNanos = now
+        val t = seconds(fallbackNanos, now).toFloat()
+        val w = canvas.width
+        val h = canvas.height
+        val open = cubic((t - 0.45f) / 0.8f)
+        val half = h / 2f * (1f - open)
+        canvas.rect(0f, 0f, w, half, tint(DARK, 1f))
+        canvas.rect(0f, h - half, w, half, tint(DARK, 1f))
+        val hero = hero(canvas)
+        val move = cubic((t - 0.3f) / 0.85f)
+        val scale = lerp(1f, 0.42f, move)
+        val lift = lerp(0f, hero.mark.y + hero.mark.h / 2f - h * 0.1f, move)
+        fun shrink(box: Box): Box {
+            val cx = w / 2f
+            val cy = h * HERO_CENTER
+            return Box(cx + (box.x - cx) * scale, cy + (box.y - cy) * scale - lift, box.w * scale, box.h * scale)
+        }
+        val alpha = 1f - smooth(0.95f, 1.35f, t)
+        canvas.brand(shrink(hero.mark), shrink(hero.word), tint(WHITE, alpha))
+        val thick = max(2f / canvas.pixelScale, 1f)
+        val lineW = hero.width * scale * cubic(t / 0.4f)
+        val lineY = h * HERO_CENTER + (hero.mark.h / 2f + LINE_GAP * designUnit(w, h) * 0.5f) * scale - lift
+        canvas.rect((w - lineW) / 2f, lineY, lineW, thick, tint(accent, alpha))
+        return t >= 1.4f
     }
 
     private fun drawRise(canvas: StartupCanvas, t: Float, line: Float): Boolean {

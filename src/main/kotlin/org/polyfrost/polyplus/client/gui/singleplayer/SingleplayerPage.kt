@@ -22,6 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.polyfrost.polyplus.client.gui.SocialTextSecondary
+import org.polyfrost.polyplus.client.gui.vanillamenu.MenuText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -127,10 +133,25 @@ private fun WorldGrid(state: SingleplayerState, hero: SingleplayerWorld?, worlds
                         WorldCard(state, hero, onHost, Modifier.fillMaxWidth().height(rowHeight), lastPlayed = true)
                     }
                 }
-                items(worlds, key = { it.id }) { world ->
+                val (current, other) = worlds.partition { !it.otherVersion }
+                if (other.isNotEmpty() && current.isNotEmpty()) {
+                    item(key = "section-current", span = { GridItemSpan(maxLineSpan) }) { WorldSectionHeader("Playable on this version") }
+                }
+                items(current, key = { it.id }) { world ->
+                    WorldCard(state, world, onHost, Modifier.fillMaxWidth().height(rowHeight))
+                }
+                if (other.isNotEmpty()) {
+                    item(key = "section-other", span = { GridItemSpan(maxLineSpan) }) { WorldSectionHeader("Other versions") }
+                }
+                items(other, key = { it.id }) { world ->
                     WorldCard(state, world, onHost, Modifier.fillMaxWidth().height(rowHeight))
                 }
             }
         }
     }
+}
+
+@Composable
+private fun WorldSectionHeader(label: String) {
+    MenuText(label, 13.sp, color = SocialTextSecondary, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
 }

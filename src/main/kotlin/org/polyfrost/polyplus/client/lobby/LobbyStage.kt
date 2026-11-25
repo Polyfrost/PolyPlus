@@ -19,6 +19,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
+import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 
 data class LobbySlot(val pos: Vec3, val yaw: Float)
 
@@ -81,6 +82,11 @@ data class LobbyStage(
     }
 
     private class Solver(val level: BlockGetter, val interior: Boolean = false) {
+        /** Any Terrain: party on different heights, ledges, drops and slopes are fine. */
+        val anyTerrain = PolyPlusLobbyConfig.lobbyAnyTerrain
+
+        /** Second try with Any Terrain: a busy backdrop (a hill right behind the group) no longer rules a view out. */
+        var lenientBackdrop = false
         val shots = if (interior) INTERIOR_SHOTS else SHOTS
         val base = if (interior) INTERIOR_BASE else SHOTS.first()
 
@@ -109,7 +115,7 @@ data class LobbyStage(
             val head = level.getBlockState(cell.above())
             if (level.getBlockState(cell).lightEmission > 0 || !(head.isAir || head.canBeReplaced())) return false
             val support = Direction.Plane.HORIZONTAL.count { surface(cell.relative(it), 1, 1) != null }
-            return support >= if (loose) LOOSE_SUPPORT else FIRM_SUPPORT
+            return support >= if (anyTerrain) ANY_TERRAIN_SUPPORT else if (loose) LOOSE_SUPPORT else FIRM_SUPPORT
         }
 
         fun walkable(spot: BlockPos): Set<Long> = walkable.getOrPut(spot.asLong()) { flood(spot) }
@@ -127,7 +133,8 @@ data class LobbyStage(
                 for (direction in Direction.Plane.HORIZONTAL) {
                     val flat = cell.relative(direction)
                     if (hypot((flat.x - spot.x).toDouble(), (flat.z - spot.z).toDouble()) > WALK_REACH) continue
-                    val next = listOf(flat, flat.above(), flat.below()).firstOrNull(::canStand) ?: continue
+                    val steps = if (anyTerrain) ANY_TERRAIN_STEPS.map { flat.offset(0, it, 0) } else listOf(flat, flat.above(), flat.below())
+                    val next = steps.firstOrNull(::canStand) ?: continue
                     if (found.add(next.asLong())) queue += next
                 }
             }
@@ -188,7 +195,8 @@ data class LobbyStage(
                 if (loose && !level.getBlockState(cell.above(2)).isAir) return false
                 if (!loose && !solver.open(cell)) return false
                 if (cells.any { planar(it, cell) < PARTY_SPACE } || frame.depthOf(cell) < FRONT_LIMIT) return false
-                if (abs(feet.y - feetOf(level, player).y) > if (loose) LOOSE_RISE else PARTY_RISE) return false
+                val rise = if (solver.anyTerrain) ANY_TERRAIN_RISE else if (loose) LOOSE_RISE else PARTY_RISE
+                if (abs(feet.y - feetOf(level, player).y) > rise) return false
                 if (!solver.settled(cell, loose)) return false
             }
             val figure = figure(view, feet)
@@ -275,6 +283,12 @@ data class LobbyStage(
         private const val FRONT_LIMIT = -0.75
         private const val WIDE_GROUND = 0.6
         private const val FIRM_SUPPORT = 3
+        private const val ANY_TERRAIN_SUPPORT = 1
+        private const val ANY_TERRAIN_RISE = 8.0
+        private const val ANY_TERRAIN_SURFACE = 24
+        private const val ANY_TERRAIN_SKY_SHARE = 0.4
+        // a walk step can go up one block or down a drop of up to four
+        private val ANY_TERRAIN_STEPS = listOf(0, 1, -1, -2, -3, -4)
         private const val LOOSE_SUPPORT = 2
         private const val FILL_REACH = 9
         private const val TURN_IN = 0.3f
@@ -379,8 +393,12 @@ data class LobbyStage(
             8.5 to 8.0,
         )
 
-        fun build(level: BlockGetter, anchor: BlockPos, interior: Boolean = false): LobbyStage? {
-            val solver = Solver(level, interior)
+        fun build(level: BlockGetter, anchor: BlockPos, interior: Boolean = false): LobbyStage? = build(Solver(level, interior), anchor)
+
+        /** Party members you need room for: 4 normally, with Any Terrain only you (the rest fill in where they can). */
+        private fun required(solver: Solver): Int = if (solver.anyTerrain) 1 else PARTY_MIN
+
+        private fun build(solver: Solver, anchor: BlockPos): LobbyStage? {
             val frames = ArrayList<Candidate>()
             for ((spot, open) in openSpots(solver, anchor)) {
                 val drift = hypot((spot.x - anchor.x).toDouble(), (spot.z - anchor.z).toDouble()) * ANCHOR_DISTANCE_COST
@@ -388,15 +406,20 @@ data class LobbyStage(
                     val heading = index * Math.PI * 2.0 / YAW_CANDIDATES
                     for ((pitch, distance) in solver.shots) {
                         val frame = Frame(spot, heading, pitch, distance, solver.base)
-                        val stage = solve(solver, frame, PARTY_MIN, false) ?: continue
+                        val stage = solve(solver, frame, required(solver), false) ?: continue
                         val bonus = open * OPEN_WEIGHT - drift
                         frames += Candidate(frame, stage.quality + bonus, bonus)
                     }
                 }
             }
             val best = frames.sortedByDescending { it.quality }.take(FINAL_FRAMES).mapNotNull { candidate ->
-                solve(solver, candidate.frame, PARTY_MIN, true)?.let { it.copy(quality = it.quality + candidate.bonus) }
+                solve(solver, candidate.frame, required(solver), true)?.let { it.copy(quality = it.quality + candidate.bonus) }
             }.maxByOrNull { it.quality }
+            if (best == null && solver.anyTerrain && !solver.lenientBackdrop) {
+                // nothing fit: try again with only you needing a place and any backdrop allowed
+                solver.lenientBackdrop = true
+                return build(solver, anchor)
+            }
             return best?.let { finish(solver, it) }
         }
 
@@ -444,7 +467,7 @@ data class LobbyStage(
                 final.fill(false)
                 final.fill(true)
             }
-            val backdrop = backdrop(level, view, frame.distance, solver.interior) ?: return null
+            val backdrop = backdrop(level, view, frame.distance, solver.interior) ?: if (solver.lenientBackdrop) 0.0 else return null
             val feet = final.feet()
             val player = feet.first()
             val slots = feet.mapIndexed { index, pos ->
@@ -697,8 +720,9 @@ data class LobbyStage(
             val spots = ArrayList<Pair<BlockPos, Int>>()
             for (dx in -SPOT_SEARCH_RADIUS..SPOT_SEARCH_RADIUS step SPOT_STEP) {
                 for (dz in -SPOT_SEARCH_RADIUS..SPOT_SEARCH_RADIUS step SPOT_STEP) {
-                    val spot = solver.surface(anchor.offset(dx, 0, dz), 8, 8) ?: continue
-                    if (skyShare(solver, spot) < MIN_SKY_SHARE) continue
+                    val reach = if (solver.anyTerrain) ANY_TERRAIN_SURFACE else 8
+                    val spot = solver.surface(anchor.offset(dx, 0, dz), reach, reach) ?: continue
+                    if (skyShare(solver, spot) < if (solver.anyTerrain) ANY_TERRAIN_SKY_SHARE else MIN_SKY_SHARE) continue
                     spots += spot to openArea(solver, spot)
                 }
             }
@@ -732,6 +756,10 @@ data class LobbyStage(
             val hit = clip(level, from, to)
             return if (hit.type == HitResult.Type.MISS) from.distanceTo(to) else from.distanceTo(hit.location)
         }
+
+        /** Where a line from [from] to [to] first hits a block, or null when it hits nothing. */
+        fun hit(level: BlockGetter, from: Vec3, to: Vec3): Vec3? =
+            clip(level, from, to).takeIf { it.type != HitResult.Type.MISS }?.location
 
         //? if > 1.8.9 {
         private fun clip(level: BlockGetter, from: Vec3, to: Vec3): BlockHitResult =
