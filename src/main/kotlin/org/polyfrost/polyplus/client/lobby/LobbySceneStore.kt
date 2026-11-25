@@ -28,9 +28,25 @@ import kotlin.io.path.deleteIfExists
 import kotlin.math.hypot
 import kotlin.math.pow
 
-/** A camera angle saved for one scene: added yaw and pitch in degrees, and the zoom. */
+/** A camera angle saved for one scene: added yaw and pitch in degrees, the zoom, and the pan in blocks. */
 @Serializable
-data class LobbySceneView(val yaw: Double = 0.0, val pitch: Double = 0.0, val zoom: Double = 1.0)
+data class LobbySceneView(
+    val yaw: Double = 0.0,
+    val pitch: Double = 0.0,
+    val zoom: Double = 1.0,
+    val panX: Double = 0.0,
+    val panY: Double = 0.0,
+    val panZ: Double = 0.0,
+)
+
+/** Where you put your own player in one scene (feet position and facing). */
+@Serializable
+data class LobbySceneSpot(
+    val x: Double = 0.0,
+    val y: Double = 0.0,
+    val z: Double = 0.0,
+    val yaw: Float = 0f,
+)
 
 @Serializable
 data class LobbySceneEntry(
@@ -95,6 +111,9 @@ object LobbySceneStore {
         val lastWorld: String? = null,
         val serverScenes: Map<String, String> = emptyMap(),
         val views: Map<String, LobbySceneView> = emptyMap(),
+        val spots: Map<String, LobbySceneSpot> = emptyMap(),
+        val hideName: Boolean = false,
+        val pose: String = "none",
     )
 
     private const val SERVER_PREFIX = "server:"
@@ -243,6 +262,42 @@ object LobbySceneStore {
         ensureLoaded()
         if (state.views[id] == view) return
         update { copy(views = if (view == null) views - id else views + (id to view)) }
+    }
+
+    /** Where you placed your own player in this scene, or null for the scene's own spot. */
+    fun spot(id: String?): LobbySceneSpot? {
+        ensureLoaded()
+        return id?.let { state.spots[it] }
+    }
+
+    fun setSpot(id: String, spot: LobbySceneSpot?) {
+        ensureLoaded()
+        if (state.spots[id] == spot) return
+        update { copy(spots = if (spot == null) spots - id else spots + (id to spot)) }
+    }
+
+    /** Hide your own name tag above your player in the lobby. */
+    fun hideName(): Boolean {
+        ensureLoaded()
+        return state.hideName
+    }
+
+    fun setHideName(hide: Boolean) {
+        ensureLoaded()
+        if (state.hideName == hide) return
+        update { copy(hideName = hide) }
+    }
+
+    /** The looping pose your own player holds while standing in the lobby ("none" for the normal idle). */
+    fun pose(): String {
+        ensureLoaded()
+        return state.pose
+    }
+
+    fun setPose(id: String) {
+        ensureLoaded()
+        if (state.pose == id) return
+        update { copy(pose = id) }
     }
 
     fun serverScene(address: String): String? {

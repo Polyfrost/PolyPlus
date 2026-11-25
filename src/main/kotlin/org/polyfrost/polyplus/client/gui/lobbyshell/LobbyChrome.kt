@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -171,6 +172,12 @@ import org.polyfrost.polyplus.compat.LinkedModMenus
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.math.roundToInt
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.cos
+import kotlin.math.sin
 import org.polyfrost.polyplus.client.gui.usableScale
 import org.polyfrost.polyplus.client.gui.usableSize
 import org.polyfrost.polyplus.client.gui.widgets.WidgetColumn
@@ -309,6 +316,8 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
         LobbyPage.Home -> {
             Box(Modifier.fillMaxSize().avatarTaps(lobby, notch))
             SceneTags(feed, root, notch)
+            TurnRing(notch)
+            LobbyPlayerMenuHost()
             EditableBlock("lobby", "corner", "News card", Modifier.align(Alignment.TopStart).padding(start = LobbyLayout.Margin, top = LobbyLayout.Top)) {
                 LobbyCornerCard(lobby, Modifier)
             }
@@ -812,12 +821,22 @@ private fun Modifier.avatarTaps(lobby: LobbyShell, notch: Int): Modifier = point
                 }
                 continue
             }
+            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && size.width > 0 && size.height > 0 && lobby.calm()) {
+                // right button: a drag pans the camera, a click on your character opens its menu
+                val at = event.changes.firstOrNull()?.position ?: continue
+                val onAvatar = LobbyGrab.touches(sceneX(at), sceneY(at, notch))
+                if (!LobbyLook.enabled() && !onAvatar) continue
+                event.changes.forEach { it.consume() }
+                val dragged = LobbyLook.enabled() && panGesture(at)
+                if (!dragged && onAvatar) LobbyPlayerMenu.open(at.x, at.y)
+                continue
+            }
             if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed || size.width <= 0 || size.height <= 0) continue
             val at = event.changes.firstOrNull()?.position ?: continue
             if (!lobby.calm()) continue
             if (LobbyGrab.touches(sceneX(at), sceneY(at, notch))) {
                 event.changes.forEach { it.consume() }
-                avatarGesture(lobby, at, notch)
+                if (Minecraft.getInstance().hasShiftDown()) turnGesture(at, notch) else avatarGesture(lobby, at, notch)
                 continue
             }
             if (!LobbyLook.enabled()) continue
@@ -849,6 +868,66 @@ private suspend fun AwaitPointerEventScope.lookGesture(press: Offset): Boolean {
             event.changes.forEach { it.consume() }
         }
         last = at
+    }
+}
+
+/** Right drags pan the camera; true when it was a drag, false for a click. */
+private suspend fun AwaitPointerEventScope.panGesture(press: Offset): Boolean {
+    var last = press
+    var panning = false
+    while (true) {
+        val event = awaitPointerEvent()
+        val at = event.changes.firstOrNull()?.position ?: return panning
+        if (event.type == PointerEventType.Release || !event.buttons.isSecondaryPressed) return panning
+        if (!panning && (at - press).getDistance() > viewConfiguration.touchSlop) panning = true
+        if (panning && size.width > 0 && size.height > 0) {
+            LobbyLook.pan((at.x - last.x) / size.width.toDouble(), (at.y - last.y) / size.height.toDouble())
+            event.changes.forEach { it.consume() }
+        }
+        last = at
+    }
+}
+
+/** Shift + left drag on your character turns it around on the spot, with a ring around its feet. */
+private suspend fun AwaitPointerEventScope.turnGesture(press: Offset, notch: Int) {
+    val aspect = size.width / (size.height + notch).toDouble()
+    if (!LobbyGrab.turnStart(sceneX(press), sceneY(press, notch), aspect)) return
+    try {
+        while (true) {
+            val event = awaitPointerEvent()
+            event.changes.forEach { it.consume() }
+            if (event.type == PointerEventType.Release || !event.buttons.isPrimaryPressed) return
+            val at = event.changes.firstOrNull()?.position ?: continue
+            LobbyGrab.turn(sceneX(at), sceneY(at, notch))
+        }
+    } finally {
+        LobbyGrab.turnEnd()
+    }
+}
+
+/** The ring around your character's feet while you turn it (shift + drag). */
+@Composable
+private fun TurnRing(notch: Int) {
+    val accent = OneConfigTheme.accent
+    var frame by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) withFrameNanos { frame = it }
+    }
+    Canvas(Modifier.fillMaxSize()) {
+        frame
+        val ring = LobbyGrab.ring() ?: return@Canvas
+        val full = size.height + notch
+        val cx = (ring.x * size.width).toFloat()
+        val cy = (ring.y * full - notch).toFloat()
+        val rx = (ring.radiusX * size.width).toFloat()
+        val ry = rx * LobbyGrab.RING_SQUASH.toFloat()
+        val stroke = 2.dp.toPx()
+        drawOval(Color.Black.copy(alpha = 0.35f), Offset(cx - rx, cy - ry), Size(rx * 2f, ry * 2f), style = Stroke(stroke * 3f))
+        drawOval(accent, Offset(cx - rx, cy - ry), Size(rx * 2f, ry * 2f), style = Stroke(stroke))
+        val knob = Offset(cx + rx * cos(ring.facing).toFloat(), cy - ry * sin(ring.facing).toFloat())
+        drawLine(accent.copy(alpha = 0.6f), Offset(cx, cy), knob, stroke, StrokeCap.Round)
+        drawCircle(Color.White, stroke * 3.5f, knob)
+        drawCircle(accent, stroke * 2.5f, knob)
     }
 }
 

@@ -55,8 +55,13 @@ object LobbyGrab {
     private const val LEG_KICK = 32.0
     private const val HOP_ARC = 4.0
     // Place Your Character Anywhere: how far from where it stood it can go in one drag, and how high it hangs while held
-    private const val FREE_REACH = 48.0
+    private const val FREE_REACH = 400.0
+    private const val FREE_FALL = 256.0
     private const val FREE_HOVER = 1.1
+    const val RING_SQUASH = 0.35
+    private const val RING_SIZE = 2.4
+    private const val RING_MIN = 0.08
+    private const val RING_QUARTER = 90f
 
     private val DANGLE_ID = Identifier.fromNamespaceAndPath("polyplus", "lobby/dangle")
 
@@ -73,6 +78,17 @@ object LobbyGrab {
     private var right = Vec3(1.0, 0.0, 0.0)
     private var eye = Vec3(0.0, 0.0, 0.0)
     private var cameraYaw = 0f
+    private var feetX = 0.0
+    private var feetY = 0.0
+
+    // shift + left drag on your character turns it around on the spot (a ring around its feet)
+    private var turnAvatar: LobbyAvatar? = null
+    private var turnFrom = 0.0
+    private var turnYaw = 0f
+    private var turnAspect = 1.0
+
+    /** The ring drawn around the feet while turning, in screen shares (x right, y down); [radiusX] is a share of the width. */
+    class Ring(val x: Double, val y: Double, val radiusX: Double, val facing: Double)
 
     private var held: Hold? = null
     private var drop: Drop? = null
@@ -120,6 +136,8 @@ object LobbyGrab {
         bottom = minOf(feetY, headY)
         top = maxOf(feetY, headY)
         eye = camera
+        this.feetX = feetX
+        this.feetY = feetY
         if (held != null) return
         val share = NECK / avatar.bbHeight
         neckX = feetX + (headX - feetX) * share
@@ -175,24 +193,72 @@ object LobbyGrab {
         if (Motion.reduced) controller.stop() else LobbyEntrance.fallPose()?.let(controller::play) ?: controller.stop()
         val from = avatar.position()
         val rest = avatar.rest.pos
-        val away = (from.x - rest.x) * (from.x - rest.x) + (from.z - rest.z) * (from.z - rest.z) > NEAR_HOME * NEAR_HOME
-        val ground = if (away) level?.let { LobbyEntrance.landing(it, from) } else null
-        if (ground != null && hold.free != null) {
-            // it stays where you dropped it, facing the camera, instead of walking back
-            val spot = Vec3(from.x, ground, from.z)
-            avatar.moveTo(LobbySlot(spot, Mth.wrapDegrees(cameraYaw + TURN_AROUND)))
+        val pointed = hold.free
+        if (pointed != null) {
+            // it stays wherever you dropped it (any block, any height), facing the camera, instead of walking back
+            val ground = level?.let { LobbyEntrance.landing(it, from, FREE_FALL) }
+            val spot = if (ground != null) Vec3(from.x, ground, from.z) else pointed.subtract(0.0, FREE_HOVER, 0.0)
+            val slot = LobbySlot(spot, Mth.wrapDegrees(cameraYaw + TURN_AROUND))
+            avatar.moveTo(slot)
+            LobbyScene.rememberSpot(slot)
             drop = dropping(avatar, from, spot, home = false, stay = true)
             return
         }
+        val away = (from.x - rest.x) * (from.x - rest.x) + (from.z - rest.z) * (from.z - rest.z) > NEAR_HOME * NEAR_HOME
+        val ground = if (away) level?.let { LobbyEntrance.landing(it, from) } else null
         drop = if (ground == null) dropping(avatar, from, rest, false) else dropping(avatar, from, Vec3(from.x, ground, from.z), true)
     }
 
     fun homeward(avatar: LobbyAvatar): Boolean = strolling === avatar
 
-    fun handling(avatar: LobbyAvatar): Boolean = held?.avatar === avatar || drop?.avatar === avatar || strolling === avatar
+    fun handling(avatar: LobbyAvatar): Boolean =
+        held?.avatar === avatar || drop?.avatar === avatar || strolling === avatar || turnAvatar === avatar
+
+    val turning: Boolean get() = turnAvatar != null
+
+    /** Starts turning your character; [aspect] is the screen's width / height so the ring is round on screen. */
+    fun turnStart(x: Double, y: Double, aspect: Double): Boolean {
+        val avatar = seen ?: return false
+        if (held != null || turnAvatar != null || !visible || !ready() || !usable(avatar)) return false
+        if (avatar.arrival != LobbyAvatar.Arrival.LANDED) avatar.halt()
+        strolling = null
+        drop = null
+        turnAspect = if (aspect > 0.0) aspect else 1.0
+        turnYaw = avatar.rest.yaw
+        turnFrom = ringAngle(x, y)
+        turnAvatar = avatar
+        return true
+    }
+
+    fun turn(x: Double, y: Double) {
+        val avatar = turnAvatar ?: return
+        val yaw = Mth.wrapDegrees(turnYaw - Math.toDegrees(ringAngle(x, y) - turnFrom).toFloat())
+        avatar.moveTo(LobbySlot(avatar.rest.pos, yaw))
+        avatar.face(yaw, 0f)
+    }
+
+    fun turnEnd() {
+        val avatar = turnAvatar ?: return
+        turnAvatar = null
+        LobbyScene.rememberSpot(avatar.rest)
+    }
+
+    fun ring(): Ring? {
+        val avatar = turnAvatar ?: return null
+        if (!visible) return null
+        val facing = Math.toRadians((cameraYaw + RING_QUARTER - avatar.rest.yaw).toDouble())
+        return Ring((feetX + 1.0) / 2.0, (1.0 - feetY) / 2.0, maxOf(halfWidth * RING_SIZE, RING_MIN) / 2.0, facing)
+    }
+
+    private fun ringAngle(x: Double, y: Double): Double {
+        val dx = (x * 2.0 - 1.0 - feetX) * turnAspect
+        val dy = (1.0 - y * 2.0 - feetY) / RING_SQUASH
+        return atan2(dy, dx)
+    }
 
     fun tick(level: ClientLevel, avatar: LobbyAvatar?) {
         this.level = level
+        turnAvatar?.let { if (it !== avatar || !usable(it)) turnEnd() }
         strolling?.let {
             if (it !== avatar || it.arrival != LobbyAvatar.Arrival.ARRIVING) {
                 strolling = null

@@ -381,9 +381,9 @@ object LobbyEntrance {
         return true
     }
 
-    fun landing(level: ClientLevel, feet: Vec3): Double? {
+    fun landing(level: ClientLevel, feet: Vec3, depth: Double = MAX_FALL): Double? {
         if (level.obstacle(feet.x, feet.z, feet.y) != null) return null
-        val ground = level.ground(feet.x, feet.z, feet.y, MAX_FALL) ?: return null
+        val ground = level.ground(feet.x, feet.z, feet.y, depth) ?: return null
         val support = LobbyCompat.blockAt(feet.x, ground - SNAP, feet.z)
         if (level.getBlockState(support).getCollisionShape(level, support).isEmpty) return null
         val top = LobbyCompat.blockAt(feet.x, feet.y, feet.z).y

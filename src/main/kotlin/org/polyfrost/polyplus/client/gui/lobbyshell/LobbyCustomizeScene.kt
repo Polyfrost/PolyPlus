@@ -141,7 +141,16 @@ private fun ViewRows() {
             label = "Use the scene's own angle",
         )
     }
-    PanelHint("Drag and scroll the lobby to aim the camera. The lobby always opens on the saved angle; double click goes back to it.")
+    PanelHint("Drag and scroll the lobby to aim the camera, right drag to pan. The lobby always opens on the saved angle; double click goes back to it.")
+    if (LobbySceneStore.spot(current) != null) {
+        ResetRow(
+            {
+                LobbyScene.forgetSpot()
+                LobbyScene.reload()
+            },
+            label = "Put your player back on the scene's spot",
+        )
+    }
 }
 
 private fun modeHint(mode: SceneMode, pinned: String?, following: Boolean): String = when {

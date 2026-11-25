@@ -1361,7 +1361,7 @@ object LobbyScene {
         *///?} else {
         /*val localSkin = mc.skinManager.getOrLoad(localProfile)
         *///?}
-        val slot = stage.slots.first()
+        val slot = LobbySceneStore.spot(currentId)?.let { LobbySlot(Vec3(it.x, it.y, it.z), it.yaw) } ?: stage.slots.first()
         //? if > 1.8.9 {
         val avatar = LobbyAvatar(level, localProfile, localProfile.name, true, slot) { localSkin.get() }
         //?} else {
@@ -1721,6 +1721,17 @@ object LobbyScene {
      * The point in the scene under a spot on the lobby ([x], [y] as shares of the window, top left 0,0): the first block
      * a line from the camera through that spot hits. Null when it hits nothing (the sky, outside the scene).
      */
+    /** Saves where you put (or turned) your own player, so it stays there next time this scene loads. */
+    fun rememberSpot(slot: LobbySlot) {
+        val id = currentId ?: return
+        LobbySceneStore.setSpot(id, LobbySceneSpot(slot.pos.x, slot.pos.y, slot.pos.z, slot.yaw))
+    }
+
+    fun forgetSpot() {
+        val id = currentId ?: return
+        LobbySceneStore.setSpot(id, null)
+    }
+
     fun pointAt(x: Double, y: Double): Vec3? {
         val scene = live ?: return null
         val rig = scene.rig
@@ -1773,6 +1784,7 @@ object LobbyScene {
         yaw += LobbyLook.yaw
         pitch = LobbyLook.pitched(pitch)
         distance *= LobbyLook.zoom
+        aim = aim.add(LobbyLook.panX, LobbyLook.panY, LobbyLook.panZ)
         val framed = LobbyFraming.frame(time, elapsed, eased, OPENING_SECONDS)
         scene.avatars.firstOrNull { it.isLocal }?.takeIf { framed > 0.0 }?.let { star ->
             pitch += (LobbyFraming.PITCH - scene.stage.pitch) * framed
@@ -1857,10 +1869,11 @@ object LobbyScene {
             val reach = LobbyStage.reach(scene.level, aim, aim.subtract(look.scale(distance + WALL_MARGIN))) - WALL_MARGIN
             distance = minOf(distance, reach.coerceAtLeast(MIN_WALL_DISTANCE))
             // and in front of whatever would hide your character (a house between it and the camera)
-            scene.avatars.firstOrNull { it.isLocal }?.let { star ->
+            scene.avatars.firstOrNull { it.isLocal }?.takeIf { !LobbyLook.panned() }?.let { star ->
                 distance = inSight(scene, aim, look, distance, star.position().add(0.0, star.bbHeight * SIGHT_HEAD_SHARE, 0.0))
             }
         }
+        LobbyLook.viewed(yaw, pitch, distance)
         val camera = aim.subtract(look.scale(distance))
         val nudge = LobbyFraming.insetYaw(currentFov.toDouble(), viewAspect(mc), (1.0 - portrait) * (1.0 - plunge))
         if (nudge != 0.0) {
@@ -2262,6 +2275,7 @@ object LobbyScene {
             val screenX = projector.x.toFloat()
             val screenY = projector.y.toFloat()
             if (avatar.isLocal && driven == null) sightAvatar(avatar, right, eye, scene.rig.yRot)
+            if (avatar.isLocal && LobbySceneStore.hideName()) continue
             val label = Label(avatar.displayName, screenX, screenY, avatar.isLocal, sight.invite, avatar.whereabouts)
             (next ?: ArrayList<Label>(scene.avatars.size).also { next = it }) += label
         }
@@ -2408,6 +2422,7 @@ object LobbyScene {
             val local = scene.avatars.firstOrNull { it.isLocal }.takeIf { driven == null }
             LobbyAntics.tick(local)
             LobbyGrab.tick(scene.level, local)
+            LobbyPoses.tick(local)
             //? if > 1.8.9
             if (driven == null) LobbyCats.tick(scene.level, Motion.reduced)
             LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)
