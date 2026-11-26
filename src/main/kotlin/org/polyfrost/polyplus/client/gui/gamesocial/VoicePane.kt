@@ -319,6 +319,18 @@ private fun ModeControl(party: Party, width: Dp) {
 
 @Composable
 private fun InputControl(mode: VoiceInputMode, width: Dp, onSelect: (VoiceInputMode) -> Unit) {
-    val tabs = remember { listOf(TabItem(VoiceInputMode.VOICE_ACTIVITY, "Voice activity"), TabItem(VoiceInputMode.PUSH_TO_TALK, "Push to talk"), TabItem(VoiceInputMode.PUSH_TO_MUTE, "Push to mute")) }
-    TabRow(tabs, mode, onSelect, Modifier.width(width), style = TabStyle.Segmented)
+    Select(
+        selected = mode,
+        options = VoiceInputMode.entries,
+        onSelect = onSelect,
+        modifier = Modifier.width(width),
+        label = {
+            when (it) {
+                VoiceInputMode.VOICE_ACTIVITY -> "Voice activity"
+                VoiceInputMode.PUSH_TO_TALK -> "Push to talk"
+                VoiceInputMode.PUSH_TO_MUTE -> "Push to mute"
+            }
+        },
+        contentDescription = "Input mode",
+    )
 }
