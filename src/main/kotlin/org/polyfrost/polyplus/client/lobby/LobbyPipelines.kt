@@ -40,6 +40,7 @@ object LobbyPipelines {
     var previewing = false
 
     private val failed = ConcurrentHashMap.newKeySet<RenderPipeline>()
+    private val errors = ConcurrentHashMap<RenderPipeline, Throwable>()
 
     private fun usable(pipeline: RenderPipeline): Boolean {
         if (pipeline in failed) return false
@@ -52,6 +53,7 @@ object LobbyPipelines {
             *///?}
         }
         if (result.getOrDefault(false)) return true
+        result.exceptionOrNull()?.let { errors[pipeline] = it }
         if (failed.add(pipeline)) LOBBY_LOGGER.warn("Lobby pipeline {} failed to compile, falling back to vanilla rendering for it", pipeline.location, result.exceptionOrNull())
         return false
     }
@@ -59,6 +61,11 @@ object LobbyPipelines {
     private fun pick(lobby: RenderPipeline, original: RenderPipeline): RenderPipeline = if (usable(lobby)) lobby else original
 
     fun compiled(): Boolean = terrain.all(::usable)
+
+    fun failure(): Pair<String, Throwable?> {
+        val broken = terrain.filter { it in failed }
+        return "lobby pipelines ${broken.joinToString { it.location.toString() }} did not compile" to broken.firstNotNullOfOrNull { errors[it] }
+    }
 
     private val SHADER = Identifier.fromNamespaceAndPath("polyplus", "core/lobby_terrain")
     private val HOLOGRAM = Identifier.fromNamespaceAndPath("polyplus", "core/lobby_hologram")
@@ -234,6 +241,7 @@ object LobbyPipelines {
     var previewing = false
 
     private val failed = ConcurrentHashMap.newKeySet<ShaderProgram>()
+    private val errors = ConcurrentHashMap<ShaderProgram, Throwable>()
 
     @JvmStatic
     fun ownsProgram(program: ShaderProgram): Boolean = program.configId().namespace == "polyplus"
@@ -243,6 +251,7 @@ object LobbyPipelines {
         if (!RenderSystem.isOnRenderThread()) return true
         val result = runCatching { Minecraft.getInstance().shaderManager.getProgram(program) != null }
         if (result.getOrDefault(false)) return true
+        result.exceptionOrNull()?.let { errors[program] = it }
         if (failed.add(program)) LOBBY_LOGGER.warn("Lobby shader {} failed to compile, falling back to vanilla rendering for it", program.configId(), result.exceptionOrNull())
         return false
     }
@@ -261,7 +270,14 @@ object LobbyPipelines {
     private val entity = program("lobby_entity", DefaultVertexFormat.NEW_ENTITY)
     private val hologram = program("lobby_hologram", DefaultVertexFormat.NEW_ENTITY)
 
-    fun compiled(): Boolean = listOf(solid, cutoutMipped, cutout, translucent, tripwire).all(::usable)
+    private val terrain = listOf(solid, cutoutMipped, cutout, translucent, tripwire)
+
+    fun compiled(): Boolean = terrain.all(::usable)
+
+    fun failure(): Pair<String, Throwable?> {
+        val broken = terrain.filter { it in failed }
+        return "lobby shaders ${broken.joinToString { it.configId().toString() }} did not compile" to broken.firstNotNullOfOrNull { errors[it] }
+    }
 
     @JvmStatic
     fun hologramState() {
@@ -314,8 +330,16 @@ object LobbyPipelines {
     private var hologram: ShaderInstance? = null
 
     private val failed = mutableSetOf<String>()
+    private val errors = mutableMapOf<String, Throwable>()
 
     fun compiled(): Boolean = solid != null && cutoutMipped != null && cutout != null && translucent != null && tripwire != null
+
+    fun failure(): Pair<String, Throwable?> {
+        if (Mods.vulkanMod) return "VulkanMod is installed and the lobby shaders need OpenGL" to null
+        val missing = listOf("lobby_solid" to solid, "lobby_cutout_mipped" to cutoutMipped, "lobby_cutout" to cutout, "lobby_translucent" to translucent, "lobby_tripwire" to tripwire)
+            .filter { it.second == null }.map { it.first }
+        return "lobby shaders $missing did not load" to missing.firstNotNullOfOrNull { errors[it] }
+    }
 
     fun register() {
         // VulkanMod can't compile these shaders, and the GL link check aborts the JVM without a GL context
@@ -352,6 +376,7 @@ object LobbyPipelines {
     }
 
     private fun fail(name: String, error: Throwable?) {
+        if (error != null) errors[name] = error
         if (failed.add(name)) LOBBY_LOGGER.warn("Lobby shader {} failed to load, falling back to vanilla rendering for it", name, error)
     }
 
