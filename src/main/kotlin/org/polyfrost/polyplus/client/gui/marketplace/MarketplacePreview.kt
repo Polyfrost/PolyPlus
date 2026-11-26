@@ -71,7 +71,7 @@ private val EDGE_FADE_BRUSH = Brush.horizontalGradient(
 @Composable
 private fun rememberLook(wanted: Map<BodySlot, Int>, yawDeg: Float): Look {
     var worn by remember { mutableStateOf(emptyMap<BodySlot, Int>()) }
-    LaunchedEffect(wanted) {
+    LaunchedEffect(wanted, CosmeticCatalog.version) {
         val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
         val resolved = wanted.mapValues { CosmeticCatalog.resolveVariantForSkin(it.value, slim) }
         worn = resolved

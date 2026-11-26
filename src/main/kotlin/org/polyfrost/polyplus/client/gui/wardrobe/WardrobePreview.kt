@@ -180,7 +180,7 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
             },
         )
     }
-    LaunchedEffect(pieceIds, previewsOwned) {
+    LaunchedEffect(pieceIds, previewsOwned, CosmeticCatalog.version) {
         if (!previewsOwned || slot == null) return@LaunchedEffect
         val pieces = pieceIds.associate { pieceId ->
             CosmeticCatalog.getCosmeticDefinition(pieceId)

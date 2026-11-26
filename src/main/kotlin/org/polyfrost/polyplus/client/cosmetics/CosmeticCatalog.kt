@@ -5,6 +5,9 @@ import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.http.ContentType
 import org.polyfrost.polyplus.libs.ktor.http.contentType
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -44,6 +47,9 @@ object CosmeticCatalog {
     private var selectedEmoteId: Int? = null
     private var ownedCosmeticIds: Set<Int> = emptySet()
     private var ownedEmoteIds: Set<Int> = emptySet()
+
+    var version by mutableIntStateOf(0)
+        private set
 
     fun getDefinition(id: Int): CosmeticDefinition? = cosmeticDefinitions[id] ?: emoteDefinitions[id]
 
@@ -138,6 +144,8 @@ object CosmeticCatalog {
                 emoteDefinitions[definition.id] = definition
             }
         }
+
+        version++
 
         LOGGER.info(
             "Loaded {} cosmetic group(s) ({} variant(s)) and {} emote definition(s) from API",
@@ -327,6 +335,7 @@ object CosmeticCatalog {
         selectedEmoteId = null
         ownedCosmeticIds = emptySet()
         ownedEmoteIds = emptySet()
+        version++
     }
 
     private data class GroupMeta(
