@@ -105,6 +105,12 @@ import org.polyfrost.polyplus.client.featured.MainMenuFeaturedServer
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalGlassRegistry
 import org.polyfrost.polyplus.client.gui.lobbyshell.LocalRootSize
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneBlur
+//? if ornithe {
+/*import org.polyfrost.polyplus.client.gui.lobbyshell.MOD_UPDATES_ICON
+import org.polyfrost.polyplus.client.gui.lobbyshell.rememberModUpdates
+import org.polyfrost.polyplus.client.gui.lobbyshell.tint
+import org.polyfrost.polyplus.compat.ModUpdateChecker
+*///?}
 import org.polyfrost.polyplus.client.host.HostWorldManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
@@ -596,7 +602,12 @@ private fun ModIntegrationBar(
     screen: Screen,
 ) {
     val buttons = ModIntegrationButtons.available()
+    //? if ornithe {
+    /*val modUpdates = rememberModUpdates()
+    if (buttons.isEmpty() && modUpdates == null) return
+    *///?} else {
     if (buttons.isEmpty()) return
+    //?}
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         buttons.forEach { button ->
             MenuIconButton(
@@ -606,6 +617,17 @@ private fun ModIntegrationBar(
                 onClick = { button.onClick(screen) },
             )
         }
+        //? if ornithe {
+        /*modUpdates?.let { status ->
+            MenuIconButton(
+                icon = MOD_UPDATES_ICON,
+                label = status.label,
+                tint = status.tint(),
+                tooltipPlacement = TooltipPlacement.AboveCenter,
+                onClick = { ModUpdateChecker.open(screen) },
+            )
+        }
+        *///?}
     }
 }
 
@@ -837,6 +859,7 @@ private fun MenuIconButton(
     label: String,
     modifier: Modifier = Modifier,
     danger: Boolean = false,
+    tint: Color? = null,
     tooltip: String? = label,
     tooltipPlacement: TooltipPlacement = TooltipPlacement.BelowEnd,
     onClick: () -> Unit = {},
@@ -857,8 +880,8 @@ private fun MenuIconButton(
         shape = theme.buttonShape,
         restTint = theme.textColor,
         glass = false,
-    ) { tint ->
-        Icon(icon, if (danger) dangerTint else tint, Modifier.size(18.dp))
+    ) { hoverTint ->
+        Icon(icon, if (danger) dangerTint else tint ?: hoverTint, Modifier.size(18.dp))
     }
 }
 
