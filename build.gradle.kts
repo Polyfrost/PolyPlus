@@ -211,6 +211,10 @@ val javaVersion = when {
     else -> 21
 }
 
+sourceSets.main {
+    java.exclude(if (isOrnithe) "**/client/party/LwjglRenderTap.java" else "**/client/party/FfmRenderTap.java")
+}
+
 configure<KotlinJvmExtension> {
     jvmToolchain(javaVersion)
 }

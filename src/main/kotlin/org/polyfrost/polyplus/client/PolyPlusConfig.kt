@@ -475,6 +475,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var voiceNoiseStrength = 100f
 
     @JvmStatic
+    @Switch(
+        title = "Echo Cancellation",
+        description = "Stop your party from hearing themselves through your speakers.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceEchoCancellation = false
+
+    @JvmStatic
     @Slider(
         title = "Soundboard Volume",
         description = "How loud your soundboard sounds are for your party, in percent.",
@@ -689,6 +698,8 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         hideIf("voiceLinuxRtc") { !EosRtcSupport.isLinux }
 
         addCallback("voiceJavaSound") { PartyVoice.onSettingsChanged(restartAudio = true) }
+
+        addCallback("voiceEchoCancellation") { PartyVoice.onSettingsChanged() }
 
         for (option in listOf("voiceInputVolume", "voiceOutputVolume", "voiceProximityRange", "voiceHideIp", "voiceInputMode")) {
             addCallback(option) { PartyVoice.onSettingsChanged() }

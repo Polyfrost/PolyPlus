@@ -104,6 +104,7 @@ internal object LocalMonitor {
             return
         }
         val busy = mixSources(out)
+        EchoReference.rendered(out)
         val now = System.currentTimeMillis()
         when {
             busy -> idleSince = 0L

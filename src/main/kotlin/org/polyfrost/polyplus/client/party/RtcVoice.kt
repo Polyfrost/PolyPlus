@@ -163,6 +163,22 @@ internal object RtcVoice {
         val handles = owned.removals
         present.clear()
         val onDisconnect = rtc.addNotifyDisconnected(user, room) { info -> disconnected.complete(info.result) }
+        if (EchoReference.enabled && !EchoReference.tapFailed) {
+            runCatching {
+                EosRenderTap.register(platform, user.raw, room) { samples, frames, channels, rate ->
+                    EchoReference.eosRendered(samples, frames, channels, rate)
+                }
+            }.onSuccess { tap ->
+                val tapToken = EchoReference.tapInstalled()
+                handles += {
+                    runCatching { tap.remove() }
+                    EchoReference.tapRemoved(tapToken)
+                }
+            }.onFailure { error ->
+                LOGGER.warn("Couldn't listen to EOS voice output for echo cancellation", error)
+                EchoReference.failTap(error.message ?: error.javaClass.simpleName)
+            }
+        }
         handles += { it.rtc.removeNotifyDisconnected(onDisconnect) }
         val onStatus = rtc.addNotifyParticipantStatusChanged(user, room) { info ->
             val id = info.participantId.toStringValue()
@@ -267,6 +283,8 @@ internal object RtcVoice {
             null
         }
     }
+
+    fun participants(): Set<String> = if (joined) present.toSet() else emptySet()
 
     fun setDeafened(value: Boolean) {
         if (deafened == value) return

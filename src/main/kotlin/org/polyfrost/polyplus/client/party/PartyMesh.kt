@@ -278,6 +278,7 @@ internal object PartyMesh {
     private fun mixInto(out: ShortArray) {
         mixPeers(out)
         LocalMonitor.mixShared(out)
+        EchoReference.rendered(out)
     }
 
     private fun mixPeers(out: ShortArray) {

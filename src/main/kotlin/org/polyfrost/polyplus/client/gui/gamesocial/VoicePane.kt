@@ -115,6 +115,7 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
     var automatic by remember { mutableStateOf(PartyVoiceSettings.autoSensitivity()) }
     var suppressing by remember { mutableStateOf(PartyVoiceSettings.noiseSuppression()) }
     var strength by remember { mutableStateOf(PartyVoiceSettings.noiseStrength()) }
+    var echo by remember { mutableStateOf(PartyVoiceSettings.echoCancellation()) }
     val rnnoise = NoiseSuppressor.available
     Section("Devices") {
         SettingRow("Microphone") { DeviceSelect(true, control) }
@@ -187,6 +188,22 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
             }
         }
         if (!rnnoise) VoiceHint("Noise suppression and automatic sensitivity don't work on this computer.")
+        SettingRow("Echo cancellation") {
+            Switch(
+                checked = echo,
+                onCheckedChange = {
+                    echo = it
+                    PartyVoiceSettings.setEchoCancellation(it)
+                },
+            )
+        }
+        VoiceHint(
+            if (echo) {
+                "Filters your party's voices and sounds out of your mic, so they don't hear themselves through your speakers."
+            } else {
+                "Turn this on if you use speakers and your party hears themselves."
+            },
+        )
     }
     Section("Mic test") {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

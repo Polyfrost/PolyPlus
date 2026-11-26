@@ -228,6 +228,11 @@ object PartyVoice {
     }
 
     fun onSettingsChanged(restartAudio: Boolean = false) {
+        if (EchoReference.enabled != PolyPlusConfig.voiceEchoCancellation) {
+            EchoReference.setEnabled(PolyPlusConfig.voiceEchoCancellation)
+            if (active == VoiceTransport.Rtc) stopTransport()
+            PartyPresence.forceSend()
+        }
         if (active == VoiceTransport.P2p) P2PSessionManager.setVoiceRelay(PolyPlusConfig.voiceHideIp)
         if (!restartAudio) return
         LocalMonitor.restart()
@@ -283,6 +288,7 @@ object PartyVoice {
     }
 
     fun rtcCapable(): Boolean {
+        if (PolyPlusConfig.voiceEchoCancellation && EchoReference.tapFailed) return false
         if (rtcSessionFailed || P2PSessionManager.activeBridge?.rtcEnabled != true) return false
         if (System.currentTimeMillis() - rtcFailedAt <= RTC_RETRY_MS) return false
         if (!EosRtcSupport.isLinux) return true
@@ -326,6 +332,7 @@ object PartyVoice {
 
     private fun startCapture() {
         if (capture != null) return
+        EchoReference.setEnabled(PolyPlusConfig.voiceEchoCancellation)
         silentSince = 0L
         micHeard = false
         micSilent = false
@@ -389,6 +396,7 @@ object PartyVoice {
                 setMicSilent(true)
             }
         }
+        EchoReference.process(frame)
         val speech = denoise(frame)
         val voiceLevel = PartyAudio.rms(frame)
         reportLevel(voiceLevel)
@@ -515,6 +523,12 @@ object PartyVoice {
         SoundboardStream.deafened = deafened
         SoundboardStream.outputGain = outputGain
         SoundboardStream.retain(byPuid.keys)
+        val linked = when (active) {
+            VoiceTransport.P2p -> PartyMesh.connected()
+            VoiceTransport.Rtc -> RtcVoice.participants().filterTo(HashSet()) { it in byPuid }
+            else -> emptySet()
+        }
+        if (active == VoiceTransport.Rtc) EchoReference.checkTap(linked.isNotEmpty())
         val speaking = when (active) {
             VoiceTransport.Rtc -> {
                 RtcVoice.setDeafened(deafened)

@@ -73,6 +73,14 @@ object PartyVoiceSettings {
         PolyPlusConfig.voiceNoiseStrength = percent.coerceIn(0f, 100f)
     }
 
+    fun echoCancellation(): Boolean = PolyPlusConfig.voiceEchoCancellation
+
+    fun setEchoCancellation(enabled: Boolean) {
+        PolyPlusConfig.voiceEchoCancellation = enabled
+        PolyPlusConfig.save()
+        PartyVoice.onSettingsChanged()
+    }
+
     fun soundboardOthers(): Float = PolyPlusConfig.voiceSoundboardOthers
 
     fun setSoundboardOthers(percent: Float) {
