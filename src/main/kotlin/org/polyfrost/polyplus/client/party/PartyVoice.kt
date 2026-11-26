@@ -12,6 +12,7 @@ import org.polyfrost.polyplus.client.network.p2p.EosStatus
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.party.soundboard.Soundboard
 import org.polyfrost.polyplus.client.party.soundboard.SoundboardStream
+import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -130,6 +131,7 @@ object PartyVoice {
         Soundboard.onVoiceStopped()
         SoundboardStream.reset()
         VoiceLinks.reset()
+        VoiceAnnouncer.reset()
         talking = false
         speakingPlayers = emptySet()
         publish()
@@ -531,6 +533,7 @@ object PartyVoice {
         }
         VoiceLinks.tick(active, linked)
         if (active == VoiceTransport.Rtc) EchoReference.checkTap(linked.isNotEmpty())
+        VoiceAnnouncer.update(talkers.associate { it.player to PlayerNamesRepository.nameOr(it.player) })
         val speaking = when (active) {
             VoiceTransport.Rtc -> {
                 RtcVoice.setDeafened(deafened)

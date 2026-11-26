@@ -24,6 +24,7 @@ import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.party.PartyVoice
+import org.polyfrost.polyplus.client.party.VoiceAnnouncer
 import org.polyfrost.polyplus.client.party.VoiceInputMode
 import org.polyfrost.polyplus.client.party.soundboard.Soundboard
 import org.polyfrost.polyplus.client.party.soundboard.SoundboardKeybind
@@ -484,6 +485,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var voiceEchoCancellation = false
 
     @JvmStatic
+    @Switch(
+        title = "Read Out Voice Joins",
+        description = "Say out loud when someone joins or leaves party voice.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceAnnounceJoins = false
+
+    @JvmStatic
     @Slider(
         title = "Soundboard Volume",
         description = "How loud your soundboard sounds are for your party, in percent.",
@@ -696,6 +706,7 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         }
 
         hideIf("voiceLinuxRtc") { !EosRtcSupport.isLinux }
+        hideIf("voiceAnnounceJoins") { !VoiceAnnouncer.SUPPORTED }
 
         addCallback("voiceJavaSound") { PartyVoice.onSettingsChanged(restartAudio = true) }
 

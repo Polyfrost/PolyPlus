@@ -63,6 +63,7 @@ import org.polyfrost.polyplus.client.party.PartyAudio
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
+import org.polyfrost.polyplus.client.party.VoiceAnnouncer
 import org.polyfrost.polyplus.client.party.VoiceInputMode
 
 private val Edge = 24.dp
@@ -116,6 +117,7 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
     var suppressing by remember { mutableStateOf(PartyVoiceSettings.noiseSuppression()) }
     var strength by remember { mutableStateOf(PartyVoiceSettings.noiseStrength()) }
     var echo by remember { mutableStateOf(PartyVoiceSettings.echoCancellation()) }
+    var announce by remember { mutableStateOf(PartyVoiceSettings.announceJoins()) }
     val rnnoise = NoiseSuppressor.available
     Section("Devices") {
         SettingRow("Microphone") { DeviceSelect(true, control) }
@@ -217,6 +219,17 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
                     voice.micTestFailed -> "Couldn't open your microphone. Check the device above and try again."
                     voice.micTest -> "Talk and you'll hear yourself. Wear headphones so you don't get an echo."
                     else -> "Hear what your party hears, with noise suppression and your volume applied."
+                },
+            )
+        }
+    }
+    if (VoiceAnnouncer.SUPPORTED) Section("Announcements") {
+        SettingRow("Read out voice joins") {
+            Switch(
+                checked = announce,
+                onCheckedChange = {
+                    announce = it
+                    PartyVoiceSettings.setAnnounceJoins(it)
                 },
             )
         }

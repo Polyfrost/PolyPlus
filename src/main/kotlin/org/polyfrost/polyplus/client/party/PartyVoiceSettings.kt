@@ -81,6 +81,13 @@ object PartyVoiceSettings {
         PartyVoice.onSettingsChanged()
     }
 
+    fun announceJoins(): Boolean = PolyPlusConfig.voiceAnnounceJoins
+
+    fun setAnnounceJoins(enabled: Boolean) {
+        PolyPlusConfig.voiceAnnounceJoins = enabled
+        PolyPlusConfig.save()
+    }
+
     fun soundboardOthers(): Float = PolyPlusConfig.voiceSoundboardOthers
 
     fun setSoundboardOthers(percent: Float) {
