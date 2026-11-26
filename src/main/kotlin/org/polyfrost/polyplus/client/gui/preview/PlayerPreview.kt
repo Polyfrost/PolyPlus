@@ -218,7 +218,8 @@ private fun PlayerPreviewBitmap(
             withContext(Dispatchers.Default) {
                 repeat(CAPTURE_RENDERS) { attempt ->
                     if (attempt > 0) delay(CAPTURE_RETRY_DELAY_MS)
-                    val previous = PlayerPreviewRenderer.capture(source, yaw, pitch, sizePx.width, sizePx.height, modelScale, verticalAnchor, previewKey)
+                    val previous = PlayerPreviewRenderer.cached(previewKey)
+                    PlayerPreviewRenderer.capture(source, yaw, pitch, sizePx.width, sizePx.height, modelScale, verticalAnchor, previewKey)
                     if (previous != null) value = previous
                     withTimeoutOrNull(CAPTURE_TIMEOUT_MS) {
                         while (true) {
@@ -267,7 +268,7 @@ private fun PlayerPreviewBitmap(
 
 private const val CAPTURE_RENDERS = 3
 private const val CAPTURE_RETRY_DELAY_MS = 250L
-private const val CAPTURE_TIMEOUT_MS = 5_000L
+private const val CAPTURE_TIMEOUT_MS = 1_000L
 private const val CAPTURE_POLL_INTERVAL_MS = 16L
 
 private const val AUTO_SPIN_DEG_PER_TICK = 0.6f

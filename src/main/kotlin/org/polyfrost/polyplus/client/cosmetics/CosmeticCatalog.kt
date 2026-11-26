@@ -196,7 +196,8 @@ object CosmeticCatalog {
             clearParticleColor(localUuid)
         }
 
-        lock.withLock {
+        val changed = lock.withLock {
+            var changed = false
             localEquipped = EquippedCosmetics(equippedKnown)
             ownedCosmeticIds = ownedDefs.map { it.id }.toSet()
             ownedEmoteIds = player.emotes.map { it.id }.toSet()
@@ -206,15 +207,19 @@ object CosmeticCatalog {
                 }
             }
             for (definition in ownedDefs) {
-                cosmeticDefinitions[definition.id] = definition
+                if (cosmeticDefinitions.put(definition.id, definition) != definition) changed = true
             }
             for (group in ownedGroups) {
-                groupMeta[group.id] = group.toMeta()
+                val meta = group.toMeta()
+                if (groupMeta.put(group.id, meta) != meta) changed = true
             }
             for (definition in player.emotes) {
-                emoteDefinitions[definition.id] = definition.asCosmeticDefinition()
+                val emote = definition.asCosmeticDefinition()
+                if (emoteDefinitions.put(definition.id, emote) != emote) changed = true
             }
+            changed
         }
+        if (changed) version++
 
         //? if >= 1.21.1 || = 1.8.9 {
         val owned = ownedDefs + player.emotes.map { it.asCosmeticDefinition() }
