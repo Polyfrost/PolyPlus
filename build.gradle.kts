@@ -435,6 +435,7 @@ dependencies {
 
     implementation(include("gg.sona:eos:2.2.0")!!)
     implementation(include("io.github.jaredmdobson:concentus:1.0.2")!!)
+    implementation(include("fr.delthas:javamp3:1.0.1") { isTransitive = false })
 
     implementation(include("com.moulberry:mixinconstraints:1.1.0")!!)
 

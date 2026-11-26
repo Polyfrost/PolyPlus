@@ -80,22 +80,32 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
             if (!back) IconButton(icon = LobbyIcons.CLOSE, contentDescription = "Close voice settings", onClick = window::closeVoice, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
         }
         Divider()
+        val tabs = remember { listOf(TabItem(VoiceTab.Settings, "Voice"), TabItem(VoiceTab.Soundboard, "Soundboard")) }
+        TabRow(tabs, window.voiceTab, { window.voiceTab = it }, Modifier.padding(horizontal = Edge, vertical = 8.dp), style = TabStyle.Underline, fill = false)
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val control = (maxWidth - Edge * 2 - LabelRoom).coerceAtMost(ControlWidth)
-            ScrollFade(Modifier.fillMaxSize().padding(start = Edge, end = Edge, top = Edge), 28.dp) {
-                Section("Devices") {
-                    SettingRow("Microphone") { DeviceSelect(true, control) }
-                    SettingRow("Microphone volume") { VolumeControl(true, control) }
-                    SettingRow("Speaker") { DeviceSelect(false, control) }
-                    SettingRow("Speaker volume") { VolumeControl(false, control) }
-                }
-                Section("Talking") {
-                    if (party != null) SettingRow("Voice mode") { ModeControl(party, control) }
-                    SettingRow("Input") { InputControl(control) }
+            ScrollFade(Modifier.fillMaxSize().padding(start = Edge, end = Edge, top = 12.dp), 28.dp) {
+                when (window.voiceTab) {
+                    VoiceTab.Settings -> VoiceSettings(party, control)
+                    VoiceTab.Soundboard -> SoundboardSettings(control)
                 }
                 Spacer(Modifier.height(Edge))
             }
         }
+    }
+}
+
+@Composable
+private fun VoiceSettings(party: Party?, control: Dp) {
+    Section("Devices") {
+        SettingRow("Microphone") { DeviceSelect(true, control) }
+        SettingRow("Microphone volume") { VolumeControl(true, control) }
+        SettingRow("Speaker") { DeviceSelect(false, control) }
+        SettingRow("Speaker volume") { VolumeControl(false, control) }
+    }
+    Section("Talking") {
+        if (party != null) SettingRow("Voice mode") { ModeControl(party, control) }
+        SettingRow("Input") { InputControl(control) }
     }
 }
 
@@ -107,7 +117,7 @@ private fun voiceStatus(party: Party?, inVoice: Boolean): String = when {
 }
 
 @Composable
-private fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
+internal fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(title, Modifier.padding(bottom = 4.dp))
         rows()
@@ -115,7 +125,7 @@ private fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SettingRow(label: String, control: @Composable () -> Unit) {
+internal fun SettingRow(label: String, control: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.weight(1f), style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         control()

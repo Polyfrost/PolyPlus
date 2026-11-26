@@ -11,6 +11,7 @@ import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import org.polyfrost.polyplus.client.network.http.PartyApi
 import org.polyfrost.polyplus.client.network.http.PartyApiException
+import org.polyfrost.polyplus.client.network.http.responses.VoiceTransport
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.concurrent.CompletableFuture
@@ -30,6 +31,7 @@ internal object RtcVoice {
     private const val VOLUME_INTERVAL_MS = 100L
     private const val UNCHANGED = 50f
     private const val NOT_SENT = -1f
+    private const val DATA_CHANNEL_FLAG = 0x04
 
     sealed interface Outcome {
         object Left : Outcome
@@ -43,10 +45,15 @@ internal object RtcVoice {
     @Volatile private var bridge: EosSdkBridge? = null
     @Volatile private var room: String? = null
     @Volatile private var partyId: String? = null
-    @Volatile private var notifications: List<(EosPlatform) -> Unit> = emptyList()
+    private class Hooks {
+        val removals = ArrayList<(EosPlatform) -> Unit>()
+    }
+
+    @Volatile private var hooks: Hooks? = null
     @Volatile private var transmit = true
     @Volatile private var deafened = false
     @Volatile private var sentInputVolume = NOT_SENT
+    @Volatile private var dataChannel = false
 
     private val speaking = ConcurrentHashMap.newKeySet<String>()
     private val volumes = ConcurrentHashMap<String, Volume>()
@@ -57,6 +64,8 @@ internal object RtcVoice {
         private set
 
     val running: Boolean get() = job?.isActive == true
+
+    val dataReady: Boolean get() = joined && dataChannel && present.any { it != bridge?.localUser?.raw }
 
     fun start(party: String, onOutcome: (Outcome) -> Unit) {
         if (partyId == party && job?.isActive == true) return
@@ -97,23 +106,34 @@ internal object RtcVoice {
         this.bridge = bridge
         val disconnected = CompletableDeferred<EosResult>()
         this.room = token.roomName
+        val owned = Hooks()
+        hooks = owned
+        suspend fun attempt(flags: Int): EosResult = bridge.callOnTick("EOS::RTC::JoinRoom") { platform ->
+            if (hooks !== owned) error("party voice stopped before joining")
+            val user = ProductUserId.fromString(local.raw)
+            install(platform, user, token.roomName, disconnected, owned)
+            platform.rtc.joinRoom(user, token.roomName, token.clientBaseUrl, token.participantToken, flags = flags)
+        }.result
         val result = runSuspendCatching {
-            bridge.callOnTick("EOS::RTC::JoinRoom") { platform ->
-                val user = ProductUserId.fromString(local.raw)
-                install(platform, user, token.roomName, disconnected)
-                platform.rtc.joinRoom(user, token.roomName, token.clientBaseUrl, token.participantToken)
-            }.result
+            var outcome = attempt(DATA_CHANNEL_FLAG)
+            dataChannel = outcome == EosResult.Success
+            if (outcome != EosResult.Success && outcome != EosResult.InvalidAuth) {
+                LOGGER.warn("EOS refused the party voice room with a data channel ({}); trying without one", outcome)
+                uninstall(owned)
+                outcome = attempt(0)
+            }
+            outcome
         }.getOrElse { error ->
             LOGGER.warn("Joining the party voice room failed", error)
             queueLeave(bridge, token.roomName)
-            this.room = null
-            uninstall()
+            if (hooks === owned) this.room = null
+            uninstall(owned)
             return Outcome.Failed(error.message ?: "join failed")
         }
         if (result != EosResult.Success) {
             LOGGER.warn("EOS refused the party voice room: {}", result)
-            this.room = null
-            uninstall()
+            if (hooks === owned) this.room = null
+            uninstall(owned)
             return if (result == EosResult.InvalidAuth) Outcome.Failed(INVALID_AUTH) else Outcome.Failed(result.toString())
         }
         room = token.roomName
@@ -124,10 +144,12 @@ internal object RtcVoice {
         sentInputVolume = NOT_SENT
         applySending()
         applyDeafen()
+        if (dataChannel) onRoom { platform, user, room -> platform.rtc.data.updateSending(user, room, true) }
         PartyVoice.onRtcJoined()
         val reason = disconnected.await()
+        uninstall(owned)
+        if (hooks !== owned) return null
         joined = false
-        uninstall()
         room = null
         speaking.clear()
         present.clear()
@@ -139,9 +161,9 @@ internal object RtcVoice {
         }
     }
 
-    private fun install(platform: EosPlatform, user: ProductUserId, room: String, disconnected: CompletableDeferred<EosResult>) {
+    private fun install(platform: EosPlatform, user: ProductUserId, room: String, disconnected: CompletableDeferred<EosResult>, owned: Hooks) {
         val rtc = platform.rtc
-        val handles = ArrayList<(EosPlatform) -> Unit>()
+        val handles = owned.removals
         present.clear()
         val onDisconnect = rtc.addNotifyDisconnected(user, room) { info -> disconnected.complete(info.result) }
         handles += { it.rtc.removeNotifyDisconnected(onDisconnect) }
@@ -166,14 +188,21 @@ internal object RtcVoice {
             if (info.status == EosRtcAudioInputStatus.Failed) PartyVoice.onCaptureFailed()
         }
         handles += { it.rtc.audio.removeNotifyAudioInputState(onInput) }
-        notifications = handles
+        val onData = rtc.data.addNotifyDataReceived(user, room) { info ->
+            val sender = info.sender.toStringValue()
+            if (sender in present) VoicePackets.route(sender, info.data, VoiceTransport.Rtc)
+        }
+        handles += { it.rtc.data.removeNotifyDataReceived(onData) }
     }
 
-    private fun uninstall() {
-        val handles = notifications
-        notifications = emptyList()
-        if (handles.isEmpty()) return
-        bridge?.onTick { platform -> handles.forEach { remove -> runCatching { remove(platform) } } }
+    private fun uninstall(owned: Hooks?) {
+        if (owned == null) return
+        val bridge = bridge ?: return
+        bridge.onTick { platform ->
+            val removals = owned.removals.toList()
+            owned.removals.clear()
+            removals.forEach { remove -> runCatching { remove(platform) } }
+        }
     }
 
     fun stop() {
@@ -186,7 +215,8 @@ internal object RtcVoice {
         if (bridge != null && room != null) queueLeave(bridge, room)
         current?.cancel()
         joined = false
-        uninstall()
+        uninstall(hooks)
+        hooks = null
         this.room = null
         speaking.clear()
         volumes.clear()
@@ -217,6 +247,15 @@ internal object RtcVoice {
     private fun applySending() {
         val status = if (transmit) EosRtcAudioStatus.Enabled else EosRtcAudioStatus.Disabled
         onRoom { platform, user, room -> platform.rtc.audio.updateSending(user, room, status) }
+    }
+
+    fun sendData(packet: ByteArray) {
+        if (!joined || !dataChannel) return
+        onRoom { platform, user, room ->
+            val result = platform.rtc.data.sendData(user, room, packet)
+            if (result != EosResult.Success) LOGGER.debug("EOS refused a voice data packet: {}", result)
+            null
+        }
     }
 
     fun setDeafened(value: Boolean) {

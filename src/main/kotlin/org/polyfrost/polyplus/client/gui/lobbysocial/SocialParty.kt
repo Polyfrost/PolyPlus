@@ -213,9 +213,23 @@ internal fun memberMuteItem(cell: PartyCell): MenuAction? {
     )
 }
 
+internal fun memberSoundMuteItem(cell: PartyCell): MenuAction? {
+    if (cell.self) return null
+    val muted = PartyVoiceSettings.isSoundMuted(cell.id)
+    return MenuAction(
+        if (muted) "Unmute their sounds" else "Mute their sounds",
+        { PartyVoiceSettings.toggleSoundMute(cell.id) },
+        icon = if (muted) SOUNDS_ON_ICON else SOUNDS_OFF_ICON,
+    )
+}
+
+private const val SOUNDS_ON_ICON = SOCIAL_ASSETS + "volume-max.svg"
+private const val SOUNDS_OFF_ICON = SOCIAL_ASSETS + "volume-x.svg"
+
 internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Unit = {}): List<MenuAction> {
     if (!PartyRepository.isLeader(party) || cell.self) return emptyList()
     val hardMuted = cell.member?.voiceHardMuted == true
+    val soundsMuted = cell.member?.soundboardMuted == true
     return listOf(
         MenuAction(
             "Make leader",
@@ -227,6 +241,10 @@ internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Uni
         MenuAction(
             if (hardMuted) "Let them talk" else "Mute their voice for everyone",
             { PartyRepository.setHardMuted(cell.id, !hardMuted) },
+        ),
+        MenuAction(
+            if (soundsMuted) "Let them play sounds" else "Mute their sounds for everyone",
+            { PartyRepository.setSoundboardMuted(cell.id, !soundsMuted) },
         ),
         MenuAction(
             "Remove from party",
@@ -254,7 +272,7 @@ internal fun memberSocialItems(cell: PartyCell): List<MenuAction> {
 }
 
 internal fun memberMenuItems(host: SocialHost, party: Party, cell: PartyCell): List<MenuAction> =
-    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell)) + memberLeaderItems(party, cell) + memberSocialItems(cell)
+    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell), memberSoundMuteItem(cell)) + memberLeaderItems(party, cell) + memberSocialItems(cell)
 
 internal fun partyInviteItem(
     friendId: String,
@@ -272,6 +290,7 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
     val theme = OneConfigTheme.current
     val join = memberJoinItem(host, cell, onClose)
     val mute = memberMuteItem(cell)
+    val soundMute = memberSoundMuteItem(cell)
     val joinIcon = join?.icon
     val muteIcon = mute?.icon
     val leaderItems = memberLeaderItems(party, cell, onClose)
@@ -289,6 +308,10 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
             MemberVolume(cell.id)
             OptionalIconTextButton(it.label, muteIcon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Secondary, true)
         }
+        soundMute?.let {
+            MemberSoundVolume(cell.id)
+            OptionalIconTextButton(it.label, it.icon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Secondary, true)
+        }
         if (leaderItems.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 leaderItems.forEach { item ->
@@ -297,6 +320,12 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
             }
         }
     }
+}
+
+@Composable
+private fun MemberSoundVolume(player: String) {
+    val volume = PartyVoiceSettings.soundVolumes[player.lowercase()] ?: 1f
+    VolumeRow(volume * PERCENT, label = "Sounds") { percent -> PartyVoiceSettings.setSoundVolume(player, percent / PERCENT) }
 }
 
 @Composable

@@ -25,6 +25,8 @@ import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.VoiceInputMode
+import org.polyfrost.polyplus.client.party.soundboard.Soundboard
+import org.polyfrost.polyplus.client.party.soundboard.SoundboardKeybind
 import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -430,6 +432,76 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         subcategory = "Voice",
     )
     var voiceHideIp = true
+
+    @JvmStatic
+    @Slider(
+        title = "Soundboard Volume",
+        description = "How loud your soundboard sounds are for your party, in percent.",
+        min = 0f,
+        max = 200f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var voiceSoundboardVolume = 100f
+
+    @JvmStatic
+    @Slider(
+        title = "Hear My Sounds",
+        description = "How loud you hear your own soundboard sounds, in percent. Set it to 0 to stay silent on your end.",
+        min = 0f,
+        max = 100f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var voiceSoundboardMonitor = 60f
+
+    @JvmStatic
+    @Slider(
+        title = "Other People's Sounds",
+        description = "How loud your party's soundboard sounds are for you, in percent.",
+        min = 0f,
+        max = 200f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var voiceSoundboardOthers = 100f
+
+    @Keybind(
+        title = "Soundboard",
+        description = "Hold to open the soundboard wheel, then let go to play the sound you picked.",
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var soundboardWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        SoundboardKeybind.onKeybindState(state)
+        true
+    }
+
+    @Keybind(
+        title = "Stop Sounds",
+        description = "Stop every soundboard sound you're playing.",
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var stopSoundsKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) Soundboard.stopAll()
+        true
+    }
+
+    @JvmStatic @Include
+    var voiceSoundVolumes = ""
+
+    @JvmStatic @Include
+    var voiceSoundFavorites = ""
+
+    @JvmStatic @Include
+    var voiceSoundMemberVolumes = ""
+
+    @JvmStatic @Include
+    var voiceSoundMemberMutes = ""
 
     @JvmStatic @Include
     var voiceInputDevice = ""

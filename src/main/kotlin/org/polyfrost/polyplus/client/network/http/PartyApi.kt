@@ -18,6 +18,7 @@ import org.polyfrost.polyplus.client.network.http.responses.HostedJoinRequest
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PartyAcceptRequest
 import org.polyfrost.polyplus.client.network.http.responses.PartyHardMuteRequest
+import org.polyfrost.polyplus.client.network.http.responses.PartySoundboardMuteRequest
 import org.polyfrost.polyplus.client.network.http.responses.PartyInvite
 import org.polyfrost.polyplus.client.network.http.responses.PartyInvitePolicy
 import org.polyfrost.polyplus.client.network.http.responses.PartyPlayerRequest
@@ -84,6 +85,9 @@ object PartyApi {
 
     suspend fun setHardMuted(player: String, hardMuted: Boolean): Result<Unit> =
         unit("/members/$player/voice", HttpMethod.Put) { json(PartyHardMuteRequest(hardMuted)) }
+
+    suspend fun setSoundboardMuted(player: String, muted: Boolean): Result<Unit> =
+        unit("/members/$player/soundboard", HttpMethod.Put) { json(PartySoundboardMuteRequest(muted)) }
 
     suspend fun invite(player: String): Result<PartyInvite> =
         call("/invites", HttpMethod.Post) { json(PartyPlayerRequest(player)) }

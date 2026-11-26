@@ -6,6 +6,7 @@ import org.polyfrost.polyplus.client.network.eos.EosP2PSocketId
 import org.polyfrost.polyplus.client.network.eos.EosProductUserId
 import org.polyfrost.polyplus.client.network.eos.EosSdkBridge
 import org.polyfrost.polyplus.client.network.http.PartyApi
+import org.polyfrost.polyplus.client.network.http.responses.VoiceTransport
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import java.nio.ByteBuffer
 import java.time.Instant
@@ -60,6 +61,8 @@ internal object PartyMesh {
 
     val running: Boolean get() = partyId != null
 
+    val rendering: Boolean get() = speaker != null
+
     fun start(party: String) {
         if (partyId == party) return
         stop()
@@ -68,6 +71,7 @@ internal object PartyMesh {
         seq = 0
         speaker = PartyAudio.openSpeaker(PartyVoiceSettings.outputDevice(), ::mixInto)
         if (speaker == null) LOGGER.warn("Party voice has no speaker; you won't hear your party")
+        LocalMonitor.restart()
         passJob = PolyPlusClient.SCOPE.launch { keepPass(party) }
     }
 
@@ -79,6 +83,7 @@ internal object PartyMesh {
         pass = null
         speaker?.stop()
         speaker = null
+        LocalMonitor.restart()
         val current = bridge
         peers.values.forEach { peer -> current?.closeConnection(SOCKET, peer.puid) }
         peers.clear()
@@ -207,8 +212,24 @@ internal object PartyMesh {
                 peer.remoteMuted = bits and 1 != 0
                 peer.remoteDeafened = bits and 2 != 0
             }
+            else -> {
+                if (!peer.accepted) return true
+                val packet = ByteArray(2 + data.remaining())
+                packet[0] = type
+                packet[1] = VERSION
+                data.get(packet, 2, packet.size - 2)
+                VoicePackets.route(received.remote.raw, packet, VoiceTransport.P2p)
+            }
         }
         return true
+    }
+
+    fun broadcast(packet: ByteArray) {
+        val bridge = bridge ?: return
+        for (peer in peers.values) {
+            if (!peer.accepted) continue
+            bridge.sendPacket(SOCKET, peer.puid, ByteBuffer.wrap(packet), EosSdkBridge.PacketReliability.UnreliableUnordered)
+        }
     }
 
     private var lastState = 0
@@ -255,6 +276,11 @@ internal object PartyMesh {
     fun connected(): Set<String> = peers.values.filter { it.accepted }.mapTo(HashSet()) { it.puid.raw }
 
     private fun mixInto(out: ShortArray) {
+        mixPeers(out)
+        LocalMonitor.mixShared(out)
+    }
+
+    private fun mixPeers(out: ShortArray) {
         if (deafened) {
             peers.values.forEach { it.jitter.clear() }
             return

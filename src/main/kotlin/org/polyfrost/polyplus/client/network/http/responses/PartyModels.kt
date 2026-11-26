@@ -238,6 +238,7 @@ data class PartyMember(
     val online: Boolean = false,
     @SerialName("eos_product_user_id") val eosProductUserId: String? = null,
     @SerialName("voice_hard_muted") val voiceHardMuted: Boolean = false,
+    @SerialName("soundboard_muted") val soundboardMuted: Boolean = false,
     val state: MemberState? = null,
 )
 
@@ -291,6 +292,9 @@ data class PartyPlayerRequest(val player: String)
 
 @Serializable
 data class PartyHardMuteRequest(@SerialName("hard_muted") val hardMuted: Boolean)
+
+@Serializable
+data class PartySoundboardMuteRequest(val muted: Boolean)
 
 @Serializable
 data class PartyAcceptRequest(@SerialName("leave_current") val leaveCurrent: Boolean = false)

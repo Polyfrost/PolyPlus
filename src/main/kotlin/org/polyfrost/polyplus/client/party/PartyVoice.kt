@@ -10,10 +10,14 @@ import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.VoiceTransport
 import org.polyfrost.polyplus.client.network.p2p.EosStatus
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.party.soundboard.Soundboard
+import org.polyfrost.polyplus.client.party.soundboard.SoundboardStream
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 object PartyVoice {
     private val LOGGER = LogManager.getLogger()
@@ -33,6 +37,7 @@ object PartyVoice {
         val talking: Boolean = false,
         val speaking: Set<String> = emptySet(),
         val noticeOpen: Boolean = false,
+        val soundsReady: Boolean = false,
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -56,6 +61,7 @@ object PartyVoice {
     @Volatile private var silentSince = 0L
     @Volatile private var micHeard = false
     @Volatile private var micSilent = false
+    @Volatile private var soundClockStarted = false
     private var speakingPlayers: Set<String> = emptySet()
     private var autoJoinedParty: String? = null
     private var voicePartyId: String? = null
@@ -78,6 +84,7 @@ object PartyVoice {
         }
         if (inVoice) return
         LOGGER.info("Joining party voice for party {}", party.id)
+        startSoundClock()
         inVoice = true
         voicePartyId = party.id
         micBlocked = false
@@ -102,6 +109,8 @@ object PartyVoice {
         inVoice = false
         stopTransport()
         stopCapture()
+        Soundboard.onVoiceStopped()
+        SoundboardStream.reset()
         talking = false
         speakingPlayers = emptySet()
         publish()
@@ -158,6 +167,26 @@ object PartyVoice {
         publish()
     }
 
+    fun canSendSounds(): Boolean = inVoice && !deafened && !soundboardBlocked() && soundTransportReady()
+
+    private fun soundTransportReady(): Boolean = when (active) {
+        VoiceTransport.P2p -> PartyMesh.hasListeners()
+        VoiceTransport.Rtc -> RtcVoice.dataReady
+        else -> false
+    }
+
+    private fun startSoundClock() {
+        if (soundClockStarted) return
+        soundClockStarted = true
+        val clock = Executors.newSingleThreadScheduledExecutor { task -> Thread(task, "polyplus-soundboard").apply { isDaemon = true } }
+        clock.scheduleAtFixedRate({
+            runCatching { if (inVoice && capture == null) SoundboardStream.pump(active, canSendSounds()) }
+                .onFailure { LOGGER.warn("Soundboard clock failed", it) }
+        }, PartyAudio.FRAME_MILLIS, PartyAudio.FRAME_MILLIS, TimeUnit.MILLISECONDS)
+    }
+
+    fun soundboardBlocked(): Boolean = PartyRepository.party.value?.let { PartyRepository.self(it)?.soundboardMuted } == true
+
     fun onPushToTalk(state: Boolean) {
         pttHeld = state
     }
@@ -165,7 +194,9 @@ object PartyVoice {
     fun onSettingsChanged(restartAudio: Boolean = false) {
         RtcVoice.setInputGain(PartyVoiceSettings.inputGain())
         if (active == VoiceTransport.P2p) P2PSessionManager.setVoiceRelay(PolyPlusConfig.voiceHideIp)
-        if (!restartAudio || !inVoice) return
+        if (!restartAudio) return
+        LocalMonitor.restart()
+        if (!inVoice) return
         if (!micBlocked) {
             stopCapture()
             startCapture()
@@ -281,6 +312,7 @@ object PartyVoice {
             VoiceTransport.Rtc -> RtcVoice.setTransmit(talk)
             else -> Unit
         }
+        SoundboardStream.pump(active, canSendSounds())
     }
 
     private fun setMicSilent(silent: Boolean) {
@@ -357,6 +389,19 @@ object PartyVoice {
             mix[puid] = PeerMix(gain, proximity?.pan ?: 0f, silenced)
         }
         val byPuid = others.mapNotNull { member -> member.eosProductUserId?.let { it to member.player } }.toMap()
+        val othersGain = PartyVoiceSettings.soundboardOthers() / 100f
+        val soundMix = HashMap<String, PeerMix>()
+        for (member in others) {
+            val puid = member.eosProductUserId ?: continue
+            val proximity = gains[member.player]
+            val gain = (proximity?.gain ?: 1f) * PartyVoiceSettings.soundVolumeOf(member.player) * othersGain
+            val silenced = member.soundboardMuted || PartyVoiceSettings.isSoundMuted(member.player)
+            soundMix[puid] = PeerMix(gain, proximity?.pan ?: 0f, silenced)
+        }
+        SoundboardStream.mix = soundMix
+        SoundboardStream.deafened = deafened
+        SoundboardStream.outputGain = outputGain
+        SoundboardStream.retain(byPuid.keys)
         val speaking = when (active) {
             VoiceTransport.Rtc -> {
                 RtcVoice.setDeafened(deafened)
@@ -404,6 +449,7 @@ object PartyVoice {
             talking = talkingNow,
             speaking = speaking,
             noticeOpen = noticeOpen,
+            soundsReady = canSendSounds(),
         )
         if (next != _ui.value) _ui.value = next
     }
