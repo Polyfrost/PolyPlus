@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.polyfrost.compose.backend.drawPoly
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
@@ -215,12 +216,20 @@ private fun PlayerPreviewBitmap(
     val bitmap: ImageBitmap? by produceState(null, source, yaw, pitch, sizePx, modelScale, verticalAnchor, previewKey, skinRevision) {
         if (sizePx.width > 0 && sizePx.height > 0) {
             withContext(Dispatchers.Default) {
-                var attempts = 0
-                while (attempts < CAPTURE_POLL_ATTEMPTS) {
-                    val bmp = PlayerPreviewRenderer.capture(source, yaw, pitch, sizePx.width, sizePx.height, modelScale, verticalAnchor, previewKey)
-                    if (bmp != null) value = bmp
-                    delay(CAPTURE_POLL_INTERVAL_MS)
-                    attempts++
+                repeat(CAPTURE_RENDERS) { attempt ->
+                    if (attempt > 0) delay(CAPTURE_RETRY_DELAY_MS)
+                    val previous = PlayerPreviewRenderer.capture(source, yaw, pitch, sizePx.width, sizePx.height, modelScale, verticalAnchor, previewKey)
+                    if (previous != null) value = previous
+                    withTimeoutOrNull(CAPTURE_TIMEOUT_MS) {
+                        while (true) {
+                            delay(CAPTURE_POLL_INTERVAL_MS)
+                            val bmp = PlayerPreviewRenderer.cached(previewKey)
+                            if (bmp != null && bmp !== previous) {
+                                value = bmp
+                                break
+                            }
+                        }
+                    }
                 }
             }
         } else {
@@ -256,7 +265,9 @@ private fun PlayerPreviewBitmap(
     }
 }
 
-private const val CAPTURE_POLL_ATTEMPTS = 30
+private const val CAPTURE_RENDERS = 3
+private const val CAPTURE_RETRY_DELAY_MS = 250L
+private const val CAPTURE_TIMEOUT_MS = 5_000L
 private const val CAPTURE_POLL_INTERVAL_MS = 16L
 
 private const val AUTO_SPIN_DEG_PER_TICK = 0.6f
