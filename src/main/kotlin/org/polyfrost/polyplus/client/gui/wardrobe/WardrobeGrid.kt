@@ -207,14 +207,13 @@ internal fun WardrobeGrid(
                         val owned = info.fullyOwned(ownedIds)
                         val inCart = cosmeticCartKey(variant.id) in cartKeys
                         val variants = info.uiVariants()
-                        val variantCount = variants.size
                         WardrobeCard(
                             name = info.name,
                             detail = {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     PriceLabel(info)
-                                    if (variantCount > 1) {
-                                        Text("$variantCount variants", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.caption)
+                                    if (variants.size > 1) {
+                                        Text("${variants.size} bundled", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.caption)
                                     }
                                 }
                             },
