@@ -58,6 +58,9 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
+import org.polyfrost.polyplus.client.party.LinkQuality
+import org.polyfrost.polyplus.client.party.VoiceLink
+import org.polyfrost.polyplus.client.party.VoiceLinks
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -104,6 +107,7 @@ internal class PartyCell(
     val detail: String,
     val speaking: Boolean,
     val muted: Boolean,
+    val link: VoiceLink? = null,
 )
 
 internal fun locationLabel(state: MemberState?, online: Boolean): String {
@@ -134,6 +138,7 @@ private fun voiceLabel(member: PartyMember?, state: MemberState?): String? {
 internal fun partyCells(party: Party): List<PartyCell> {
     val voice by PartyVoice.ui.collectAsState()
     val names by PlayerNamesRepository.names.collectAsState()
+    val links by VoiceLinks.links.collectAsState()
     val self = PartyRepository.self(party)
     val selfState = PartyPresence.local.let {
         it.copy(voice = it.voice.copy(inVoice = voice.inVoice, muted = voice.muted, deafened = voice.deafened, micBlocked = voice.micBlocked))
@@ -152,6 +157,8 @@ internal fun partyCells(party: Party): List<PartyCell> {
     )
     val others = PartyRepository.others(party).map { member ->
         val state = member.state
+        val link = member.eosProductUserId?.let { links[it] }.takeIf { voice.inVoice && state?.voice?.inVoice == true }
+        val base = if (!member.online) "Offline" else voiceLabel(member, state) ?: locationLabel(state, true)
         PartyCell(
             id = member.player,
             name = names[member.player] ?: PlayerNamesRepository.nameOr(member.player),
@@ -159,9 +166,10 @@ internal fun partyCells(party: Party): List<PartyCell> {
             leader = PartyRepository.samePlayer(member.player, party.leader),
             member = member,
             state = state,
-            detail = if (!member.online) "Offline" else voiceLabel(member, state) ?: locationLabel(state, true),
+            detail = if (link != null && link.quality != LinkQuality.Good) "$base · ${linkLabel(link)}" else base,
             speaking = member.player in voice.speaking,
             muted = state?.voice?.let { it.inVoice && (it.muted || it.deafened || it.micBlocked) } == true || member.voiceHardMuted,
+            link = link,
         )
     }
     return listOf(local) + others
@@ -211,6 +219,12 @@ internal fun memberMuteItem(cell: PartyCell): MenuAction? {
         { PartyVoiceSettings.toggleMute(cell.id) },
         icon = if (mutedForMe) PartyIcons.MIC else PartyIcons.MIC_OFF,
     )
+}
+
+internal fun linkLabel(link: VoiceLink): String = when (link.quality) {
+    LinkQuality.Good -> "Good connection"
+    LinkQuality.Fair -> "Unstable connection"
+    LinkQuality.Poor -> "Bad connection"
 }
 
 internal fun memberSoundMuteItem(cell: PartyCell): MenuAction? {
@@ -301,6 +315,14 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
                 Text(if (cell.leader) "${cell.name} · Leader" else cell.name, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 Text(locationLabel(cell.state, cell.self || cell.member?.online == true), color = theme.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 voiceLabel(cell.member, cell.state)?.let { Text(it, color = theme.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
+                cell.link?.let { link ->
+                    val tint = when (link.quality) {
+                        LinkQuality.Good -> theme.mutedText
+                        LinkQuality.Fair -> theme.warning
+                        LinkQuality.Poor -> theme.error
+                    }
+                    Text("${linkLabel(link)} · ${link.rttMillis} ms · ${link.lossPercent}% lost", color = tint, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                }
             }
         }
         join?.let { OptionalIconTextButton(it.label, joinIcon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Primary, true) }

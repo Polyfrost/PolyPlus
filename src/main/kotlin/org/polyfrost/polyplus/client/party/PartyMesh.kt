@@ -232,6 +232,12 @@ internal object PartyMesh {
         }
     }
 
+    fun sendTo(puid: String, packet: ByteArray) {
+        val bridge = bridge ?: return
+        val peer = peers[puid]?.takeIf { it.accepted } ?: return
+        bridge.sendPacket(SOCKET, peer.puid, ByteBuffer.wrap(packet), EosSdkBridge.PacketReliability.UnreliableUnordered)
+    }
+
     private var lastState = 0
 
     fun sendState(muted: Boolean, deafened: Boolean) {

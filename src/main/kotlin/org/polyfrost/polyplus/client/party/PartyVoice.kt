@@ -129,6 +129,7 @@ object PartyVoice {
         if (!micTest) stopCapture()
         Soundboard.onVoiceStopped()
         SoundboardStream.reset()
+        VoiceLinks.reset()
         talking = false
         speakingPlayers = emptySet()
         publish()
@@ -528,6 +529,7 @@ object PartyVoice {
             VoiceTransport.Rtc -> RtcVoice.participants().filterTo(HashSet()) { it in byPuid }
             else -> emptySet()
         }
+        VoiceLinks.tick(active, linked)
         if (active == VoiceTransport.Rtc) EchoReference.checkTap(linked.isNotEmpty())
         val speaking = when (active) {
             VoiceTransport.Rtc -> {
