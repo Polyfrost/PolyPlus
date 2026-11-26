@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.layers.CapeLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
 import org.polyfrost.polyplus.compat.EntityModelFeaturesCompat;
 import org.spongepowered.asm.mixin.Mixin;
 
@@ -28,7 +29,12 @@ public abstract class MixinCapeLayer {
     *///?}
         poseStack.pushPose();
         try {
-            if (!EntityModelFeaturesCompat.animatesRoot(((RenderLayer<?, ?>) (Object) this).getParentModel())) {
+            boolean capePosed = false;
+            //? if >= 26.1 {
+            // the cape model is a PlayerModel too, so the emote already moved its own root; adding the parent root again lifted the cape off the body
+            capePosed = state instanceof AvatarEmoteRenderAccess access && access.polyplus$boundEmoteController().isActive();
+            //?}
+            if (!capePosed && !EntityModelFeaturesCompat.animatesRoot(((RenderLayer<?, ?>) (Object) this).getParentModel())) {
                 ((RenderLayer<?, ?>) (Object) this).getParentModel().root().translateAndRotate(poseStack);
             }
             //? if >= 1.21.10 {

@@ -159,6 +159,24 @@ object LobbyGrab {
 
     fun lose() {
         visible = false
+        boxes.clear()
+    }
+
+    /** Where each visible character's body is on screen this frame (NDC), for right-click menus. */
+    private class Box(val avatar: LobbyAvatar, val minX: Double, val maxX: Double, val minY: Double, val maxY: Double)
+
+    private val boxes = ArrayList<Box>()
+
+    fun box(avatar: LobbyAvatar, minX: Double, maxX: Double, minY: Double, maxY: Double) {
+        boxes.add(Box(avatar, minX, maxX, minY, maxY))
+    }
+
+    /** The character under a point given as screen fractions, or null. */
+    fun touched(x: Double, y: Double): LobbyAvatar? {
+        if (!ready()) return null
+        val ndcX = x * 2.0 - 1.0
+        val ndcY = 1.0 - y * 2.0
+        return boxes.lastOrNull { ndcX in it.minX..it.maxX && ndcY in it.minY..it.maxY }?.avatar
     }
 
     fun touches(x: Double, y: Double): Boolean {

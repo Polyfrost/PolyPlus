@@ -61,7 +61,7 @@ private fun LegacyRow(content: @Composable () -> Unit) {
 internal object PerformanceShellWidget : ShellWidget {
     override val id = WidgetMigration.PERFORMANCE
     override val title = "Performance"
-    override val icon = asset("loading-02")
+    override val icon = asset("speedometer")
     override val size = WidgetSize.ROW
     override val surfaces = setOf(WidgetSurface.LOBBY, WidgetSurface.PAUSE)
     override val bleed = true
@@ -151,7 +151,7 @@ private fun LobbyPerformance() {
         CardRow(label = if (ready != null) "Open ${ready.label.lowercase()}" else "spark tools", active = menu, onClick = press) { lit ->
             val muted = OneConfigTheme.current.mutedText
             Box(Modifier.size(ROW_GLYPH), contentAlignment = Alignment.Center) {
-                PauseGlyph(asset("loading-02"), if (lit) SocialTextPrimary else muted, ROW_GLYPH)
+                PauseGlyph(asset("speedometer"), if (lit) SocialTextPrimary else muted, ROW_GLYPH)
             }
             val profile = view.profile
             when {

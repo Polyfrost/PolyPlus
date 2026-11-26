@@ -12,6 +12,8 @@ import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanel
 import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanelHost
 import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyHudMenuHost
 import org.polyfrost.polyplus.client.gui.vanillamenu.MenuEditorBar
+import org.polyfrost.polyplus.client.gui.vanillamenu.MenuLayoutEditor
+import androidx.compose.ui.zIndex
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
@@ -365,9 +367,19 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
                 val widgetRoom = stackHeight - LobbyLayout.Top - LobbyLayout.Gap - STACK_ROW_GAP - with(density) { stackRest.toDp() }
                 val widgetScope = remember(lobby, screen, stackWidth) { LobbyWidgetScope(lobby, screen, stackWidth) }
                 if (widgetRoom > 0.dp) {
-                    WidgetColumn(WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope, Modifier.padding(bottom = STACK_ROW_GAP)) { widget, place, frame ->
+                    val editing = MenuLayoutEditor.isEditing("lobby")
+                    // the moved / selected widget draws above the others (and the column above the chat and player bar)
+                    fun onTop(id: String) = id in MenuLayoutEditor.dragIds || MenuLayoutEditor.selection[MenuLayoutEditor.key("lobby", id)] == true
+                    val columnOnTop = editing && (MenuLayoutEditor.dragIds + MenuLayoutEditor.selection.filterValues { it }.keys.map { it.substringAfter('/') })
+                        .any { it.startsWith("widget.") }
+                    WidgetColumn(
+                        WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope,
+                        Modifier.padding(bottom = STACK_ROW_GAP).zIndex(if (columnOnTop) 2f else 0f),
+                        scroll = !editing,
+                    ) { widget, place, frame ->
                         // every widget is its own piece in the menu editor (move / scale / hide), new ones too
-                        EditableBlock("lobby", "widget." + widget.id, widget.title.ifBlank { widget.id } + " widget", place) { frame(Modifier) }
+                        val id = "widget." + widget.id
+                        EditableBlock("lobby", id, widget.title.ifBlank { widget.id } + " widget", place.zIndex(if (editing && onTop(id)) 2f else 0f)) { frame(Modifier) }
                     }
                 }
             }
@@ -851,13 +863,14 @@ private fun Modifier.avatarTaps(lobby: LobbyShell, notch: Int): Modifier = point
                 continue
             }
             if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && size.width > 0 && size.height > 0 && lobby.calm()) {
-                // right button: a drag pans the camera, a click on your character opens its menu
+                // right button: a drag pans the camera, a click on a character opens its menu
                 val at = event.changes.firstOrNull()?.position ?: continue
-                val onAvatar = LobbyGrab.touches(sceneX(at), sceneY(at, notch))
+                val target = LobbyGrab.touched(sceneX(at), sceneY(at, notch))
+                val onAvatar = target != null
                 if (!LobbyLook.enabled() && !onAvatar) continue
                 event.changes.forEach { it.consume() }
                 val dragged = LobbyLook.enabled() && panGesture(at)
-                if (!dragged && onAvatar) LobbyPlayerMenu.open(at.x, at.y)
+                if (!dragged && onAvatar) LobbyPlayerMenu.open(at.x, at.y, target)
                 continue
             }
             if (event.type != PointerEventType.Press || !event.buttons.isPrimaryPressed || size.width <= 0 || size.height <= 0) continue

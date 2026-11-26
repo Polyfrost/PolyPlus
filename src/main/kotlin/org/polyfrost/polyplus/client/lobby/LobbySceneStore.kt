@@ -122,6 +122,10 @@ object LobbySceneStore {
         val spots: Map<String, LobbySceneSpot> = emptyMap(),
         val hideName: Boolean = false,
         val pose: String = "none",
+        val hideSelf: Boolean = false,
+        val hiddenPlayers: Map<String, String> = emptyMap(),
+        val hiddenNames: Set<String> = emptySet(),
+        val poses: Map<String, String> = emptyMap(),
     )
 
     private const val SERVER_PREFIX = "server:"
@@ -327,6 +331,59 @@ object LobbySceneStore {
         ensureLoaded()
         if (state.pose == id) return
         update { copy(pose = id) }
+    }
+
+    /** Hide your own player in the lobby. */
+    fun hideSelf(): Boolean {
+        ensureLoaded()
+        return state.hideSelf
+    }
+
+    fun setHideSelf(hide: Boolean) {
+        ensureLoaded()
+        if (state.hideSelf == hide) return
+        update { copy(hideSelf = hide) }
+    }
+
+    /** Other players hidden from the lobby, uuid to the name they had, so the Characters page can list them. */
+    fun hiddenPlayers(): Map<String, String> {
+        ensureLoaded()
+        return state.hiddenPlayers
+    }
+
+    fun playerHidden(uuid: String): Boolean {
+        ensureLoaded()
+        return uuid in state.hiddenPlayers
+    }
+
+    fun setPlayerHidden(uuid: String, name: String, hide: Boolean) {
+        ensureLoaded()
+        if ((uuid in state.hiddenPlayers) == hide) return
+        update { copy(hiddenPlayers = if (hide) hiddenPlayers + (uuid to name) else hiddenPlayers - uuid) }
+    }
+
+    /** Other players whose name tag is hidden. */
+    fun nameHidden(uuid: String): Boolean {
+        ensureLoaded()
+        return uuid in state.hiddenNames
+    }
+
+    fun setNameHidden(uuid: String, hide: Boolean) {
+        ensureLoaded()
+        if ((uuid in state.hiddenNames) == hide) return
+        update { copy(hiddenNames = if (hide) hiddenNames + uuid else hiddenNames - uuid) }
+    }
+
+    /** The pose picked for another player ("none" when not set). */
+    fun poseOf(uuid: String): String {
+        ensureLoaded()
+        return state.poses[uuid] ?: "none"
+    }
+
+    fun setPoseOf(uuid: String, id: String) {
+        ensureLoaded()
+        if (poseOf(uuid) == id) return
+        update { copy(poses = if (id == "none") poses - uuid else poses + (uuid to id)) }
     }
 
     fun serverScene(address: String): String? {

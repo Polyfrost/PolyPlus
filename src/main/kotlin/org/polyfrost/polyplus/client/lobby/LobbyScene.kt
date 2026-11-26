@@ -281,6 +281,8 @@ object LobbyScene {
     private const val LYING_HALF_LENGTH = 0.95
     private val LYING_ENDS = doubleArrayOf(-1.0, 1.0)
     private val LYING_HEIGHTS = doubleArrayOf(0.0, 0.45)
+    private const val POSED_PAD = 0.25
+    private const val POSED_LABEL_LIFT = 0.36
     private const val SWAY_YAW_DEGREES = 1.4
     private const val SWAY_PITCH_DEGREES = 0.4
     private const val HEAD_TURN_RANGE = 30f
@@ -2255,31 +2257,72 @@ object LobbyScene {
         projector.project(feet.x + right.x * LobbyAntics.HALF_WIDTH, feet.y + middle, feet.z + right.z * LobbyAntics.HALF_WIDTH)
         if (avatar.arrival == LobbyAvatar.Arrival.LANDED && !LobbyGrab.handling(avatar)) LobbyAntics.sight(avatar, feetX, feetY, headX, headY, projector.x)
         LobbyGrab.sight(avatar, feetX, feetY, headX, headY, projector.x, eye, yaw)
-        if (LobbyPoses.lying(avatar.id)) sightLying(avatar)
+        if (LobbyPoses.lying(avatar.id) || LobbyPoses.posed(avatar.id) != null) {
+            bodyBounds(avatar, right)
+            if (avatar.arrival == LobbyAvatar.Arrival.LANDED && !LobbyGrab.handling(avatar)) LobbyAntics.area(bounds[0], bounds[1], bounds[2], bounds[3])
+            LobbyGrab.area(bounds[0], bounds[1], bounds[2], bounds[3])
+        }
     }
 
-    /** Lying down the body is a flat box along the facing line, so click/drag use its screen bounds. */
-    private fun sightLying(avatar: LobbyAvatar) {
-        val feet = avatar.position()
-        val bodyRad = Math.toRadians(avatar.yBodyRot.toDouble())
-        val alongX = -sin(bodyRad) * LYING_HALF_LENGTH
-        val alongZ = cos(bodyRad) * LYING_HALF_LENGTH
-        val sideX = cos(bodyRad) * LobbyAntics.HALF_WIDTH
-        val sideZ = sin(bodyRad) * LobbyAntics.HALF_WIDTH
-        var minX = Double.MAX_VALUE
-        var maxX = -Double.MAX_VALUE
-        var minY = Double.MAX_VALUE
-        var maxY = -Double.MAX_VALUE
-        for (end in LYING_ENDS) for (side in LYING_ENDS) for (height in LYING_HEIGHTS) {
-            projector.project(feet.x + alongX * end + sideX * side, feet.y + height, feet.z + alongZ * end + sideZ * side)
-            minX = min(minX, projector.x)
-            maxX = max(maxX, projector.x)
-            minY = min(minY, projector.y)
-            maxY = max(maxY, projector.y)
-        }
-        if (avatar.arrival == LobbyAvatar.Arrival.LANDED && !LobbyGrab.handling(avatar)) LobbyAntics.area(minX, maxX, minY, maxY)
-        LobbyGrab.area(minX, maxX, minY, maxY)
+    /** Screen bounds of the last [bodyBounds] call: minX, maxX, minY, maxY. */
+    private val bounds = DoubleArray(4)
+
+    private fun take() {
+        bounds[0] = min(bounds[0], projector.x)
+        bounds[1] = max(bounds[1], projector.x)
+        bounds[2] = min(bounds[2], projector.y)
+        bounds[3] = max(bounds[3], projector.y)
     }
+
+    /**
+     * Where a character's body is on screen, so clicks land on what you see: a flat box along the facing
+     * line while lying, the posed head, hands and feet while an animation plays, else the standing box.
+     */
+    private fun bodyBounds(avatar: LobbyAvatar, right: Vec3) {
+        bounds[0] = Double.MAX_VALUE
+        bounds[1] = -Double.MAX_VALUE
+        bounds[2] = Double.MAX_VALUE
+        bounds[3] = -Double.MAX_VALUE
+        val feet = avatar.position()
+        val shape = LobbyPoses.posed(avatar.id)
+        if (LobbyPoses.lying(avatar.id)) {
+            val bodyRad = Math.toRadians(avatar.yBodyRot.toDouble())
+            val alongX = -sin(bodyRad) * LYING_HALF_LENGTH
+            val alongZ = cos(bodyRad) * LYING_HALF_LENGTH
+            val sideX = cos(bodyRad) * LobbyAntics.HALF_WIDTH
+            val sideZ = sin(bodyRad) * LobbyAntics.HALF_WIDTH
+            for (end in LYING_ENDS) for (side in LYING_ENDS) for (height in LYING_HEIGHTS) {
+                projector.project(feet.x + alongX * end + sideX * side, feet.y + height, feet.z + alongZ * end + sideZ * side)
+                take()
+            }
+        } else if (shape != null) {
+            for (i in 0 until LobbyPoses.POINTS) for (side in LYING_ENDS) {
+                val pad = side * POSED_PAD
+                projector.project(feet.x + shape[i * 3] + right.x * pad, feet.y + shape[i * 3 + 1], feet.z + shape[i * 3 + 2] + right.z * pad)
+                take()
+            }
+        } else {
+            for (height in doubleArrayOf(0.0, avatar.bbHeight.toDouble())) for (side in LYING_ENDS) {
+                val pad = side * LobbyAntics.HALF_WIDTH
+                projector.project(feet.x + right.x * pad, feet.y + height, feet.z + right.z * pad)
+                take()
+            }
+        }
+    }
+
+    /** Where the name tag goes: above the posed head while an animation plays, else above the standing head. */
+    private fun labelPoint(avatar: LobbyAvatar) {
+        val feet = avatar.position()
+        val shape = LobbyPoses.posed(avatar.id)
+        when {
+            LobbyPoses.lying(avatar.id) -> projector.project(feet.x, feet.y + LYING_LABEL_HEIGHT, feet.z)
+            shape != null -> projector.project(feet.x + shape[0], feet.y + shape[1] + POSED_LABEL_LIFT, feet.z + shape[2])
+            else -> projector.project(feet.x, feet.y + avatar.bbHeight + HEAD_LABEL_OFFSET, feet.z)
+        }
+    }
+
+    private fun nameHiddenByUser(avatar: LobbyAvatar): Boolean =
+        if (avatar.isLocal) LobbySceneStore.hideName() else LobbySceneStore.nameHidden(avatar.uuid.toString())
 
     private fun sectionsSettled(mc: Minecraft): Boolean = LobbyCompat.sectionsDone(mc)
 
@@ -2299,14 +2342,16 @@ object LobbyScene {
         for (avatar in scene.avatars) {
             if ((avatar.arrival != LobbyAvatar.Arrival.LANDED && !LobbyGrab.homeward(avatar)) || avatar.dismissed || !ahead(eye, look, avatar)) continue
             val sight = (if (driven == null) scene.sight[avatar] else null) ?: survey(scene, eye, avatar)
-            if (!sight.clear) continue
-            val feet = avatar.position()
-            val labelHeight = if (LobbyPoses.lying(avatar.id)) LYING_LABEL_HEIGHT else avatar.bbHeight + HEAD_LABEL_OFFSET
-            projector.project(feet.x, feet.y + labelHeight, feet.z)
+            if (!sight.clear || avatar.hiddenByUser()) continue
+            labelPoint(avatar)
             val screenX = projector.x.toFloat()
             val screenY = projector.y.toFloat()
             if (avatar.isLocal && driven == null) sightAvatar(avatar, right, eye, scene.rig.yRot)
-            if (avatar.isLocal && LobbySceneStore.hideName()) continue
+            if (driven == null) {
+                bodyBounds(avatar, right)
+                LobbyGrab.box(avatar, bounds[0], bounds[1], bounds[2], bounds[3])
+            }
+            if (nameHiddenByUser(avatar)) continue
             val label = Label(avatar.displayName, screenX, screenY, avatar.isLocal, sight.invite, avatar.whereabouts)
             (next ?: ArrayList<Label>(scene.avatars.size).also { next = it }) += label
         }
@@ -2453,7 +2498,7 @@ object LobbyScene {
             val local = scene.avatars.firstOrNull { it.isLocal }.takeIf { driven == null }
             LobbyAntics.tick(local)
             LobbyGrab.tick(scene.level, local)
-            LobbyPoses.tick(local)
+            LobbyPoses.tick(if (driven == null) scene.avatars else emptyList())
             //? if > 1.8.9
             if (driven == null) LobbyCats.tick(scene.level, Motion.reduced)
             LobbyHerobrine.tick(scene.level, scene.rig, driven == null && scene.started && !introPlaying() && selected == null && departNanos == 0L && !LobbyWardrobe.open)

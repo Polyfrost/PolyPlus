@@ -27,7 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -212,13 +214,18 @@ private fun ElementPage(element: MenuElement) {
 
 @Composable
 private fun PropField(id: String, key: String, value: String, placeholder: String) {
+    // own text state (keeps the cursor) and every keystroke goes straight to the element: the lobby redraws live
+    var field by remember(id, key) { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    if (field.text != value) field = TextFieldValue(value, TextRange(value.length))
     TextField(
-        value = value,
-        onValueChange = { LobbyElementPanel.set(id, key, it) },
+        value = field,
+        onValueChange = {
+            field = if (it.text.length > 256) it.copy(text = it.text.take(256)) else it
+            LobbyElementPanel.set(id, key, field.text)
+        },
         modifier = Modifier.fillMaxWidth(),
         size = ControlSize.Large,
         placeholder = placeholder,
-        maxLength = 256,
         fontSize = 14.sp,
     )
 }

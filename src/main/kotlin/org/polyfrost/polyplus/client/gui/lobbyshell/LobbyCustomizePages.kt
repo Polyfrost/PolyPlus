@@ -300,6 +300,56 @@ internal fun WidgetsPage(lobby: LobbyShell, state: CustomizeState) {
 }
 
 @Composable
+internal fun CharactersPage(lobby: LobbyShell, state: CustomizeState) {
+    val hiddenSelf = LobbySceneStore.hideSelf()
+    val hidden = LobbySceneStore.hiddenPlayers()
+    PanelPageColumn {
+        PanelHint("Hide characters or change their animation. Right-click a player in the lobby to hide them.")
+        PanelSection("You", divider = false) {
+            CharacterRow(
+                "Your character",
+                if (hiddenSelf) "Hidden" else "Shown",
+                if (hiddenSelf) "Show" else "Hide",
+                { LobbySceneStore.setHideSelf(!hiddenSelf) },
+                { state.close(); LobbyPlayerMenu.edit(null, "") },
+            )
+        }
+        PanelSection("Hidden players") {
+            if (hidden.isEmpty()) PanelHint("No hidden players.")
+            for ((uuid, name) in hidden.entries.sortedBy { it.value.lowercase() }) {
+                key(uuid) {
+                    CharacterRow(
+                        name.ifBlank { "Player" },
+                        "Hidden",
+                        "Unhide",
+                        { LobbySceneStore.setPlayerHidden(uuid, name, false) },
+                        { state.close(); LobbyPlayerMenu.edit(uuid, name) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CharacterRow(name: String, detail: String, toggleLabel: String, onToggle: () -> Unit, onEdit: () -> Unit) {
+    val theme = OneConfigTheme.current
+    Row(
+        Modifier.fillMaxWidth().height(CustomizeKit.RowHeight + 6.dp).padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LobbyIcon("user-01", theme.textColorSecondary, 18.dp)
+        Column(Modifier.weight(1f)) {
+            Text(name, color = theme.textColor, style = theme.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+            Text(detail, color = theme.textColorSecondary, style = theme.typography.small, maxLines = 1, softWrap = false)
+        }
+        TextButton(text = toggleLabel, onClick = onToggle, size = ControlSize.Compact, style = ControlStyle.Secondary)
+        TextButton(text = "Edit", onClick = onEdit, size = ControlSize.Compact, style = ControlStyle.Secondary)
+    }
+}
+
+@Composable
 private fun ChoiceRow(label: String, selected: Boolean, detail: String?, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
     val shape = OneConfigTheme.shape(CustomizeKit.RowRadius)

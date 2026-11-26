@@ -122,7 +122,10 @@ class LobbyAvatar(
     *///?}
 
     override fun shouldRender(x: Double, y: Double, z: Double): Boolean =
-        !hidden && !phantom && projection < SOLID_SWAP && arrival != Arrival.WAITING && super.shouldRender(x, y, z)
+        !hidden && !phantom && !hiddenByUser() && projection < SOLID_SWAP && arrival != Arrival.WAITING && super.shouldRender(x, y, z)
+
+    /** Hidden from the lobby by the player (their own character, or someone in Characters). */
+    fun hiddenByUser(): Boolean = if (isLocal) LobbySceneStore.hideSelf() else LobbySceneStore.playerHidden(uuid.toString())
 
     //? if > 1.8.9 {
     override fun isModelPartShown(part: PlayerModelPart): Boolean = true

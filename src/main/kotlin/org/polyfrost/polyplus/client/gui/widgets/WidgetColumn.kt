@@ -324,6 +324,7 @@ fun WidgetColumn(
     glass: @Composable Modifier.(Dp) -> Modifier,
     scope: WidgetScope,
     modifier: Modifier = Modifier,
+    scroll: Boolean = true,
     itemWrapper: (@Composable (widget: ShellWidget, layoutModifier: Modifier, content: @Composable (Modifier) -> Unit) -> Unit)? = null,
 ) {
     val widgets = rememberShellWidgets(surface)
@@ -333,10 +334,8 @@ fun WidgetColumn(
     ReorderLayout(
         list,
         FRAME_GAP,
-        modifier
-            .width(width)
-            .heightIn(max = maxHeight)
-            .verticalScroll(rememberScrollState()),
+        // no scroll container (it clips) while the menu editor moves or scales widgets out of the column
+        if (scroll) modifier.width(width).heightIn(max = maxHeight).verticalScroll(rememberScrollState()) else modifier.width(width),
     ) {
         widgets.forEach { widget ->
             key(widget.id) {

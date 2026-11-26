@@ -51,6 +51,7 @@ internal enum class CustomizePage(val title: String) {
     Capture("Capture"),
     Reveal("Opening animation"),
     Widgets("Widgets"),
+    Characters("Characters"),
 }
 
 internal class CustomizeState {
@@ -122,6 +123,7 @@ internal fun CustomizePanel(lobby: LobbyShell) {
                 CustomizePage.Capture -> CapturePage(lobby, state)
                 CustomizePage.Reveal -> RevealPage(lobby, state)
                 CustomizePage.Widgets -> WidgetsPage(lobby, state)
+                CustomizePage.Characters -> CharactersPage(lobby, state)
             }
         }
     }
@@ -138,6 +140,7 @@ private fun HomePage(lobby: LobbyShell, state: CustomizeState) {
         if (PartyScene.isMember(party)) PartySection()
         PanelSection(null) {
             DrillRow("package-01", "Widgets", null, { state.open(CustomizePage.Widgets) })
+            DrillRow("users-01", "Characters", null, { state.open(CustomizePage.Characters) })
         }
         PanelSection("Main menu") {
             DrillRow("logo", "Switch to OneClient v1 main menu", null, { state.close(); MainMenuReplacement.switchToPolyPlusMenu() })

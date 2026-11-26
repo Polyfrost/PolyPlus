@@ -4,6 +4,7 @@ package org.polyfrost.polyplus.mixin.client.cosmetics;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
+import org.polyfrost.polyplus.client.lobby.LobbyPoses;
 import org.polyfrost.polyplus.client.render.PlayerRenderContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -118,11 +119,16 @@ public class MixinPlayerModel
             return;
 
         EmoteController controller = renderAccess.polyplus$boundEmoteController();
-        if (!controller.isActive())
+        if (!controller.isActive()) {
+            //? if >= 26.1
+            LobbyPoses.clearShape(state.id);
             return;
+        }
 
         PlayerModel model = (PlayerModel) (Object) this;
         renderAccess.polyplus$setLastEmoteSample(controller.applyToModel(model, PlayerRenderContext.Companion.from(state)));
+        //? if >= 26.1
+        LobbyPoses.shape(state.id, model, state.bodyRot);
         //?}
     }
 }

@@ -8,6 +8,9 @@ import java.io.ByteArrayInputStream
 //? if >= 26.1 {
 import com.mojang.blaze3d.vertex.PoseStack
 import org.joml.Quaternionf
+import net.minecraft.client.model.geom.ModelPart
+import net.minecraft.client.model.player.PlayerModel
+import org.joml.Vector3f
 import org.polyfrost.polyplus.client.utils.rotateBy
 //?}
 
@@ -22,6 +25,10 @@ object LobbyPoses {
     private const val LIE_LIFT = 0.13f
     private const val LIE_HALF_LENGTH = 0.9f
     private const val PATH = "lobby/pose_"
+    private const val MODEL_SCALE = 0.9375f
+    private const val MODEL_DROP = 1.501f
+    private const val PIXELS = 16f
+    const val POINTS = 8
 
     class Pose(val id: String, val name: String, val bones: String, val length: Double = 2.0)
 
@@ -163,26 +170,52 @@ object LobbyPoses {
     /** A pose shown while you hover it in the menu, before you pick it. */
     var preview: String? = null
 
+    /** Whose character [preview] shows on: a player's uuid, or null for your own. */
+    var previewTarget: String? = null
+
     private val built = HashMap<String, Emote?>()
-    private var lyingId = NO_ID
+    private val lyingIds = HashSet<Int>()
+
+    /** Where the posed model's key points are, per entity id: xyz triples in blocks, relative to the feet. */
+    private val shapes = HashMap<Int, FloatArray>()
 
     /** True while this entity is shown lying down (the whole model is laid flat in [lie], not just its bones). */
-    fun lying(entityId: Int): Boolean = entityId == lyingId
+    fun lying(entityId: Int): Boolean = entityId in lyingIds
 
-    fun current(): String = preview ?: LobbySceneStore.pose()
+    fun current(): String = if (previewTarget == null) preview ?: LobbySceneStore.pose() else LobbySceneStore.pose()
+
+    /** The pose a lobby character holds: yours from [current], other players' from their own saved pick. */
+    fun poseFor(avatar: LobbyAvatar): String {
+        if (avatar.isLocal) return current()
+        val uuid = avatar.uuid.toString()
+        val hovered = preview
+        if (hovered != null && previewTarget == uuid) return hovered
+        return LobbySceneStore.poseOf(uuid)
+    }
 
     fun name(id: String): String = all.firstOrNull { it.id == id }?.name ?: "Normal"
 
+    /** The posed model's key points for this entity (xyz triples, blocks from the feet), or null when it isn't posed. */
+    fun posed(entityId: Int): FloatArray? = shapes[entityId]
+
+    @JvmStatic
+    fun clearShape(entityId: Int) {
+        shapes.remove(entityId)
+    }
+
     private fun ours(emote: Emote?): Boolean = emote != null && emote.id.namespace == "polyplus" && emote.id.path.startsWith(PATH)
 
-    fun tick(avatar: LobbyAvatar?) {
-        lyingId = NO_ID
-        avatar ?: return
+    fun tick(avatars: List<LobbyAvatar>) {
+        lyingIds.clear()
+        for (avatar in avatars) tickOne(avatar)
+    }
+
+    private fun tickOne(avatar: LobbyAvatar) {
         val controller = (avatar as PlayerEmotesAccess).`polyplus$emoteController`()
         val playing = controller.playbackSnapshot()?.emote
-        val id = current()
+        val id = poseFor(avatar)
         val free = avatar.arrival == LobbyAvatar.Arrival.LANDED && !avatar.dismissed && !avatar.isCrouching && !LobbyGrab.handling(avatar)
-        if (id == LIE && free && (playing == null || ours(playing))) lyingId = avatar.id
+        if (id == LIE && free && (playing == null || ours(playing))) lyingIds.add(avatar.id)
         if (id == NONE || !free) {
             if (ours(playing)) controller.stop()
             return
@@ -198,9 +231,42 @@ object LobbyPoses {
      * name tag all stay with the body. Runs before setupRotations turns the body by (180 - bodyRot),
      * so the extra turn here is undone by that one and the tilt happens in the body's own frame.
      */
+    /**
+     * Records where the posed model's head, body, hands and feet end up, so the name tag and the
+     * right-click area can follow the animation. Mirrors the player renderer: turn by (180 - bodyRot),
+     * flip and scale by 0.9375, drop by 1.501, then each part's own pivot and rotation.
+     */
+    @JvmStatic
+    fun shape(entityId: Int, model: PlayerModel, bodyRot: Float) {
+        val stack = PoseStack()
+        stack.rotateBy(Quaternionf().rotationY(Math.toRadians(180.0 - bodyRot).toFloat()))
+        stack.scale(-MODEL_SCALE, -MODEL_SCALE, MODEL_SCALE)
+        stack.translate(0f, -MODEL_DROP, 0f)
+        val out = shapes[entityId] ?: FloatArray(POINTS * 3).also { shapes[entityId] = it }
+        var at = 0
+        fun point(part: ModelPart, x: Float, y: Float) {
+            stack.pushPose()
+            model.root().translateAndRotate(stack)
+            part.translateAndRotate(stack)
+            val v = stack.last().pose().transformPosition(Vector3f(x / PIXELS, y / PIXELS, 0f))
+            stack.popPose()
+            out[at++] = v.x
+            out[at++] = v.y
+            out[at++] = v.z
+        }
+        point(model.head, 0f, -8f)
+        point(model.head, 0f, -4f)
+        point(model.body, 0f, 0f)
+        point(model.body, 0f, 12f)
+        point(model.rightArm, -1f, 10f)
+        point(model.leftArm, 1f, 10f)
+        point(model.rightLeg, 0f, 12f)
+        point(model.leftLeg, 0f, 12f)
+    }
+
     @JvmStatic
     fun lie(entityId: Int, poseStack: PoseStack, bodyRot: Float) {
-        if (entityId != lyingId) return
+        if (entityId !in lyingIds) return
         val turn = Math.toRadians(180.0 - bodyRot).toFloat()
         poseStack.rotateBy(Quaternionf().rotationY(turn))
         poseStack.translate(0f, LIE_LIFT, -LIE_HALF_LENGTH)
