@@ -62,9 +62,11 @@ private const val FOLDER = "folder"
 private const val SOUNDS_ON = "assets/polyplus/mainmenu/volume-max.svg"
 private const val SOUNDS_OFF = "assets/polyplus/mainmenu/volume-x.svg"
 private val SoundVolumeWidth = 132.dp
+private val CompactVolumeWidth = 72.dp
 
 @Composable
-internal fun ColumnScope.SoundboardSettings(control: Dp) {
+internal fun ColumnScope.SoundboardSettings(control: Dp?) {
+    val compact = control == null
     val sounds by Soundboard.sounds.collectAsState()
     val playing by Soundboard.playing.collectAsState()
     val problem by Soundboard.problem.collectAsState()
@@ -109,7 +111,12 @@ internal fun ColumnScope.SoundboardSettings(control: Dp) {
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(text = if (picking) "Choosing..." else "Add sound", onClick = ::addSound, style = ControlStyle.Primary, enabled = !picking)
-            TextButton(text = "Open folder", onClick = { Multithreading.submit { DesktopHelper.open(Soundboard.folder.toFile()) } })
+            val openFolder = { Multithreading.submit { DesktopHelper.open(Soundboard.folder.toFile()) } }
+            if (compact) {
+                IconButton(icon = FOLDER, contentDescription = "Open sounds folder", onClick = { openFolder() }, modifier = Modifier.size(34.dp), tooltipPlacement = TooltipPlacement.BelowCenter)
+            } else {
+                TextButton(text = "Open folder", onClick = { openFolder() })
+            }
             IconButton(icon = LobbyIcons.REFRESH, contentDescription = "Reload sounds", onClick = Soundboard::reload, modifier = Modifier.size(34.dp), tooltipPlacement = TooltipPlacement.BelowCenter)
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
                 if (playing.isNotEmpty()) TextButton(text = "Stop all", onClick = Soundboard::stopAll)
@@ -117,19 +124,19 @@ internal fun ColumnScope.SoundboardSettings(control: Dp) {
         }
     }
 
-    Section("Volume") {
-        SettingRow("Your party hears") {
-            PercentSlider(PartyVoiceSettings.soundboardVolume(), 200f, control, "Soundboard volume for your party", PartyVoiceSettings::setSoundboardVolume)
+    Section("Volume", compact) {
+        WideRow("Your party hears", control) { modifier ->
+            PercentSlider(PartyVoiceSettings.soundboardVolume(), 200f, modifier, "Soundboard volume for your party", PartyVoiceSettings::setSoundboardVolume)
         }
-        SettingRow("You hear") {
-            PercentSlider(PartyVoiceSettings.soundboardMonitor(), 100f, control, "Soundboard volume for you", PartyVoiceSettings::setSoundboardMonitor)
+        WideRow("You hear", control) { modifier ->
+            PercentSlider(PartyVoiceSettings.soundboardMonitor(), 100f, modifier, "Soundboard volume for you", PartyVoiceSettings::setSoundboardMonitor)
         }
-        SettingRow("Other people's sounds") {
-            PercentSlider(PartyVoiceSettings.soundboardOthers(), 200f, control, "Volume of your party's sounds", PartyVoiceSettings::setSoundboardOthers)
+        WideRow("Other people's sounds", control) { modifier ->
+            PercentSlider(PartyVoiceSettings.soundboardOthers(), 200f, modifier, "Volume of your party's sounds", PartyVoiceSettings::setSoundboardOthers)
         }
     }
 
-    Section(if (sounds.isEmpty()) "Sounds" else "Sounds (${sounds.size})") {
+    Section(if (sounds.isEmpty()) "Sounds" else "Sounds (${sounds.size})", compact) {
         if (sounds.isEmpty()) {
             EmptyState(
                 title = "No sounds yet",
@@ -139,7 +146,16 @@ internal fun ColumnScope.SoundboardSettings(control: Dp) {
             )
         } else {
             val ordered = remember(sounds, Soundboard.favorites) { Soundboard.ordered(sounds) }
-            ordered.forEach { sound -> SoundRow(sound, sound.id in playing) { removing = sound } }
+            ordered.forEach { sound ->
+                if (compact && removing?.id == sound.id) {
+                    DeleteSoundRow(sound, { removing = null }) {
+                        Soundboard.remove(sound)
+                        removing = null
+                    }
+                } else {
+                    SoundRow(sound, sound.id in playing, compact) { removing = sound }
+                }
+            }
         }
         if (!PolyPlusConfig.soundboardWheelKeybind.isBound) {
             VoiceHint("Set a Soundboard key in PolyPlus keybinds to play sounds from a wheel while you play. Starred sounds come first.")
@@ -150,9 +166,9 @@ internal fun ColumnScope.SoundboardSettings(control: Dp) {
         val others = PartyRepository.others(current)
         if (others.isNotEmpty()) {
             val names by PlayerNamesRepository.names.collectAsState()
-            Section("Party members' sounds") {
+            Section("Party members' sounds", compact) {
                 others.forEach { member ->
-                    MemberSoundRow(member.player, names[member.player] ?: PlayerNamesRepository.nameOr(member.player), member.soundboardMuted)
+                    MemberSoundRow(member.player, names[member.player] ?: PlayerNamesRepository.nameOr(member.player), member.soundboardMuted, compact)
                 }
                 VoiceHint(
                     if (PartyRepository.isLeader(current)) {
@@ -165,7 +181,7 @@ internal fun ColumnScope.SoundboardSettings(control: Dp) {
         }
     }
 
-    removing?.let { sound ->
+    removing?.takeUnless { compact }?.let { sound ->
         ConfirmDialog(
             title = "Delete ${sound.name}?",
             text = "This removes the file from your sounds folder.",
@@ -183,15 +199,15 @@ internal fun ColumnScope.SoundboardSettings(control: Dp) {
 }
 
 @Composable
-private fun SoundRow(sound: Soundboard.Sound, playing: Boolean, onRemove: () -> Unit) {
+private fun SoundRow(sound: Soundboard.Sound, playing: Boolean, compact: Boolean, onRemove: () -> Unit) {
     val favorite = Soundboard.isFavorite(sound.id)
     var volume by remember(sound.id) { mutableStateOf(Soundboard.volumeOf(sound.id) * 100f) }
-    Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth().height(if (compact) 34.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp)) {
         IconButton(
             icon = if (playing) STOP_ICON else PLAY_ICON,
             contentDescription = if (playing) "Stop ${sound.name}" else "Play ${sound.name}",
             onClick = { Soundboard.toggle(sound) },
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(if (compact) 30.dp else 34.dp),
             active = playing,
             tooltipPlacement = TooltipPlacement.BelowStart,
         )
@@ -217,13 +233,13 @@ private fun SoundRow(sound: Soundboard.Sound, playing: Boolean, onRemove: () -> 
                 volume = it
                 Soundboard.setVolume(sound.id, it / 100f)
             },
-            modifier = Modifier.width(SoundVolumeWidth),
+            modifier = Modifier.width(if (compact) CompactVolumeWidth else SoundVolumeWidth),
             range = 0f..Soundboard.MAX_VOLUME * 100f,
             step = 5f,
             onValueChangeFinished = Soundboard::save,
             contentDescription = "${sound.name} volume",
         )
-        Text("${volume.roundToInt()}%", Modifier.width(40.dp), style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
+        if (!compact) Text("${volume.roundToInt()}%", Modifier.width(40.dp), style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
         IconButton(
             icon = LobbyIcons.TRASH,
             contentDescription = "Delete ${sound.name}",
@@ -236,10 +252,19 @@ private fun SoundRow(sound: Soundboard.Sound, playing: Boolean, onRemove: () -> 
 }
 
 @Composable
-private fun MemberSoundRow(player: String, name: String, leaderMuted: Boolean) {
+private fun DeleteSoundRow(sound: Soundboard.Sound, onCancel: () -> Unit, onDelete: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Delete ${sound.name}?", Modifier.weight(1f), style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        TextButton(text = "Cancel", onClick = onCancel)
+        TextButton(text = "Delete", onClick = onDelete, style = ControlStyle.Danger)
+    }
+}
+
+@Composable
+private fun MemberSoundRow(player: String, name: String, leaderMuted: Boolean, compact: Boolean) {
     val muted = PartyVoiceSettings.isSoundMuted(player)
     var volume by remember(player) { mutableStateOf(PartyVoiceSettings.soundVolumeOf(player) * 100f) }
-    Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(name, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             if (leaderMuted) Text("Muted by the party leader", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
@@ -250,13 +275,13 @@ private fun MemberSoundRow(player: String, name: String, leaderMuted: Boolean) {
                 volume = it
                 PartyVoiceSettings.setSoundVolume(player, it / 100f)
             },
-            modifier = Modifier.width(SoundVolumeWidth),
+            modifier = Modifier.width(if (compact) CompactVolumeWidth else SoundVolumeWidth),
             range = 0f..200f,
             step = 5f,
             enabled = !muted,
             contentDescription = "Volume of $name's sounds",
         )
-        Text("${volume.roundToInt()}%", Modifier.width(40.dp), style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
+        if (!compact) Text("${volume.roundToInt()}%", Modifier.width(40.dp), style = OneConfigTheme.current.typography.small, maxLines = 1, softWrap = false)
         IconButton(
             icon = if (muted) SOUNDS_OFF else SOUNDS_ON,
             contentDescription = if (muted) "Unmute $name's sounds" else "Mute $name's sounds",
@@ -269,9 +294,9 @@ private fun MemberSoundRow(player: String, name: String, leaderMuted: Boolean) {
 }
 
 @Composable
-internal fun PercentSlider(start: Float, max: Float, width: Dp, description: String, onChange: (Float) -> Unit) {
+internal fun PercentSlider(start: Float, max: Float, modifier: Modifier, description: String, onChange: (Float) -> Unit) {
     var percent by remember { mutableStateOf(start) }
-    Row(Modifier.width(width), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Slider(
             value = percent,
             onValueChange = {

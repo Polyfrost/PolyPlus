@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -71,6 +72,7 @@ private val ControlWidth = 300.dp
 private val ControlHeight = 32.dp
 private val LabelRoom = 140.dp
 private val MeterHeight = 8.dp
+private val CompactRow = 32.dp
 
 @Composable
 internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
@@ -111,6 +113,21 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
 
 @Composable
 private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
+    Section("Devices") {
+        SettingRow("Microphone") { DeviceSelect(true, control) }
+        SettingRow("Microphone volume") { VolumeControl(true, control) }
+        SettingRow("Speaker") { DeviceSelect(false, control) }
+        SettingRow("Speaker volume") { VolumeControl(false, control) }
+    }
+    VoiceOptions(voice, control) {
+        if (party != null) SettingRow("Voice mode") { ModeControl(party, control) }
+    }
+}
+
+@Composable
+internal fun VoiceOptions(voice: PartyVoice.Ui, control: Dp?, talking: @Composable ColumnScope.() -> Unit = {}) {
+    val compact = control == null
+    val row = if (compact) CompactRow else 40.dp
     var inputMode by remember { mutableStateOf(PartyVoiceSettings.inputMode()) }
     var sensitivity by remember { mutableStateOf(PartyVoiceSettings.sensitivity()) }
     var automatic by remember { mutableStateOf(PartyVoiceSettings.autoSensitivity()) }
@@ -119,24 +136,18 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
     var echo by remember { mutableStateOf(PartyVoiceSettings.echoCancellation()) }
     var announce by remember { mutableStateOf(PartyVoiceSettings.announceJoins()) }
     val rnnoise = NoiseSuppressor.available
-    Section("Devices") {
-        SettingRow("Microphone") { DeviceSelect(true, control) }
-        SettingRow("Microphone volume") { VolumeControl(true, control) }
-        SettingRow("Speaker") { DeviceSelect(false, control) }
-        SettingRow("Speaker volume") { VolumeControl(false, control) }
-    }
-    Section("Talking") {
-        if (party != null) SettingRow("Voice mode") { ModeControl(party, control) }
-        SettingRow("Input") {
-            InputControl(inputMode, control) {
+    Section("Talking", compact) {
+        talking()
+        WideRow("Input", control) { modifier ->
+            InputControl(inputMode, modifier) {
                 inputMode = it
                 PartyVoiceSettings.setInputMode(it)
             }
         }
         if (inputMode == VoiceInputMode.PUSH_TO_TALK) {
-            SettingRow("Mic level") { Box(Modifier.width(control)) { LevelMeter(null) } }
+            WideRow("Mic level", control) { modifier -> Box(modifier) { LevelMeter(null) } }
         } else {
-            SettingRow("Automatic sensitivity") {
+            SettingRow("Automatic sensitivity", row) {
                 Switch(
                     checked = automatic && rnnoise,
                     onCheckedChange = {
@@ -146,8 +157,8 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
                     enabled = rnnoise,
                 )
             }
-            SettingRow(if (automatic && rnnoise) "Mic level" else "Sensitivity", height = if (automatic && rnnoise) 40.dp else 56.dp) {
-                Column(Modifier.width(control), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            WideRow(if (automatic && rnnoise) "Mic level" else "Sensitivity", control, height = if (automatic && rnnoise) 40.dp else 56.dp) { modifier ->
+                Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (!(automatic && rnnoise)) {
                         Slider(
                             value = sensitivity,
@@ -170,8 +181,8 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
             }
         }
     }
-    Section("Sound processing") {
-        SettingRow("Noise suppression") {
+    Section("Sound processing", compact) {
+        SettingRow("Noise suppression", row) {
             Switch(
                 checked = suppressing && rnnoise,
                 onCheckedChange = {
@@ -182,15 +193,15 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
             )
         }
         if (suppressing && rnnoise) {
-            SettingRow("Strength") {
-                PercentSlider(strength, 100f, control, "Noise suppression strength") {
+            WideRow("Strength", control) { modifier ->
+                PercentSlider(strength, 100f, modifier, "Noise suppression strength") {
                     strength = it
                     PartyVoiceSettings.setNoiseStrength(it)
                 }
             }
         }
         if (!rnnoise) VoiceHint("Noise suppression and automatic sensitivity don't work on this computer.")
-        SettingRow("Echo cancellation") {
+        SettingRow("Echo cancellation", row) {
             Switch(
                 checked = echo,
                 onCheckedChange = {
@@ -207,24 +218,24 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
             },
         )
     }
-    Section("Mic test") {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(
-                text = if (voice.micTest) "Stop test" else "Test mic",
-                onClick = { PartyVoice.setMicTest(!voice.micTest) },
-                active = voice.micTest,
-            )
-            VoiceHint(
-                when {
-                    voice.micTestFailed -> "Couldn't open your microphone. Check the device above and try again."
-                    voice.micTest -> "Talk and you'll hear yourself. Wear headphones so you don't get an echo."
-                    else -> "Hear what your party hears, with noise suppression and your volume applied."
-                },
-            )
+    Section("Mic test", compact) {
+        val hint = when {
+            voice.micTestFailed -> "Couldn't open your microphone. Check which one is selected and try again."
+            voice.micTest -> "Talk and you'll hear yourself. Wear headphones so you don't get an echo."
+            else -> "Hear what your party hears, with noise suppression and your volume applied."
+        }
+        if (compact) {
+            MicTestButton(voice)
+            VoiceHint(hint)
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MicTestButton(voice)
+                VoiceHint(hint)
+            }
         }
     }
-    if (VoiceAnnouncer.SUPPORTED) Section("Announcements") {
-        SettingRow("Read out voice joins") {
+    if (VoiceAnnouncer.SUPPORTED) Section("Announcements", compact) {
+        SettingRow("Read out voice joins", row) {
             Switch(
                 checked = announce,
                 onCheckedChange = {
@@ -234,6 +245,15 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
             )
         }
     }
+}
+
+@Composable
+private fun MicTestButton(voice: PartyVoice.Ui) {
+    TextButton(
+        text = if (voice.micTest) "Stop test" else "Test mic",
+        onClick = { PartyVoice.setMicTest(!voice.micTest) },
+        active = voice.micTest,
+    )
 }
 
 @Composable
@@ -268,10 +288,26 @@ private fun voiceStatus(party: Party?, inVoice: Boolean): String = when {
 }
 
 @Composable
-internal fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionHeader(title, Modifier.padding(bottom = 4.dp))
+internal fun Section(title: String, compact: Boolean = false, rows: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp)) {
+        if (compact) {
+            Text(title, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        } else {
+            SectionHeader(title, Modifier.padding(bottom = 4.dp))
+        }
         rows()
+    }
+}
+
+@Composable
+internal fun WideRow(label: String, control: Dp?, height: Dp = 40.dp, content: @Composable (Modifier) -> Unit) {
+    if (control != null) {
+        SettingRow(label, height) { content(Modifier.width(control)) }
+        return
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        content(Modifier.fillMaxWidth())
     }
 }
 
@@ -318,12 +354,12 @@ private fun ModeControl(party: Party, width: Dp) {
 }
 
 @Composable
-private fun InputControl(mode: VoiceInputMode, width: Dp, onSelect: (VoiceInputMode) -> Unit) {
+private fun InputControl(mode: VoiceInputMode, modifier: Modifier, onSelect: (VoiceInputMode) -> Unit) {
     Select(
         selected = mode,
         options = VoiceInputMode.entries,
         onSelect = onSelect,
-        modifier = Modifier.width(width),
+        modifier = modifier,
         label = {
             when (it) {
                 VoiceInputMode.VOICE_ACTIVITY -> "Voice activity"
