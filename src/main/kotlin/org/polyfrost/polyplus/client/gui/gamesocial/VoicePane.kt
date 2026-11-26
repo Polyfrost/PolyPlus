@@ -162,6 +162,9 @@ private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
                     LevelMeter(if (automatic && rnnoise) null else sensitivity / 100f)
                 }
             }
+            if (inputMode == VoiceInputMode.PUSH_TO_MUTE && !PolyPlusConfig.voicePushToMuteKeybind.isBound) {
+                VoiceHint("Set a Push to Mute key in PolyPlus keybinds.")
+            }
         }
     }
     Section("Sound processing") {
@@ -286,6 +289,6 @@ private fun ModeControl(party: Party, width: Dp) {
 
 @Composable
 private fun InputControl(mode: VoiceInputMode, width: Dp, onSelect: (VoiceInputMode) -> Unit) {
-    val tabs = remember { listOf(TabItem(VoiceInputMode.VOICE_ACTIVITY, "Voice activity"), TabItem(VoiceInputMode.PUSH_TO_TALK, "Push to talk")) }
+    val tabs = remember { listOf(TabItem(VoiceInputMode.VOICE_ACTIVITY, "Voice activity"), TabItem(VoiceInputMode.PUSH_TO_TALK, "Push to talk"), TabItem(VoiceInputMode.PUSH_TO_MUTE, "Push to mute")) }
     TabRow(tabs, mode, onSelect, Modifier.width(width), style = TabStyle.Segmented)
 }

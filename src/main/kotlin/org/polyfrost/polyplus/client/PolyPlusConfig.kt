@@ -340,8 +340,8 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     @JvmStatic
     @Dropdown(
         title = "Input Mode",
-        description = "Send your voice when you speak, or only while you hold a key.",
-        options = ["Voice activity", "Push to talk"],
+        description = "Send your voice when you speak, only while you hold a key, or whenever you speak except while you hold a key.",
+        options = ["Voice activity", "Push to talk", "Push to mute"],
         category = "Multiplayer",
         subcategory = "Voice",
     )
@@ -355,6 +355,17 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var voicePushToTalkKeybind = OneConfigKeybind(intArrayOf(InputConstants.KEY_V), null, KeyModifiers.NONE, 0L) { state ->
         PartyVoice.onPushToTalk(state)
+        true
+    }
+
+    @Keybind(
+        title = "Push to Mute",
+        description = "Hold to mute yourself when Input Mode is Push to mute.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voicePushToMuteKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        PartyVoice.onPushToMute(state)
         true
     }
 

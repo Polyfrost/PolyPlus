@@ -58,6 +58,8 @@ object PartyVoiceSettings {
 
     fun pushToTalk(): Boolean = PolyPlusConfig.voiceInputMode == VoiceInputMode.PUSH_TO_TALK
 
+    fun pushToMute(): Boolean = PolyPlusConfig.voiceInputMode == VoiceInputMode.PUSH_TO_MUTE
+
     fun autoSensitivity(): Boolean = PolyPlusConfig.voiceAutoSensitivity && NoiseSuppressor.available
 
     fun setAutoSensitivity(enabled: Boolean) {

@@ -57,6 +57,7 @@ object PartyVoice {
     @Volatile private var deafened = false
     @Volatile private var micBlocked = false
     @Volatile private var pttHeld = false
+    @Volatile private var ptmHeld = false
     @Volatile private var rtcFailedAt = 0L
     @Volatile private var rtcSessionFailed = false
     @Volatile private var linuxRtcChecked = false
@@ -220,6 +221,10 @@ object PartyVoice {
 
     fun onPushToTalk(state: Boolean) {
         pttHeld = state
+    }
+
+    fun onPushToMute(state: Boolean) {
+        ptmHeld = state
     }
 
     fun onSettingsChanged(restartAudio: Boolean = false) {
@@ -395,7 +400,12 @@ object PartyVoice {
             voiceLevel >= PartyVoiceSettings.activityThreshold()
         }
         if (voiced) lastLoud = now
-        val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld else now - lastLoud < VAD_HANGOVER_MS
+        val recent = now - lastLoud < VAD_HANGOVER_MS
+        val gate = when (PartyVoiceSettings.inputMode()) {
+            VoiceInputMode.PUSH_TO_TALK -> pttHeld
+            VoiceInputMode.PUSH_TO_MUTE -> recent && !ptmHeld
+            VoiceInputMode.VOICE_ACTIVITY -> recent
+        }
         val allowed = !muted && !deafened && !micBlocked && !selfHardMuted
         val talk = allowed && gate
         talking = talk
