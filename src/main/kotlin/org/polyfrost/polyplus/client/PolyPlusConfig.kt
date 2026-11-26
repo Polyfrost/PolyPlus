@@ -93,6 +93,13 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic
     @Switch(
+        title = "Share Performance Stats",
+        description = "Send your in-game FPS stats, basic hardware info (CPU, GPU, RAM), video settings and installed mods to OneClient so performance regressions get caught and fixed.",
+    )
+    var performanceTelemetry = true
+
+    @JvmStatic
+    @Switch(
         title = "Problematic Mod Warnings",
         description = "Warn on startup when an installed mod is on OneClient's list of mods known to cause crashes or conflicts.",
     )

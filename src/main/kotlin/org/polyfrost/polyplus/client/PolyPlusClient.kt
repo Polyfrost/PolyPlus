@@ -35,6 +35,7 @@ import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.GenericModNames
 import org.polyfrost.polyplus.client.features.JvmAdvisor
+import org.polyfrost.polyplus.client.features.PerfTelemetry
 import org.polyfrost.polyplus.client.features.StartupTimeNotice
 import org.polyfrost.polyplus.client.features.ModpackDiff
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
@@ -201,6 +202,7 @@ object PolyPlusClient {
         /*step("lobby shaders") { LobbyPipelines.register() }*/
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
+        step("performance telemetry") { PerfTelemetry.initialize() }
         step("startup time notice") { StartupTimeNotice.register() }
         step("modpack diff") { ModpackDiff.logAsync() }
         step("bad mods") { BadMods.checkAsync() }

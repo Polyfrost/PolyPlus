@@ -130,13 +130,13 @@ object LobbySky {
     }
 
     //? if >= 26.2 {
-    private fun gpuName(): String = RenderSystem.getDevice().deviceInfo.name()
+    internal fun gpuName(): String = RenderSystem.getDevice().deviceInfo.name()
     //?} elif >= 1.21.5 {
-    /*private fun gpuName(): String = RenderSystem.getDevice().renderer
+    /*internal fun gpuName(): String = RenderSystem.getDevice().renderer
     *///?} elif > 1.8.9 {
-    /*private fun gpuName(): String = GlUtil.getRenderer()
+    /*internal fun gpuName(): String = GlUtil.getRenderer()
     *///?} else {
-    /*private fun gpuName(): String = GL11.glGetString(GL11.GL_RENDERER).orEmpty()
+    /*internal fun gpuName(): String = GL11.glGetString(GL11.GL_RENDERER).orEmpty()
     *///?}
 
     private val untinted: Boolean get() = mood.interior || mood.realm != LobbyRealm.OVERWORLD
