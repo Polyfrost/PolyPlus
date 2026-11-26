@@ -17,6 +17,8 @@ private const val BODY_REACH = 0.5f
 
 internal class SideReach(val left: Float, val right: Float) {
     val span: Float get() = left + right
+
+    fun centered(): SideReach = max(left, right).let { SideReach(it, it) }
 }
 
 private fun walkBone(bone: BedrockBoneRenderer, parent: Matrix4f, visit: (Vector3f) -> Unit) {
