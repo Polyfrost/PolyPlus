@@ -30,6 +30,7 @@ import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.featured.ServerFolders
 import org.polyfrost.polyplus.client.featured.normalizeServerAddress
 import org.polyfrost.polyplus.client.gui.AccountsPanelState
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanel
 import org.polyfrost.polyplus.client.gui.vanillamenu.VanillaListScreens
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialChatLink
 import org.polyfrost.polyplus.client.gui.lobbysocial.SocialEscape
@@ -104,7 +105,13 @@ internal class LobbyShell(private val screen: Screen, firstPage: LobbyPage) : So
     var source by mutableStateOf(choice.source)
     var editing by mutableStateOf<ServerEdit?>(null)
     var directOpen by mutableStateOf(false)
-    val customize = CustomizeState().also { it.onOpen = ::closeAccounts }
+    val customize = CustomizeState().also {
+        it.onOpen = {
+            closeAccounts()
+            LobbyPlayerMenu.closePoses()
+            LobbyElementPanel.close()
+        }
+    }
     var customizeOpen: Boolean
         get() = customize.shown
         set(value) = if (value) customize.open() else customize.close()

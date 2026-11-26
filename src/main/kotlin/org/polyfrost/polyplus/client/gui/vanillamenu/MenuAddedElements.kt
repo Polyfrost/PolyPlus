@@ -22,6 +22,7 @@ import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
+import org.polyfrost.polyplus.client.gui.screens.packs.PackFiles
 import org.polyfrost.polyplus.client.lobby.LobbyMusic
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -327,7 +328,8 @@ internal object MenuImages {
 
     fun openFolder() {
         runCatching { Files.createDirectories(MenuLayoutStore.imageDir) }
-        ClientPlatform.openUri(MenuLayoutStore.imageDir.toUri().toString())
+        // the file manager, not the browser
+        runCatching { PackFiles.openPath(MenuLayoutStore.imageDir.toAbsolutePath()) }
     }
 
     fun get(file: String): Image? {

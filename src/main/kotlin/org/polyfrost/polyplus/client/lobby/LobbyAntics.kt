@@ -137,6 +137,14 @@ object LobbyAntics {
     }
     *///?}
 
+    /** Replaces the click area with explicit screen bounds (used while the body lies flat). */
+    fun area(minX: Double, maxX: Double, minY: Double, maxY: Double) {
+        centerX = ((minX + maxX) / 2.0).toFloat()
+        halfWidth = ((maxX - minX) / 2.0).toFloat()
+        bottom = minY.toFloat()
+        top = maxY.toFloat()
+    }
+
     fun sight(avatar: LobbyAvatar, feetX: Double, feetY: Double, headX: Double, headY: Double, sideX: Double) {
         avatarId = avatar.id
         centerX = ((feetX + headX) / 2.0).toFloat()

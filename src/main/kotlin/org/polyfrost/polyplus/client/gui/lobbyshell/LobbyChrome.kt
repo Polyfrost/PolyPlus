@@ -2,11 +2,13 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import androidx.compose.runtime.LaunchedEffect
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.polyplus.client.gui.KitDangerColor
 import org.polyfrost.polyplus.client.gui.vanillamenu.EditMenuChooser
 import org.polyfrost.polyplus.client.gui.vanillamenu.EditableBlock
 import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyAddedElements
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanel
 import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanelHost
 import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyHudMenuHost
 import org.polyfrost.polyplus.client.gui.vanillamenu.MenuEditorBar
@@ -44,7 +46,6 @@ import androidx.compose.runtime.SnapshotMutationPolicy
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -193,6 +194,8 @@ private const val REVEAL_MILLIS = 700
 private const val PLAY_SLIDE_MILLIS = 240
 private const val AVATAR_HOLD_MS = 250L
 private const val DOUBLE_TAP_MS = 350L
+
+private val NAV_TAB_GAP = 4.dp
 
 private class LobbyTab(val label: String, val page: LobbyPage)
 
@@ -362,8 +365,9 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
                 val widgetRoom = stackHeight - LobbyLayout.Top - LobbyLayout.Gap - STACK_ROW_GAP - with(density) { stackRest.toDp() }
                 val widgetScope = remember(lobby, screen, stackWidth) { LobbyWidgetScope(lobby, screen, stackWidth) }
                 if (widgetRoom > 0.dp) {
-                    EditableBlock("lobby", "widgets", "Widgets") {
-                        WidgetColumn(WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope, Modifier.padding(bottom = STACK_ROW_GAP))
+                    WidgetColumn(WidgetSurface.LOBBY, stackWidth, widgetRoom, { panel(it) }, widgetScope, Modifier.padding(bottom = STACK_ROW_GAP)) { widget, place, frame ->
+                        // every widget is its own piece in the menu editor (move / scale / hide), new ones too
+                        EditableBlock("lobby", "widget." + widget.id, widget.title.ifBlank { widget.id } + " widget", place) { frame(Modifier) }
                     }
                 }
             }
@@ -396,7 +400,14 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
             }
         }
     }
-    val playAway by Motion.animateFloatAsState(if (((lobby.customizeOpen || lobby.accountsOpen) && home) || lobby.page == LobbyPage.Wardrobe || lobby.page == LobbyPage.Settings) 1f else 0f, tween(PLAY_SLIDE_MILLIS, easing = FastOutSlowInEasing))
+    val sidePanel = home && (LobbyPlayerMenu.posesOpen || LobbyElementPanel.editing != null)
+    LaunchedEffect(sidePanel) {
+        if (sidePanel) {
+            lobby.customizeOpen = false
+            lobby.closeAccounts()
+        }
+    }
+    val playAway by Motion.animateFloatAsState(if (sidePanel || ((lobby.customizeOpen || lobby.accountsOpen) && home) || lobby.page == LobbyPage.Wardrobe || lobby.page == LobbyPage.Settings) 1f else 0f, tween(PLAY_SLIDE_MILLIS, easing = FastOutSlowInEasing))
     if (playAway < 1f) {
         EditableBlock("lobby", "play", "Play", Modifier.align(Alignment.BottomEnd).padding(end = LobbyLayout.Margin, bottom = LobbyLayout.Margin)) {
             PlayUnit(
@@ -424,6 +435,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
     MenuEditorBar("lobby")
     if (home) LobbyHudMenuHost()
     LobbyElementPanelHost()
+    if (home) LobbyPosePanelHost()
     lobby.hostWorldId?.let { worldId -> HostWorldDialog(worldId, screen) { lobby.hostWorldId = null } }
     lobby.editing?.let { edit ->
         ServerEditDialog(
@@ -527,8 +539,15 @@ private fun NavbarRow(lobby: LobbyShell, screen: Screen, unread: Boolean) {
             TabItem(tab.page, tab.label, badge = navTabBadge(dot != null), modifier = modifier, badgeDescription = dot)
         }
         Box(Modifier.weight(1f).a11yRegion(A11yRegion.Nav), contentAlignment = Alignment.Center) {
-            EditableBlock("lobby", "nav.tabs", "Tabs") {
-                NavTabRow(items, visible.firstOrNull { it.activeOn(lobby.page) }?.page ?: lobby.page, lobby::show)
+            val selectedPage = visible.firstOrNull { it.activeOn(lobby.page) }?.page ?: lobby.page
+            Row(horizontalArrangement = Arrangement.spacedBy(NAV_TAB_GAP), verticalAlignment = Alignment.CenterVertically) {
+                visible.forEachIndexed { i, tab ->
+                    key(tab.page) {
+                        EditableBlock("lobby", "nav.tab." + tab.page.name.lowercase(), tab.label + " tab") {
+                            NavTabRow(listOf(items[i]), selectedPage, lobby::show)
+                        }
+                    }
+                }
             }
         }
         Box(Modifier.width(NAV_SIDE.dp), contentAlignment = Alignment.CenterEnd) {

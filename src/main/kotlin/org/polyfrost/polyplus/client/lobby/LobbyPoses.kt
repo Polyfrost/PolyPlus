@@ -5,6 +5,11 @@ import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimationParser
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.emotes.Emote
 import java.io.ByteArrayInputStream
+//? if >= 26.1 {
+import com.mojang.blaze3d.vertex.PoseStack
+import org.joml.Quaternionf
+import org.polyfrost.polyplus.client.utils.rotateBy
+//?}
 
 /**
  * Looping poses your own player can hold while standing in the lobby (picked from its right-click menu).
@@ -12,6 +17,10 @@ import java.io.ByteArrayInputStream
  */
 object LobbyPoses {
     const val NONE = "none"
+    const val LIE = "lie"
+    private const val NO_ID = Int.MIN_VALUE
+    private const val LIE_LIFT = 0.13f
+    private const val LIE_HALF_LENGTH = 0.9f
     private const val PATH = "lobby/pose_"
 
     class Pose(val id: String, val name: String, val bones: String, val length: Double = 2.0)
@@ -145,7 +154,6 @@ object LobbyPoses {
         Pose(
             "lie", "Lie down",
             """
-            "root": {"rotation": [-90, 0, 0], "position": [0, 2, 0]},
             "rightArm": {"rotation": [-170, 0, 18]},
             "leftArm": {"rotation": [-170, 0, -18]}
             """,
@@ -156,6 +164,10 @@ object LobbyPoses {
     var preview: String? = null
 
     private val built = HashMap<String, Emote?>()
+    private var lyingId = NO_ID
+
+    /** True while this entity is shown lying down (the whole model is laid flat in [lie], not just its bones). */
+    fun lying(entityId: Int): Boolean = entityId == lyingId
 
     fun current(): String = preview ?: LobbySceneStore.pose()
 
@@ -164,11 +176,13 @@ object LobbyPoses {
     private fun ours(emote: Emote?): Boolean = emote != null && emote.id.namespace == "polyplus" && emote.id.path.startsWith(PATH)
 
     fun tick(avatar: LobbyAvatar?) {
+        lyingId = NO_ID
         avatar ?: return
         val controller = (avatar as PlayerEmotesAccess).`polyplus$emoteController`()
         val playing = controller.playbackSnapshot()?.emote
         val id = current()
         val free = avatar.arrival == LobbyAvatar.Arrival.LANDED && !avatar.dismissed && !avatar.isCrouching && !LobbyGrab.handling(avatar)
+        if (id == LIE && free && (playing == null || ours(playing))) lyingId = avatar.id
         if (id == NONE || !free) {
             if (ours(playing)) controller.stop()
             return
@@ -178,13 +192,35 @@ object LobbyPoses {
         if (playing?.id != emote.id) controller.play(emote)
     }
 
-    private fun emote(id: String): Emote? = built.getOrPut(id) {
-        val pose = all.firstOrNull { it.id == id } ?: return@getOrPut null
-        val name = "animation.lobby.pose_$id"
-        val json = """{"format_version": "1.8.0", "animations": {"$name": {"loop": true, "animation_length": ${pose.length}, "bones": {${pose.bones}}}}}"""
-        runCatching {
-            val animation = ByteArrayInputStream(json.toByteArray()).use(BedrockAnimationParser::parseStream).animations.getValue(name)
-            Emote(Identifier.fromNamespaceAndPath("polyplus", PATH + id), animation)
-        }.getOrNull()
+    //? if >= 26.1 {
+    /**
+     * Lays the whole model on its back, centred on the entity so the shadow, cape, cosmetics and
+     * name tag all stay with the body. Runs before setupRotations turns the body by (180 - bodyRot),
+     * so the extra turn here is undone by that one and the tilt happens in the body's own frame.
+     */
+    @JvmStatic
+    fun lie(entityId: Int, poseStack: PoseStack, bodyRot: Float) {
+        if (entityId != lyingId) return
+        val turn = Math.toRadians(180.0 - bodyRot).toFloat()
+        poseStack.rotateBy(Quaternionf().rotationY(turn))
+        poseStack.translate(0f, LIE_LIFT, -LIE_HALF_LENGTH)
+        poseStack.rotateBy(Quaternionf().rotationX((Math.PI / 2).toFloat()))
+        poseStack.rotateBy(Quaternionf().rotationY(-turn))
+    }
+    //?}
+
+    private fun emote(id: String): Emote? {
+        if (built.containsKey(id)) return built[id]
+        val pose = all.firstOrNull { it.id == id }
+        val made = pose?.let {
+            val name = "animation.lobby.pose_$id"
+            val json = """{"format_version": "1.8.0", "animations": {"$name": {"loop": true, "animation_length": ${it.length}, "bones": {${it.bones}}}}}"""
+            runCatching {
+                val animation = ByteArrayInputStream(json.toByteArray()).use(BedrockAnimationParser::parseStream).animations.getValue(name)
+                Emote(Identifier.fromNamespaceAndPath("polyplus", PATH + id), animation)
+            }.getOrNull()
+        }
+        built[id] = made
+        return made
     }
 }

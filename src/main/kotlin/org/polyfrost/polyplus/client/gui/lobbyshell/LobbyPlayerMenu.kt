@@ -33,6 +33,8 @@ import org.polyfrost.oneconfig.api.ui.v1.components.SelectionDefaults
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyElementPanel
+import org.polyfrost.polyplus.client.gui.vanillamenu.LobbyHudMenu
 import org.polyfrost.polyplus.client.lobby.LobbyPoses
 import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import kotlin.math.roundToInt
@@ -53,6 +55,13 @@ internal object LobbyPlayerMenu {
 
     fun close() {
         at = null
+    }
+
+    /** Opens the animation panel and closes every other side panel, so only one shows at a time. */
+    fun openPoses() {
+        LobbyElementPanel.close()
+        LobbyHudMenu.close()
+        posesOpen = true
     }
 
     fun closePoses() {
@@ -114,10 +123,15 @@ internal fun BoxScope.LobbyPlayerMenuHost() {
             }
             MenuRow("Edit animation", LobbyPoses.name(LobbyPlayerMenu.pose)) {
                 LobbyPlayerMenu.close()
-                LobbyPlayerMenu.posesOpen = true
+                LobbyPlayerMenu.openPoses()
             }
         }
     }
+}
+
+/** The "Your character" panel; composed after the Play card so it draws on top of it. */
+@Composable
+internal fun LobbyPosePanelHost() {
     PosePanel()
 }
 

@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -51,6 +52,7 @@ import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigDestination
 import org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPlayerMenu
 import org.polyfrost.polyplus.client.gui.lobbyshell.MenuRow
 import org.polyfrost.polyplus.client.gui.lobbyshell.POPUP_MENU_WIDTH
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
@@ -74,6 +76,7 @@ internal object LobbyHud {
         "fps" to "FPS",
         "text" to "Text",
         "button" to "Button (mod settings, screen, server, link)",
+        "image" to "Image",
     )
 
     val icons = listOf(
@@ -94,15 +97,16 @@ internal object LobbyHud {
 
     fun label(element: MenuElement): String = kinds.firstOrNull { it.first == element.type }?.second?.substringBefore(" (") ?: element.type
 
-    private fun defaults(kind: String): Map<String, String> = when (kind) {
+    private fun defaults(kind: String): Map<String, String> = mapOf("color" to "FFFFFF", "bg" to "true") + when (kind) {
         "clock" -> mapOf("icon" to "clock", "seconds" to "false")
         "ram" -> mapOf("icon" to "package-01")
         "cpu" -> mapOf("icon" to "diamond-01")
         "fps" -> mapOf("icon" to "play-circle")
         "text" -> mapOf("text" to "Your text", "icon" to "")
         "button" -> mapOf("label" to "Mod settings", "icon" to "settings-02", "action" to "screen", "value" to "mods")
+        "image" -> mapOf("image" to "", "icon" to "", "bg" to "false", "size" to "48")
         else -> emptyMap()
-    } + mapOf("color" to "FFFFFF", "bg" to "true")
+    }
 
     /** What the element shows right now. */
     fun text(element: MenuElement): String = when (element.type) {
@@ -119,6 +123,7 @@ internal object LobbyHud {
         "fps" -> "${Minecraft.getInstance().fps} FPS"
         "text" -> element.prop("text").replace("\\n", "\n")
         "button" -> element.prop("label", "Button")
+        "image" -> ""
         else -> element.type
     }
 
@@ -165,20 +170,26 @@ internal object LobbyHud {
         if (isHud(MenuLayoutStore.element(SCOPE, id))) LobbyElementPanel.open(id)
     }
 
-    /** Every mod with a OneConfig config, id to name. */
+    /** Every mod with settings: OneConfig configs and mods with a Mod Menu config screen (Sodium, ...), id to name. */
     fun mods(): List<Pair<String, String>> {
         val trees = runCatching { ConfigManager.active().trees().toList() }.getOrDefault(emptyList())
-        return trees.mapNotNull { tree ->
+        val oneConfig = trees.mapNotNull { tree ->
             val id = tree.id ?: return@mapNotNull null
             val title = tree.title?.toString()?.takeIf { it.isNotBlank() } ?: id.removeSuffix(".json")
             id to title
-        }.distinctBy { it.first }.sortedBy { it.second.lowercase() }
+        }
+        val titles = oneConfig.map { it.second.lowercase() }.toSet()
+        val modMenu = ModConfigScreens.mods().filter { it.second.lowercase() !in titles }.map { (id, name) -> ModConfigScreens.PREFIX + id to name }
+        return (oneConfig + modMenu).distinctBy { it.first }.sortedBy { it.second.lowercase() }
     }
 
     fun click(element: MenuElement, screen: Screen) {
         if (element.prop("action") == "mod") {
             val id = element.prop("value").trim()
-            if (id.isNotEmpty()) runCatching { OneConfigUI.open(OneConfigDestination.ModConfig(OneConfigPages.modConfig(id))) }
+            when {
+                id.startsWith(ModConfigScreens.PREFIX) -> ModConfigScreens.open(id.removePrefix(ModConfigScreens.PREFIX), screen)
+                id.isNotEmpty() -> runCatching { OneConfigUI.open(OneConfigDestination.ModConfig(OneConfigPages.modConfig(id))) }
+            }
         } else {
             CustomAction.run(element, screen)
         }
@@ -195,6 +206,7 @@ internal object LobbyHudMenu {
     var at by mutableStateOf(Offset.Zero)
 
     fun open(id: String, at: Offset) {
+        LobbyPlayerMenu.close()
         this.id = id
         this.at = at
     }
@@ -279,21 +291,22 @@ internal fun BoxScope.LobbyAddedElements(screen: Screen) {
         if (!LobbyHud.isHud(element)) continue
         key(element.id) {
             EditableBlock(LobbyHud.SCOPE, element.id, LobbyHud.label(element), Modifier.align(Alignment.Center)) {
-                tick.let { LobbyHudPill(element, editing, screen) }
+                LobbyHudPill(element, editing, screen, MenuLayoutStore.revision.intValue, tick)
             }
         }
     }
 }
 
 @Composable
-private fun LobbyHudPill(element: MenuElement, editing: Boolean, screen: Screen) {
+@Suppress("UNUSED_PARAMETER") // rev and tick only make it redraw: the element is changed in place
+private fun LobbyHudPill(element: MenuElement, editing: Boolean, screen: Screen, rev: Int, tick: Int) {
     val color = LobbyHud.color(element.prop("color", "FFFFFF"))
     val icon = element.prop("icon")
     val size = (element.prop("size", "14").toFloatOrNull() ?: 14f).coerceIn(6f, 64f)
     val image = element.prop("image").takeIf { it.isNotEmpty() }?.let { LobbyImages.get(it) }
     val shape = RoundedCornerShape(8.dp)
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    var modifier: Modifier = Modifier.onGloballyPositioned { coords = it }
+    var modifier: Modifier = Modifier.alpha(element.opacity.coerceIn(0.05f, 1f)).onGloballyPositioned { coords = it }
     if (element.prop("bg", "true") == "true") modifier = modifier.background(Color(0xB0101216), shape)
     if (element.type == "button" && !editing) modifier = modifier.clickable { LobbyHud.click(element, screen) }
     if (!editing) modifier = modifier.pointerInput(element.id) {
@@ -319,6 +332,8 @@ private fun LobbyHudPill(element: MenuElement, editing: Boolean, screen: Screen)
             Image(image, null, Modifier.height(height).width(height * (image.width.toFloat() / image.height.coerceAtLeast(1))))
         }
         if (icon.isNotEmpty() && icon in LobbyHud.icons) LobbyIcon(icon, color, (size * 1.15f).dp)
+        // an image element without a picture yet: a placeholder so it can be found and edited
+        if (element.type == "image" && image == null) LobbyIcon("image-01", color.copy(alpha = 0.6f), (size * 1.15f).dp)
         val text = LobbyHud.text(element)
         if (text.isNotEmpty()) {
             val shadow = if (element.prop("shadow") == "true") Shadow(Color.Black.copy(alpha = 0.6f), Offset(1f, 1f), 2f) else null

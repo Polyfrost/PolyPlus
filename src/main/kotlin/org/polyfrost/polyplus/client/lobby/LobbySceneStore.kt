@@ -39,6 +39,13 @@ data class LobbySceneView(
     val panZ: Double = 0.0,
 )
 
+/** One camera angle you saved earlier for a scene, with when you saved it (epoch millis). */
+@Serializable
+data class LobbySceneViewSave(
+    val view: LobbySceneView = LobbySceneView(),
+    val at: Long = 0L,
+)
+
 /** Where you put your own player in one scene (feet position and facing). */
 @Serializable
 data class LobbySceneSpot(
@@ -111,6 +118,7 @@ object LobbySceneStore {
         val lastWorld: String? = null,
         val serverScenes: Map<String, String> = emptyMap(),
         val views: Map<String, LobbySceneView> = emptyMap(),
+        val viewHistory: Map<String, List<LobbySceneViewSave>> = emptyMap(),
         val spots: Map<String, LobbySceneSpot> = emptyMap(),
         val hideName: Boolean = false,
         val pose: String = "none",
@@ -124,6 +132,7 @@ object LobbySceneStore {
     /*private const val BUNDLED_ROOT = "/assets/polyplus/lobby/scenes_legacy/"
     *///?}
     private const val MAX_PER_WORLD = 4
+    private const val MAX_VIEW_HISTORY = 10
     // room for the bigger 3D lobby scenes (Scene Size)
     private const val MAX_TOTAL_BYTES = 64L * 1024L * 1024L
     private const val SAME_SPOT_BLOCKS = 48.0
@@ -262,6 +271,26 @@ object LobbySceneStore {
         ensureLoaded()
         if (state.views[id] == view) return
         update { copy(views = if (view == null) views - id else views + (id to view)) }
+    }
+
+    /** The angles you saved for this scene, newest first. */
+    fun viewHistory(id: String?): List<LobbySceneViewSave> {
+        ensureLoaded()
+        return id?.let { state.viewHistory[it] }.orEmpty()
+    }
+
+    /** Saves [view] as this scene's angle and keeps it in the scene's angle history. */
+    fun saveView(id: String, view: LobbySceneView) {
+        ensureLoaded()
+        val past = state.viewHistory[id].orEmpty().filterNot { it.view == view }
+        val history = (listOf(LobbySceneViewSave(view, System.currentTimeMillis())) + past).take(MAX_VIEW_HISTORY)
+        update { copy(views = views + (id to view), viewHistory = viewHistory + (id to history)) }
+    }
+
+    fun forgetViewSave(id: String, save: LobbySceneViewSave) {
+        ensureLoaded()
+        val history = state.viewHistory[id].orEmpty() - save
+        update { copy(viewHistory = if (history.isEmpty()) viewHistory - id else viewHistory + (id to history)) }
     }
 
     /** Where you placed your own player in this scene, or null for the scene's own spot. */

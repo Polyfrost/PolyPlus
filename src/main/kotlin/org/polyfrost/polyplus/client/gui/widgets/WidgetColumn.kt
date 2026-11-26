@@ -324,6 +324,7 @@ fun WidgetColumn(
     glass: @Composable Modifier.(Dp) -> Modifier,
     scope: WidgetScope,
     modifier: Modifier = Modifier,
+    itemWrapper: (@Composable (widget: ShellWidget, layoutModifier: Modifier, content: @Composable (Modifier) -> Unit) -> Unit)? = null,
 ) {
     val widgets = rememberShellWidgets(surface)
     if (widgets.isEmpty()) return
@@ -339,18 +340,20 @@ fun WidgetColumn(
     ) {
         widgets.forEach { widget ->
             key(widget.id) {
-                WidgetFrame(
-                    widget,
-                    glass,
-                    Modifier
-                        .layoutId(widget.id)
-                        .lift(list, widget.id, FRAME_RADIUS)
-                        .shellWidgetGuard(widget.id)
-                        .dragSource(list, widget.id)
-                        .contextMenu(entries = { widgetMenu(surface, widget.id, list.shown.filter { it in byId }, scope) }),
-                ) {
-                    ShellWidgetGuarded(widget.id) { widget.Content(scope) }
+                val frame: @Composable (Modifier) -> Unit = { outer ->
+                    WidgetFrame(
+                        widget,
+                        glass,
+                        outer
+                            .lift(list, widget.id, FRAME_RADIUS)
+                            .shellWidgetGuard(widget.id)
+                            .dragSource(list, widget.id)
+                            .contextMenu(entries = { widgetMenu(surface, widget.id, list.shown.filter { it in byId }, scope) }),
+                    ) {
+                        ShellWidgetGuarded(widget.id) { widget.Content(scope) }
+                    }
                 }
+                if (itemWrapper == null) frame(Modifier.layoutId(widget.id)) else itemWrapper(widget, Modifier.layoutId(widget.id), frame)
             }
         }
     }

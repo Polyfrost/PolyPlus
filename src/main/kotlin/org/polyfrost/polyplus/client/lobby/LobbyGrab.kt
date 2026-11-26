@@ -127,6 +127,14 @@ object LobbyGrab {
 
     private fun ready(): Boolean = LobbyScene.showing() && LobbyScene.revealStarted() && !LobbyScene.introPlaying()
 
+    /** Replaces the click area with explicit screen bounds (used while the body lies flat). */
+    fun area(minX: Double, maxX: Double, minY: Double, maxY: Double) {
+        centerX = ((minX + maxX) / 2.0)
+        halfWidth = ((maxX - minX) / 2.0)
+        bottom = minY
+        top = maxY
+    }
+
     fun sight(avatar: LobbyAvatar, feetX: Double, feetY: Double, headX: Double, headY: Double, sideX: Double, camera: Vec3, yaw: Float) {
         seen = avatar
         visible = true

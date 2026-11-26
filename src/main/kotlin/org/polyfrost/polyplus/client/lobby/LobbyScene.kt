@@ -169,6 +169,8 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
 //? if < 26.3 && > 1.8.9
 /*import kotlin.math.roundToLong*/
 import kotlin.math.sin
@@ -275,6 +277,10 @@ object LobbyScene {
     private const val CAMERA_FOV = LobbyStage.CAMERA_FOV.toFloat()
     private const val FIRST_AVATAR_ID = 0x504C415A
     private const val HEAD_LABEL_OFFSET = 0.42
+    private const val LYING_LABEL_HEIGHT = 0.85
+    private const val LYING_HALF_LENGTH = 0.95
+    private val LYING_ENDS = doubleArrayOf(-1.0, 1.0)
+    private val LYING_HEIGHTS = doubleArrayOf(0.0, 0.45)
     private const val SWAY_YAW_DEGREES = 1.4
     private const val SWAY_PITCH_DEGREES = 0.4
     private const val HEAD_TURN_RANGE = 30f
@@ -2249,6 +2255,30 @@ object LobbyScene {
         projector.project(feet.x + right.x * LobbyAntics.HALF_WIDTH, feet.y + middle, feet.z + right.z * LobbyAntics.HALF_WIDTH)
         if (avatar.arrival == LobbyAvatar.Arrival.LANDED && !LobbyGrab.handling(avatar)) LobbyAntics.sight(avatar, feetX, feetY, headX, headY, projector.x)
         LobbyGrab.sight(avatar, feetX, feetY, headX, headY, projector.x, eye, yaw)
+        if (LobbyPoses.lying(avatar.id)) sightLying(avatar)
+    }
+
+    /** Lying down the body is a flat box along the facing line, so click/drag use its screen bounds. */
+    private fun sightLying(avatar: LobbyAvatar) {
+        val feet = avatar.position()
+        val bodyRad = Math.toRadians(avatar.yBodyRot.toDouble())
+        val alongX = -sin(bodyRad) * LYING_HALF_LENGTH
+        val alongZ = cos(bodyRad) * LYING_HALF_LENGTH
+        val sideX = cos(bodyRad) * LobbyAntics.HALF_WIDTH
+        val sideZ = sin(bodyRad) * LobbyAntics.HALF_WIDTH
+        var minX = Double.MAX_VALUE
+        var maxX = -Double.MAX_VALUE
+        var minY = Double.MAX_VALUE
+        var maxY = -Double.MAX_VALUE
+        for (end in LYING_ENDS) for (side in LYING_ENDS) for (height in LYING_HEIGHTS) {
+            projector.project(feet.x + alongX * end + sideX * side, feet.y + height, feet.z + alongZ * end + sideZ * side)
+            minX = min(minX, projector.x)
+            maxX = max(maxX, projector.x)
+            minY = min(minY, projector.y)
+            maxY = max(maxY, projector.y)
+        }
+        if (avatar.arrival == LobbyAvatar.Arrival.LANDED && !LobbyGrab.handling(avatar)) LobbyAntics.area(minX, maxX, minY, maxY)
+        LobbyGrab.area(minX, maxX, minY, maxY)
     }
 
     private fun sectionsSettled(mc: Minecraft): Boolean = LobbyCompat.sectionsDone(mc)
@@ -2271,7 +2301,8 @@ object LobbyScene {
             val sight = (if (driven == null) scene.sight[avatar] else null) ?: survey(scene, eye, avatar)
             if (!sight.clear) continue
             val feet = avatar.position()
-            projector.project(feet.x, feet.y + (avatar.bbHeight + HEAD_LABEL_OFFSET), feet.z)
+            val labelHeight = if (LobbyPoses.lying(avatar.id)) LYING_LABEL_HEIGHT else avatar.bbHeight + HEAD_LABEL_OFFSET
+            projector.project(feet.x, feet.y + labelHeight, feet.z)
             val screenX = projector.x.toFloat()
             val screenY = projector.y.toFloat()
             if (avatar.isLocal && driven == null) sightAvatar(avatar, right, eye, scene.rig.yRot)

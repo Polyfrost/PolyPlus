@@ -48,6 +48,7 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.Outfit
 import org.polyfrost.polyplus.client.gui.lobbyshell.DockedPanel
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPlayerMenu
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelHint
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelPageColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelSection
@@ -78,6 +79,8 @@ internal object LobbyElementPanel {
     val swatches = listOf("FFFFFF", "BFC6D1", "FFD54A", "FF8A3D", "FF4D5E", "FF6FD8", "B07CFF", "5AA9FF", "3DDC97", "1E1E1E")
 
     fun open(id: String) {
+        LobbyPlayerMenu.closePoses()
+        LobbyPlayerMenu.close()
         lastChange = null
         editing = id
     }
@@ -152,6 +155,7 @@ internal fun BoxScope.LobbyElementPanelHost() {
 
 @Composable
 private fun ElementPage(element: MenuElement) {
+    MenuLayoutStore.revision.intValue // the element is changed in place: redraw on every change
     val id = element.id
     PanelPageColumn {
         when (element.type) {
@@ -165,6 +169,20 @@ private fun ElementPage(element: MenuElement) {
                 }
                 ButtonAction(element)
             }
+            "image" -> PanelSection(null, divider = false) {
+                PanelHint("Pick a picture below. Size sets how big it is.")
+                val size = element.prop("size", "48").toFloatOrNull() ?: 48f
+                PanelSlider(
+                    "Picture size",
+                    size,
+                    { v -> LobbyElementPanel.change(id, "size", persist = false) { it.props["size"] = v.roundToInt().toString() } },
+                    LobbyElementPanel::settle,
+                    range = 8f..64f,
+                    step = 1f,
+                    valueText = { "${it.roundToInt()}" },
+                )
+                PanelToggle("Background", element.prop("bg", "true") == "true", { LobbyElementPanel.set(id, "bg", it.toString()) })
+            }
             "clock" -> PanelSection(null, divider = false) {
                 PanelToggle("Show seconds", element.prop("seconds") == "true", { LobbyElementPanel.set(id, "seconds", it.toString()) })
             }
@@ -172,8 +190,10 @@ private fun ElementPage(element: MenuElement) {
                 PanelHint("Shows ${LobbyHud.label(element)} live. Style it below.")
             }
         }
-        TextStyleSection(element)
-        IconSection(element)
+        if (element.type != "image") {
+            TextStyleSection(element)
+            IconSection(element)
+        }
         ImageSection(element)
         LayoutSection(element)
         PanelSection(null) {
@@ -205,6 +225,7 @@ private fun PropField(id: String, key: String, value: String, placeholder: Strin
 
 @Composable
 private fun ButtonAction(element: MenuElement) {
+    MenuLayoutStore.revision.intValue // the element is changed in place: redraw on every change
     val id = element.id
     val action = element.prop("action", "screen")
     PanelSection("When clicked") {
@@ -265,6 +286,7 @@ private fun ChoiceRow(label: String, on: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun TextStyleSection(element: MenuElement) {
+    MenuLayoutStore.revision.intValue // the element is changed in place: redraw on every change
     val id = element.id
     val current = element.prop("color", "FFFFFF").uppercase()
     PanelSection("Text style") {
@@ -319,6 +341,7 @@ private fun TextStyleSection(element: MenuElement) {
 
 @Composable
 private fun IconSection(element: MenuElement) {
+    MenuLayoutStore.revision.intValue // the element is changed in place: redraw on every change
     val id = element.id
     val current = element.prop("icon")
     val theme = OneConfigTheme.current
@@ -349,11 +372,12 @@ private fun IconSection(element: MenuElement) {
 
 @Composable
 private fun ImageSection(element: MenuElement) {
+    MenuLayoutStore.revision.intValue // the element is changed in place: redraw on every change
     val id = element.id
     val current = element.prop("image")
     val files = remember(MenuLayoutStore.revision.intValue) { MenuImages.files() }
     PanelSection("Picture") {
-        PanelHint("Put .png or .jpg files in the menu-images folder, then pick one. It shows next to the text.")
+        PanelHint(if (element.type == "image") "Put .png or .jpg files in the menu-images folder, then pick one." else "Put .png or .jpg files in the menu-images folder, then pick one. It shows next to the text.")
         Column(Modifier.fillMaxWidth().card(11.dp).padding(3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             ChoiceRow("No picture", current.isEmpty()) { LobbyElementPanel.set(id, "image", "") }
             files.forEach { file ->
@@ -390,6 +414,7 @@ private fun ImageSection(element: MenuElement) {
 
 @Composable
 private fun LayoutSection(element: MenuElement) {
+    MenuLayoutStore.revision.intValue // the element is changed in place: redraw on every change
     val id = element.id
     PanelSection("Layout") {
         PanelSlider(

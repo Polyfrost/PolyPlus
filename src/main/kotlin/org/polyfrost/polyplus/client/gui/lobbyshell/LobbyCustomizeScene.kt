@@ -27,20 +27,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
+import org.polyfrost.oneconfig.api.notifications.v1.Notifications
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11yRole
 import org.polyfrost.oneconfig.api.ui.v1.components.Select
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
+import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.PolyPlusRecentServers
 import org.polyfrost.polyplus.client.gui.SocialHoverBorder
@@ -52,6 +55,9 @@ import org.polyfrost.polyplus.client.lobby.LobbySceneStore
 import org.polyfrost.polyplus.client.lobby.SceneMode
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private const val TILE_COLUMNS = 3
 private const val OWN_LIMIT = 6
@@ -121,22 +127,53 @@ internal fun SceneSection(lobby: LobbyShell, state: CustomizeState) {
 private fun ViewRows() {
     val current = LobbyScene.currentId ?: return
     var saved by remember(current) { mutableStateOf(LobbySceneStore.view(current) != null) }
+    var history by remember(current) { mutableStateOf(LobbySceneStore.viewHistory(current)) }
+    var expanded by remember(current) { mutableStateOf(false) }
     SceneGroupLabel("Camera angle")
-    DrillRow(
-        "video-recorder",
-        if (saved) "Update saved angle" else "Save this angle",
-        if (saved) "Saved" else null,
-        {
-            LobbySceneStore.setView(current, LobbyLook.current())
+    SaveAngleRow(
+        saved = saved,
+        expanded = expanded,
+        hasHistory = history.isNotEmpty(),
+        onSave = {
+            val updating = saved
+            LobbySceneStore.saveView(current, LobbyLook.current())
             saved = true
+            history = LobbySceneStore.viewHistory(current)
+            toast(if (updating) "Updated saved camera angle" else "Saved camera angle")
         },
+        onToggle = { expanded = !expanded },
     )
+    if (expanded && history.isNotEmpty()) {
+        val active = LobbySceneStore.view(current)
+        Column(Modifier.fillMaxWidth().padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            history.forEachIndexed { i, save ->
+                key(save.at, i) {
+                    AngleHistoryRow(
+                        label = if (i == 0) "Latest angle" else "Angle ${history.size - i}",
+                        time = angleTime(save.at),
+                        active = save.view == active,
+                        onUse = {
+                            LobbySceneStore.setView(current, save.view)
+                            saved = true
+                            LobbyLook.reset()
+                            toast("Camera angle restored")
+                        },
+                        onForget = {
+                            LobbySceneStore.forgetViewSave(current, save)
+                            history = LobbySceneStore.viewHistory(current)
+                        },
+                    )
+                }
+            }
+        }
+    }
     if (saved) {
         ResetRow(
             {
                 LobbySceneStore.setView(current, null)
                 saved = false
                 LobbyLook.reset()
+                toast("Back to the scene's own angle")
             },
             label = "Use the scene's own angle",
         )
@@ -150,6 +187,77 @@ private fun ViewRows() {
             },
             label = "Put your player back on the scene's spot",
         )
+    }
+}
+
+/** A OneConfig notification, so it follows the client's theme and font like the rest of PolyPlus. */
+private fun toast(text: String) {
+    runCatching { Notifications.info("PolyPlus", text) }
+}
+
+private val ANGLE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+private fun angleTime(at: Long): String {
+    if (at <= 0L) return ""
+    val time = ANGLE_TIME.format(Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()))
+    return listOfNotNull(shortAge(at), time).joinToString(" ")
+}
+
+@Composable
+private fun SaveAngleRow(saved: Boolean, expanded: Boolean, hasHistory: Boolean, onSave: () -> Unit, onToggle: () -> Unit) {
+    val theme = OneConfigTheme.current
+    val shape = OneConfigTheme.shape(CustomizeKit.RowRadius)
+    val label = if (saved) "Update saved angle" else "Save this angle"
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(CustomizeKit.RowHeight)
+            .selectableRow(false, onSave, label, shape, role = A11yRole.Button)
+            .padding(start = 10.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        LobbyIcon("video-recorder", theme.textColorSecondary, 18.dp)
+        Text(label, Modifier.weight(1f), color = theme.textColor, style = theme.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        if (hasHistory) {
+            // the little arrow next to "Saved": shows the angles you saved before
+            Row(
+                Modifier
+                    .clip(shape)
+                    .oneConfigClickable(if (expanded) "Hide saved angles" else "Show saved angles", onToggle, shape = shape)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(if (saved) "Saved" else "History", color = theme.textColorSecondary, style = theme.typography.small, maxLines = 1, softWrap = false)
+                LobbyIcon("chevron-up", theme.textColorSecondary, 14.dp, Modifier.rotate(if (expanded) 0f else 180f))
+            }
+        } else {
+            LobbyIcon("chevron-right", theme.textColorSecondary, 16.dp, Modifier.padding(end = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun AngleHistoryRow(label: String, time: String, active: Boolean, onUse: () -> Unit, onForget: () -> Unit) {
+    val theme = OneConfigTheme.current
+    val shape = OneConfigTheme.shape(CustomizeKit.RowRadius)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(CustomizeKit.RowHeight - 8.dp)
+            .selectableRow(active, onUse, "$label, $time", shape, role = A11yRole.Button)
+            .padding(start = 10.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LobbyIcon(if (active) "check" else "video-recorder", if (active) theme.textColor else theme.textColorSecondary, 14.dp)
+        Text(label, Modifier.weight(1f), color = theme.textColor, style = theme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(time, color = theme.textColorSecondary, style = theme.typography.small, maxLines = 1, softWrap = false)
+        Box(
+            Modifier.clip(shape).oneConfigClickable("Forget this angle", onForget, shape = shape).padding(4.dp),
+            contentAlignment = Alignment.Center,
+        ) { LobbyIcon("x-close", theme.textColorSecondary, 12.dp) }
     }
 }
 

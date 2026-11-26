@@ -40,6 +40,10 @@ import org.polyfrost.polyplus.compat.NotEnoughAnimationsCompat;
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer;
 //?}
 
+//? if >= 26.1 {
+import org.polyfrost.polyplus.client.lobby.LobbyPoses;
+//?}
+
 //? if < 1.21.11 {
 /*import net.minecraft.client.model.PlayerModel;
 *///?}
@@ -141,6 +145,9 @@ public class MixinAvatarRenderer {
     private void polyplus$leanHerobrine(AvatarRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
         LobbyHerobrine.lean(state.id, poseStack);
         LobbyAntics.spin(state.id, poseStack);
+        //? if >= 26.1 {
+        LobbyPoses.lie(state.id, poseStack, bodyRot);
+        //?}
     }
     //?} elif >= 1.21.4 {
     /*@Inject(
