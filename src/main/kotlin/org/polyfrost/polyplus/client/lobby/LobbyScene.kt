@@ -2347,6 +2347,7 @@ object LobbyScene {
     private fun watchLoading() {
         if ((phase != Phase.LOADING && !switching) || embedded || ++loadingTicks < STALL_TICKS) return
         LOBBY_LOGGER.error("Lobby scene did not load within {} ticks, trying the next one", STALL_TICKS)
+        lastSceneError = IllegalStateException("Scene did not load within $STALL_TICKS ticks")
         loadGeneration++
         tryNext()
     }
