@@ -3,7 +3,6 @@ package org.polyfrost.polyplus.client.party
 import gg.sona.eos.EosPlatform
 import gg.sona.eos.EosResult
 import gg.sona.eos.common.ProductUserId
-import gg.sona.eos.rtc.EosRtcAudioInputStatus
 import gg.sona.eos.rtc.EosRtcAudioStatus
 import gg.sona.eos.rtc.EosRtcParticipantStatus
 import org.apache.logging.log4j.LogManager
@@ -30,7 +29,7 @@ internal object RtcVoice {
     private const val VOLUME_STEP = 2f
     private const val VOLUME_INTERVAL_MS = 100L
     private const val UNCHANGED = 50f
-    private const val NOT_SENT = -1f
+    private const val CHUNK_SAMPLES = PartyAudio.SAMPLE_RATE / 100
     private const val DATA_CHANNEL_FLAG = 0x04
 
     sealed interface Outcome {
@@ -52,7 +51,6 @@ internal object RtcVoice {
     @Volatile private var hooks: Hooks? = null
     @Volatile private var transmit = true
     @Volatile private var deafened = false
-    @Volatile private var sentInputVolume = NOT_SENT
     @Volatile private var dataChannel = false
 
     private val speaking = ConcurrentHashMap.newKeySet<String>()
@@ -112,7 +110,7 @@ internal object RtcVoice {
             if (hooks !== owned) error("party voice stopped before joining")
             val user = ProductUserId.fromString(local.raw)
             install(platform, user, token.roomName, disconnected, owned)
-            platform.rtc.joinRoom(user, token.roomName, token.clientBaseUrl, token.participantToken, flags = flags)
+            platform.rtc.joinRoom(user, token.roomName, token.clientBaseUrl, token.participantToken, flags = flags, manualAudioInput = true)
         }.result
         val result = runSuspendCatching {
             var outcome = attempt(DATA_CHANNEL_FLAG)
@@ -141,7 +139,6 @@ internal object RtcVoice {
         LOGGER.info("Joined party voice room {}", token.roomName)
         volumes.clear()
         receiving.clear()
-        sentInputVolume = NOT_SENT
         applySending()
         applyDeafen()
         if (dataChannel) onRoom { platform, user, room -> platform.rtc.data.updateSending(user, room, true) }
@@ -184,10 +181,6 @@ internal object RtcVoice {
             if (info.speaking && info.audioStatus == EosRtcAudioStatus.Enabled) speaking.add(id) else speaking.remove(id)
         }
         handles += { it.rtc.audio.removeNotifyParticipantUpdated(onUpdate) }
-        val onInput = rtc.audio.addNotifyAudioInputState(user, room) { info ->
-            if (info.status == EosRtcAudioInputStatus.Failed) PartyVoice.onCaptureFailed()
-        }
-        handles += { it.rtc.audio.removeNotifyAudioInputState(onInput) }
         val onData = rtc.data.addNotifyDataReceived(user, room) { info ->
             val sender = info.sender.toStringValue()
             if (sender in present) VoicePackets.route(sender, info.data, VoiceTransport.Rtc)
@@ -249,6 +242,23 @@ internal object RtcVoice {
         onRoom { platform, user, room -> platform.rtc.audio.updateSending(user, room, status) }
     }
 
+    fun send(frame: ShortArray) {
+        if (!joined || !transmit) return
+        val chunks = (0 until frame.size / CHUNK_SAMPLES).map { index ->
+            frame.copyOfRange(index * CHUNK_SAMPLES, (index + 1) * CHUNK_SAMPLES)
+        }
+        onRoom { platform, user, room ->
+            for (chunk in chunks) {
+                val result = platform.rtc.audio.sendAudio(user, room, chunk, PartyAudio.SAMPLE_RATE, 1)
+                if (result != EosResult.Success) {
+                    LOGGER.debug("EOS refused a voice buffer: {}", result)
+                    break
+                }
+            }
+            null
+        }
+    }
+
     fun sendData(packet: ByteArray) {
         if (!joined || !dataChannel) return
         onRoom { platform, user, room ->
@@ -267,17 +277,6 @@ internal object RtcVoice {
     private fun applyDeafen() {
         val volume = if (deafened) 0f else UNCHANGED
         onRoom { platform, user, room -> platform.rtc.audio.updateReceivingVolume(user, room, volume) }
-    }
-
-    fun setInputGain(gain: Float) {
-        val volume = (UNCHANGED * gain).coerceIn(0f, 100f)
-        if (!joined || volume == sentInputVolume) return
-        sentInputVolume = volume
-        onRoom { platform, user, room ->
-            platform.rtc.audio.updateSendingVolume(user, room, volume).whenComplete { result, error ->
-                if (result != EosResult.Success) LOGGER.warn("EOS refused the microphone volume: {}", result, error)
-            }
-        }
     }
 
     fun apply(mix: Map<String, PeerMix>, outputGain: Float) {
@@ -324,25 +323,19 @@ internal object RtcVoice {
         }.onFailure { LOGGER.warn("Could not list EOS voice devices", it) }.getOrNull()
     }
 
-    suspend fun applyDevices(input: String, output: String) {
+    suspend fun applyOutputDevice(output: String) {
         val bridge = bridge ?: P2PSessionManager.activeBridge ?: return
         if (!bridge.rtcEnabled) return
         val local = bridge.localUser ?: return
         runSuspendCatching {
-            bridge.callOnTick("EOS::RTCAudio::QueryInputDevicesInformation") { it.rtc.audio.queryInputDevicesInformation() }
             bridge.callOnTick("EOS::RTCAudio::QueryOutputDevicesInformation") { it.rtc.audio.queryOutputDevicesInformation() }
-            bridge.callOnTick("EOS::RTCAudio::SetDevices") { platform ->
+            bridge.callOnTick("EOS::RTCAudio::SetOutputDevice") { platform ->
                 val audio = platform.rtc.audio
                 val user = ProductUserId.fromString(local.raw)
-                val inputId = (0 until audio.getInputDevicesCount()).mapNotNull(audio::copyInputDeviceInformationByIndex)
-                    .firstOrNull { PartyAudio.deviceLabel(it.deviceName) == PartyAudio.deviceLabel(input) }?.deviceId
                 val outputId = (0 until audio.getOutputDevicesCount()).mapNotNull(audio::copyOutputDeviceInformationByIndex)
                     .firstOrNull { PartyAudio.deviceLabel(it.deviceName) == PartyAudio.deviceLabel(output) }?.deviceId
                 audio.setOutputDeviceSettings(user, outputId)
-                audio.setInputDeviceSettings(user, inputId)
             }
-            sentInputVolume = NOT_SENT
-            setInputGain(PartyVoiceSettings.inputGain())
-        }.onFailure { LOGGER.warn("Could not apply party voice devices", it) }
+        }.onFailure { LOGGER.warn("Could not apply the party voice speaker", it) }
     }
 }

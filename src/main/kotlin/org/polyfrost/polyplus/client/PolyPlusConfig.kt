@@ -359,6 +359,15 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     }
 
     @JvmStatic
+    @Switch(
+        title = "Automatic Sensitivity",
+        description = "Let noise suppression tell your voice apart from other sounds instead of using a fixed threshold.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceAutoSensitivity = true
+
+    @JvmStatic
     @Slider(
         title = "Voice Activity Threshold",
         description = "How loud you need to be before your voice is sent.",
@@ -434,6 +443,27 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     var voiceHideIp = true
 
     @JvmStatic
+    @Switch(
+        title = "Noise Suppression",
+        description = "Filter out fans, typing and other background noise before your party hears you.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceNoiseSuppression = true
+
+    @JvmStatic
+    @Slider(
+        title = "Noise Suppression Strength",
+        description = "How much background noise to remove, in percent. Lower it if your voice sounds robotic.",
+        min = 0f,
+        max = 100f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceNoiseStrength = 100f
+
+    @JvmStatic
     @Slider(
         title = "Soundboard Volume",
         description = "How loud your soundboard sounds are for your party, in percent.",
@@ -496,6 +526,9 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
 
     @JvmStatic @Include
     var voiceSoundFavorites = ""
+
+    @JvmStatic @Include
+    var voiceSensitivityMigrated = false
 
     @JvmStatic @Include
     var voiceSoundMemberVolumes = ""

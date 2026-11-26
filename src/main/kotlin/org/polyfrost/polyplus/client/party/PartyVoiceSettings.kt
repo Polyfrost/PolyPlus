@@ -5,10 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.polyfrost.polyplus.client.PolyPlusConfig
 import org.polyfrost.polyplus.client.network.eos.EosNativeSupport
+import kotlin.math.log10
 
 object PartyVoiceSettings {
     private const val DEFAULT_VOLUME = 1f
     private const val MAX_VOLUME = 2f
+    private const val MIN_DB = -70f
+    private const val DB_PER_STEP = 0.6f
 
     var memberVolumes by mutableStateOf(parseVolumes(PolyPlusConfig.voiceMemberVolumes))
         private set
@@ -36,7 +39,6 @@ object PartyVoiceSettings {
 
     fun setInputVolume(percent: Float) {
         PolyPlusConfig.voiceInputVolume = percent
-        RtcVoice.setInputGain(inputGain())
     }
 
     fun setOutputVolume(percent: Float) {
@@ -55,6 +57,19 @@ object PartyVoiceSettings {
     fun proximityRange(): Float = PolyPlusConfig.voiceProximityRange.coerceIn(16f, 128f)
 
     fun pushToTalk(): Boolean = PolyPlusConfig.voiceInputMode == VoiceInputMode.PUSH_TO_TALK
+
+    fun autoSensitivity(): Boolean = PolyPlusConfig.voiceAutoSensitivity && NoiseSuppressor.available
+
+    fun setAutoSensitivity(enabled: Boolean) {
+        PolyPlusConfig.voiceAutoSensitivity = enabled
+        PolyPlusConfig.save()
+    }
+
+    fun noiseStrength(): Float = PolyPlusConfig.voiceNoiseStrength.coerceIn(0f, 100f)
+
+    fun setNoiseStrength(percent: Float) {
+        PolyPlusConfig.voiceNoiseStrength = percent.coerceIn(0f, 100f)
+    }
 
     fun soundboardOthers(): Float = PolyPlusConfig.voiceSoundboardOthers
 
@@ -82,8 +97,27 @@ object PartyVoiceSettings {
     }
 
     fun activityThreshold(): Float {
-        val db = -70f + PolyPlusConfig.voiceActivityThreshold.coerceIn(0f, 100f) * 0.6f
+        val db = MIN_DB + PolyPlusConfig.voiceActivityThreshold.coerceIn(0f, 100f) * DB_PER_STEP
         return Math.pow(10.0, db / 20.0).toFloat()
+    }
+
+    fun sensitivity(): Float = PolyPlusConfig.voiceActivityThreshold
+
+    fun setSensitivity(value: Float) {
+        PolyPlusConfig.voiceActivityThreshold = value.coerceIn(0f, 100f)
+    }
+
+    fun levelPosition(level: Float): Float {
+        if (level <= 0f) return 0f
+        val db = 20f * log10(level)
+        return ((db - MIN_DB) / (DB_PER_STEP * 100f)).coerceIn(0f, 1f)
+    }
+
+    fun noiseSuppression(): Boolean = PolyPlusConfig.voiceNoiseSuppression && NoiseSuppressor.available
+
+    fun setNoiseSuppression(enabled: Boolean) {
+        PolyPlusConfig.voiceNoiseSuppression = enabled
+        PolyPlusConfig.save()
     }
 
     fun soundboardVolume(): Float = PolyPlusConfig.voiceSoundboardVolume

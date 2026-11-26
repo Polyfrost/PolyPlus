@@ -16,6 +16,7 @@ import org.polyfrost.polyplus.client.social.SocialOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.max
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -25,6 +26,9 @@ object PartyVoice {
     private const val RTC_RETRY_MS = 5 * 60_000L
     private const val VAD_HANGOVER_MS = 400L
     private const val SILENCE_HINT_MS = 10_000L
+    private const val LEVEL_EVERY_FRAMES = 3
+    private const val SPEECH_PROBABILITY = 0.5f
+    private const val AUTO_FLOOR = 0.001f
 
     data class Ui(
         val inVoice: Boolean = false,
@@ -37,11 +41,16 @@ object PartyVoice {
         val talking: Boolean = false,
         val speaking: Set<String> = emptySet(),
         val noticeOpen: Boolean = false,
+        val micTest: Boolean = false,
+        val micTestFailed: Boolean = false,
         val soundsReady: Boolean = false,
     )
 
     private val _ui = MutableStateFlow(Ui())
     val ui = _ui.asStateFlow()
+
+    private val _inputLevel = MutableStateFlow(0f)
+    val inputLevel = _inputLevel.asStateFlow()
 
     @Volatile private var inVoice = false
     @Volatile private var muted = false
@@ -61,7 +70,15 @@ object PartyVoice {
     @Volatile private var silentSince = 0L
     @Volatile private var micHeard = false
     @Volatile private var micSilent = false
+    @Volatile private var micTest = false
+    @Volatile private var micTestFailed = false
+    @Volatile private var suppressor: NoiseSuppressor? = null
+    private val suppressorLock = Any()
+    @Volatile private var captureToken = 0
     @Volatile private var soundClockStarted = false
+    private val silence = ShortArray(PartyAudio.FRAME_SAMPLES)
+    private var levelPeak = 0f
+    private var levelFrames = 0
     private var speakingPlayers: Set<String> = emptySet()
     private var autoJoinedParty: String? = null
     private var voicePartyId: String? = null
@@ -108,7 +125,7 @@ object PartyVoice {
         if (!inVoice) return
         inVoice = false
         stopTransport()
-        stopCapture()
+        if (!micTest) stopCapture()
         Soundboard.onVoiceStopped()
         SoundboardStream.reset()
         talking = false
@@ -167,6 +184,20 @@ object PartyVoice {
         publish()
     }
 
+    fun setMicTest(enabled: Boolean) {
+        if (micTest == enabled && !(enabled && micTestFailed)) return
+        micTest = enabled
+        micTestFailed = false
+        LocalMonitor.setHearSelf(enabled)
+        if (enabled) {
+            if (inVoice && micBlocked) micBlocked = false
+            startCapture()
+        } else if (!inVoice) {
+            stopCapture()
+        }
+        publish()
+    }
+
     fun canSendSounds(): Boolean = inVoice && !deafened && !soundboardBlocked() && soundTransportReady()
 
     private fun soundTransportReady(): Boolean = when (active) {
@@ -192,11 +223,16 @@ object PartyVoice {
     }
 
     fun onSettingsChanged(restartAudio: Boolean = false) {
-        RtcVoice.setInputGain(PartyVoiceSettings.inputGain())
         if (active == VoiceTransport.P2p) P2PSessionManager.setVoiceRelay(PolyPlusConfig.voiceHideIp)
         if (!restartAudio) return
         LocalMonitor.restart()
-        if (!inVoice) return
+        if (!inVoice) {
+            if (micTest) {
+                stopCapture()
+                startCapture()
+            }
+            return
+        }
         if (!micBlocked) {
             stopCapture()
             startCapture()
@@ -207,24 +243,38 @@ object PartyVoice {
             PartyMesh.start(party.id)
         }
         if (active == VoiceTransport.Rtc) {
-            PolyPlusClient.SCOPE.launch { RtcVoice.applyDevices(PartyVoiceSettings.inputDevice(), PartyVoiceSettings.outputDevice()) }
+            PolyPlusClient.SCOPE.launch { RtcVoice.applyOutputDevice(PartyVoiceSettings.outputDevice()) }
         }
     }
 
     fun onCaptureFailed() {
-        if (!inVoice || micBlocked) return
+        val testing = micTest
+        if (testing) {
+            LOGGER.warn("The microphone gave nothing during the mic test")
+            micTest = false
+            micTestFailed = true
+            LocalMonitor.setHearSelf(false)
+        }
+        if (!inVoice) {
+            if (!testing) return
+            stopCapture()
+            publish()
+            return
+        }
+        if (micBlocked) {
+            publish()
+            return
+        }
         LOGGER.warn("The microphone gave nothing; party voice is listen-only until you retry")
         micBlocked = true
         talking = false
         RtcVoice.setTransmit(false)
-        capture?.stop()
-        capture = null
+        stopCapture()
         publish()
     }
 
     fun onRtcJoined() {
-        RtcVoice.setInputGain(PartyVoiceSettings.inputGain())
-        PolyPlusClient.SCOPE.launch { RtcVoice.applyDevices(PartyVoiceSettings.inputDevice(), PartyVoiceSettings.outputDevice()) }
+        PolyPlusClient.SCOPE.launch { RtcVoice.applyOutputDevice(PartyVoiceSettings.outputDevice()) }
     }
 
     fun rtcCapable(): Boolean {
@@ -274,7 +324,10 @@ object PartyVoice {
         silentSince = 0L
         micHeard = false
         micSilent = false
-        val mic = PartyAudio.openCapture(PartyVoiceSettings.inputDevice(), PartyVoiceSettings::inputGain, ::onFrame)
+        val token = synchronized(suppressorLock) { ++captureToken }
+        val mic = PartyAudio.openCapture(PartyVoiceSettings.inputDevice(), PartyVoiceSettings::inputGain) { frame, level ->
+            synchronized(suppressorLock) { if (token == captureToken) onFrame(frame, level) }
+        }
         if (mic != null) {
             capture = mic
         } else {
@@ -285,6 +338,35 @@ object PartyVoice {
     private fun stopCapture() {
         capture?.stop()
         capture = null
+        synchronized(suppressorLock) {
+            captureToken++
+            suppressor?.close()
+            suppressor = null
+            levelPeak = 0f
+            levelFrames = 0
+            _inputLevel.value = 0f
+        }
+    }
+
+    private fun denoise(frame: ShortArray): Float? {
+        val clean = PolyPlusConfig.voiceNoiseSuppression
+        val current = synchronized(suppressorLock) {
+            if (!clean && !PolyPlusConfig.voiceAutoSensitivity) {
+                suppressor?.close()
+                suppressor = null
+                return null
+            }
+            suppressor ?: NoiseSuppressor.open()?.also { suppressor = it }
+        } ?: return null
+        return if (clean) current.process(frame, PartyVoiceSettings.noiseStrength() / 100f) else current.analyze(frame)
+    }
+
+    private fun reportLevel(level: Float) {
+        levelPeak = max(levelPeak, level)
+        if (++levelFrames < LEVEL_EVERY_FRAMES) return
+        _inputLevel.value = levelPeak
+        levelPeak = 0f
+        levelFrames = 0
     }
 
     private fun onFrame(frame: ShortArray, level: Float) {
@@ -302,14 +384,27 @@ object PartyVoice {
                 setMicSilent(true)
             }
         }
-        if (level >= PartyVoiceSettings.activityThreshold()) lastLoud = now
+        val speech = denoise(frame)
+        val voiceLevel = PartyAudio.rms(frame)
+        reportLevel(voiceLevel)
+        if (micTest) LocalMonitor.pushLoopback(frame)
+        if (!inVoice) return
+        val voiced = if (speech != null && PartyVoiceSettings.autoSensitivity()) {
+            speech >= SPEECH_PROBABILITY && voiceLevel >= AUTO_FLOOR
+        } else {
+            voiceLevel >= PartyVoiceSettings.activityThreshold()
+        }
+        if (voiced) lastLoud = now
         val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld else now - lastLoud < VAD_HANGOVER_MS
-        val allowed = inVoice && !muted && !deafened && !micBlocked && !selfHardMuted
+        val allowed = !muted && !deafened && !micBlocked && !selfHardMuted
         val talk = allowed && gate
         talking = talk
         when (active) {
-            VoiceTransport.P2p -> PartyMesh.onCapture(frame, talk)
-            VoiceTransport.Rtc -> RtcVoice.setTransmit(talk)
+            VoiceTransport.P2p -> PartyMesh.onCapture(if (talk) frame else silence, talk)
+            VoiceTransport.Rtc -> {
+                RtcVoice.setTransmit(talk)
+                if (talk) RtcVoice.send(frame)
+            }
             else -> Unit
         }
         SoundboardStream.pump(active, canSendSounds())
@@ -350,6 +445,7 @@ object PartyVoice {
     }
 
     fun tick() {
+        migrateSensitivity()
         val party = PartyRepository.party.value
         if (party == null) {
             autoJoinedParty = null
@@ -371,6 +467,13 @@ object PartyVoice {
         selfHardMuted = PartyRepository.self(party)?.voiceHardMuted == true
         mixPeers(party)
         publish()
+    }
+
+    private fun migrateSensitivity() {
+        if (PolyPlusConfig.voiceSensitivityMigrated) return
+        PolyPlusConfig.voiceSensitivityMigrated = true
+        if (PolyPlusConfig.voiceNoticeAccepted) PolyPlusConfig.voiceAutoSensitivity = false
+        PolyPlusConfig.save()
     }
 
     private fun mixPeers(party: Party) {
@@ -449,6 +552,8 @@ object PartyVoice {
             talking = talkingNow,
             speaking = speaking,
             noticeOpen = noticeOpen,
+            micTest = micTest,
+            micTestFailed = micTestFailed,
             soundsReady = canSendSounds(),
         )
         if (next != _ui.value) _ui.value = next

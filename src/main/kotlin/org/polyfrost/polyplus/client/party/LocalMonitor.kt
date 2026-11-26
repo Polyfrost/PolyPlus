@@ -5,15 +5,19 @@ import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.party.soundboard.Soundboard
 import org.polyfrost.polyplus.client.party.soundboard.SoundboardStream
+import java.util.concurrent.ArrayBlockingQueue
 
 internal object LocalMonitor {
     private const val IDLE_CLOSE_MS = 1_500L
+    private const val LOOPBACK_FRAMES = 6
 
+    private val loopback = ArrayBlockingQueue<ShortArray>(LOOPBACK_FRAMES)
     private val mixLock = Any()
 
     @Volatile private var stream: VoiceStream? = null
     @Volatile private var generation = 0
     @Volatile private var idleSince = 0L
+    @Volatile private var hearSelf = false
     @Volatile private var opening = false
 
     fun wake() {
@@ -37,15 +41,28 @@ internal object LocalMonitor {
             val opened = PartyAudio.openSpeaker(PartyVoiceSettings.outputDevice()) { out -> fill(out, current) }
             if (opened == null) {
                 Soundboard.onMonitorUnavailable()
+                loopback.clear()
                 return
             }
             stream = opened
         }
     }
 
+    fun setHearSelf(enabled: Boolean) {
+        hearSelf = enabled
+        loopback.clear()
+        if (enabled) wake()
+    }
+
+    fun pushLoopback(frame: ShortArray) {
+        if (!hearSelf || (stream == null && !PartyMesh.rendering)) return
+        val copy = frame.copyOf()
+        while (!loopback.offer(copy)) loopback.poll()
+    }
+
     fun restart() {
         close()
-        if (Soundboard.playing.value.isNotEmpty()) wake()
+        if (hearSelf || Soundboard.playing.value.isNotEmpty()) wake()
     }
 
     fun mixShared(out: ShortArray) {
@@ -58,6 +75,7 @@ internal object LocalMonitor {
             generation++
             stream?.stop()
             stream = null
+            loopback.clear()
         }
     }
 
@@ -66,7 +84,15 @@ internal object LocalMonitor {
     private fun mixLocked(out: ShortArray): Boolean {
         var busy = Soundboard.mixMonitor(out)
         if (SoundboardStream.mixRemote(out)) busy = true
-        return busy
+        loopback.poll()?.let { frame ->
+            val count = minOf(frame.size, out.size / 2)
+            for (i in 0 until count) {
+                out[i * 2] = clip(out[i * 2] + frame[i])
+                out[i * 2 + 1] = clip(out[i * 2 + 1] + frame[i])
+            }
+            busy = true
+        }
+        return busy || hearSelf
     }
 
     private fun clip(value: Int): Short = value.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()

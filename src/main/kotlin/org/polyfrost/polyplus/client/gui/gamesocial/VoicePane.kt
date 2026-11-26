@@ -2,7 +2,9 @@
 
 package org.polyfrost.polyplus.client.gui.gamesocial
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -11,12 +13,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,18 +29,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 import org.polyfrost.oneconfig.api.ui.v1.components.IconButton
+import org.polyfrost.oneconfig.api.ui.v1.components.ProgressBar
 import org.polyfrost.oneconfig.api.ui.v1.components.SectionHeader
 import org.polyfrost.oneconfig.api.ui.v1.components.Select
+import org.polyfrost.oneconfig.api.ui.v1.components.Slider
+import org.polyfrost.oneconfig.api.ui.v1.components.Switch
 import org.polyfrost.oneconfig.api.ui.v1.components.TabItem
 import org.polyfrost.oneconfig.api.ui.v1.components.TabRow
 import org.polyfrost.oneconfig.api.ui.v1.components.TabStyle
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
+import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TooltipPlacement
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.BackButton
@@ -48,6 +57,8 @@ import org.polyfrost.polyplus.client.gui.lobbysocial.LocalSocialLook
 import org.polyfrost.polyplus.client.gui.lobbysocial.ScrollFade
 import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.PartyVoiceMode
+import org.polyfrost.polyplus.client.PolyPlusConfig
+import org.polyfrost.polyplus.client.party.NoiseSuppressor
 import org.polyfrost.polyplus.client.party.PartyAudio
 import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
@@ -58,6 +69,7 @@ private val Edge = 24.dp
 private val ControlWidth = 300.dp
 private val ControlHeight = 32.dp
 private val LabelRoom = 140.dp
+private val MeterHeight = 8.dp
 
 @Composable
 internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
@@ -82,11 +94,12 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
         Divider()
         val tabs = remember { listOf(TabItem(VoiceTab.Settings, "Voice"), TabItem(VoiceTab.Soundboard, "Soundboard")) }
         TabRow(tabs, window.voiceTab, { window.voiceTab = it }, Modifier.padding(horizontal = Edge, vertical = 8.dp), style = TabStyle.Underline, fill = false)
+        DisposableEffect(Unit) { onDispose { PartyVoice.setMicTest(false) } }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val control = (maxWidth - Edge * 2 - LabelRoom).coerceAtMost(ControlWidth)
             ScrollFade(Modifier.fillMaxSize().padding(start = Edge, end = Edge, top = 12.dp), 28.dp) {
                 when (window.voiceTab) {
-                    VoiceTab.Settings -> VoiceSettings(party, control)
+                    VoiceTab.Settings -> VoiceSettings(party, voice, control)
                     VoiceTab.Soundboard -> SoundboardSettings(control)
                 }
                 Spacer(Modifier.height(Edge))
@@ -96,7 +109,13 @@ internal fun VoicePane(window: SocialWindowState, modifier: Modifier) {
 }
 
 @Composable
-private fun VoiceSettings(party: Party?, control: Dp) {
+private fun VoiceSettings(party: Party?, voice: PartyVoice.Ui, control: Dp) {
+    var inputMode by remember { mutableStateOf(PartyVoiceSettings.inputMode()) }
+    var sensitivity by remember { mutableStateOf(PartyVoiceSettings.sensitivity()) }
+    var automatic by remember { mutableStateOf(PartyVoiceSettings.autoSensitivity()) }
+    var suppressing by remember { mutableStateOf(PartyVoiceSettings.noiseSuppression()) }
+    var strength by remember { mutableStateOf(PartyVoiceSettings.noiseStrength()) }
+    val rnnoise = NoiseSuppressor.available
     Section("Devices") {
         SettingRow("Microphone") { DeviceSelect(true, control) }
         SettingRow("Microphone volume") { VolumeControl(true, control) }
@@ -105,7 +124,106 @@ private fun VoiceSettings(party: Party?, control: Dp) {
     }
     Section("Talking") {
         if (party != null) SettingRow("Voice mode") { ModeControl(party, control) }
-        SettingRow("Input") { InputControl(control) }
+        SettingRow("Input") {
+            InputControl(inputMode, control) {
+                inputMode = it
+                PartyVoiceSettings.setInputMode(it)
+            }
+        }
+        if (inputMode == VoiceInputMode.PUSH_TO_TALK) {
+            SettingRow("Mic level") { Box(Modifier.width(control)) { LevelMeter(null) } }
+        } else {
+            SettingRow("Automatic sensitivity") {
+                Switch(
+                    checked = automatic && rnnoise,
+                    onCheckedChange = {
+                        automatic = it
+                        PartyVoiceSettings.setAutoSensitivity(it)
+                    },
+                    enabled = rnnoise,
+                )
+            }
+            SettingRow(if (automatic && rnnoise) "Mic level" else "Sensitivity", height = if (automatic && rnnoise) 40.dp else 56.dp) {
+                Column(Modifier.width(control), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (!(automatic && rnnoise)) {
+                        Slider(
+                            value = sensitivity,
+                            onValueChange = {
+                                sensitivity = it
+                                PartyVoiceSettings.setSensitivity(it)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            range = 0f..100f,
+                            step = 1f,
+                            onValueChangeFinished = { PolyPlusConfig.save() },
+                            contentDescription = "Voice activity sensitivity",
+                        )
+                    }
+                    LevelMeter(if (automatic && rnnoise) null else sensitivity / 100f)
+                }
+            }
+        }
+    }
+    Section("Sound processing") {
+        SettingRow("Noise suppression") {
+            Switch(
+                checked = suppressing && rnnoise,
+                onCheckedChange = {
+                    suppressing = it
+                    PartyVoiceSettings.setNoiseSuppression(it)
+                },
+                enabled = rnnoise,
+            )
+        }
+        if (suppressing && rnnoise) {
+            SettingRow("Strength") {
+                PercentSlider(strength, 100f, control, "Noise suppression strength") {
+                    strength = it
+                    PartyVoiceSettings.setNoiseStrength(it)
+                }
+            }
+        }
+        if (!rnnoise) VoiceHint("Noise suppression and automatic sensitivity don't work on this computer.")
+    }
+    Section("Mic test") {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(
+                text = if (voice.micTest) "Stop test" else "Test mic",
+                onClick = { PartyVoice.setMicTest(!voice.micTest) },
+                active = voice.micTest,
+            )
+            VoiceHint(
+                when {
+                    voice.micTestFailed -> "Couldn't open your microphone. Check the device above and try again."
+                    voice.micTest -> "Talk and you'll hear yourself. Wear headphones so you don't get an echo."
+                    else -> "Hear what your party hears, with noise suppression and your volume applied."
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LevelMeter(threshold: Float?) {
+    val level by PartyVoice.inputLevel.collectAsState()
+    val position = PartyVoiceSettings.levelPosition(level)
+    val open = threshold == null || position >= threshold
+    BoxWithConstraints(Modifier.fillMaxWidth().height(MeterHeight), contentAlignment = Alignment.CenterStart) {
+        ProgressBar(
+            position,
+            Modifier.fillMaxWidth(),
+            tint = if (open) Color.Unspecified else OneConfigTheme.current.mutedText,
+            thickness = MeterHeight,
+        )
+        if (threshold != null) {
+            Box(
+                Modifier
+                    .offset(x = (maxWidth * threshold - 1.dp).coerceAtLeast(0.dp))
+                    .width(2.dp)
+                    .height(MeterHeight + 6.dp)
+                    .background(OneConfigTheme.current.textColor),
+            )
+        }
     }
 }
 
@@ -125,8 +243,8 @@ internal fun Section(title: String, rows: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-internal fun SettingRow(label: String, control: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+internal fun SettingRow(label: String, height: Dp = 40.dp, control: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(height), verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.weight(1f), style = OneConfigTheme.current.typography.body, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
         control()
     }
@@ -167,17 +285,7 @@ private fun ModeControl(party: Party, width: Dp) {
 }
 
 @Composable
-private fun InputControl(width: Dp) {
+private fun InputControl(mode: VoiceInputMode, width: Dp, onSelect: (VoiceInputMode) -> Unit) {
     val tabs = remember { listOf(TabItem(VoiceInputMode.VOICE_ACTIVITY, "Voice activity"), TabItem(VoiceInputMode.PUSH_TO_TALK, "Push to talk")) }
-    var mode by remember { mutableStateOf(PartyVoiceSettings.inputMode()) }
-    TabRow(
-        tabs,
-        mode,
-        {
-            mode = it
-            PartyVoiceSettings.setInputMode(it)
-        },
-        Modifier.width(width),
-        style = TabStyle.Segmented,
-    )
+    TabRow(tabs, mode, onSelect, Modifier.width(width), style = TabStyle.Segmented)
 }
