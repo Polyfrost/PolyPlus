@@ -198,6 +198,13 @@ if (isOrnithe) {
     }
 }
 
+if (!isOrnithe) {
+    sourceSets.main {
+        // Mod Update Checker is a 1.8.9-only mod
+        kotlin.exclude("**/compat/ModUpdateChecker.kt", "**/lobbyshell/ModUpdatesButton.kt")
+    }
+}
+
 if (optionalProperty("deps.iris") == null) {
     sourceSets.main {
         val excluded = listOf("**/compat/iris/**")

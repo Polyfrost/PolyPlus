@@ -512,6 +512,9 @@ private fun ProfileCluster(lobby: LobbyShell, screen: Screen) {
         NavIconButton(SOCIAL_ASSETS + "discord.svg", "Join our Discord", { ClientPlatform.openUri(PolyPlusConstants.DISCORD_URL) })
         NotificationsButton()
         ModMenuSlot(screen)
+        //? if ornithe {
+        /*ModUpdatesButton(screen)
+        *///?}
         NavIconButton("settings", "Mods", { PolyPlusOneConfigIntegration.openMods() })
         NavIconButton("cog", "Minecraft settings", {
             //? if >= 26.3 || < 26.1 {
