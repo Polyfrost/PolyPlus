@@ -88,6 +88,7 @@ class EmojiCatalogTest {
         assertEquals(EmojiRegistry.resolve("slightly_smiling_face"), EmojiRegistry.resolve("slight_smile"))
         assertEquals(EmojiRegistry.resolve("thinking_face"), EmojiRegistry.resolve("thinking"))
         assertNotNull(EmojiRegistry.resolve("face_with_open_eyes_and_hand_over_mouth"))
+        assertEquals(EmojiRegistry.resolve("man-facepalming"), EmojiRegistry.resolve("man_facepalming"))
         val entry = EmojiRegistry.search("rofl").first()
         assertEquals(rofl, entry.glyph)
         assertEquals("rolling_on_the_floor_laughing", entry.alias)

@@ -82,7 +82,7 @@ const bareHex = (unified) => unified.split('-').filter((h) => h !== 'FE0F' && h 
 const extraAliases = (e) => {
   const out = [];
   for (const presets of EMOJIBASE_SHORTCODES) {
-    const codes = presets[bareHex(e.unified)];
+    const codes = presets[e.unified] ?? presets[bareHex(e.unified)];
     if (codes !== undefined) out.push(...[].concat(codes));
   }
   return out.filter((alias) => ALIAS.test(alias) && !e.short_names.includes(alias));

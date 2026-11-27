@@ -34,35 +34,18 @@ object EmojiRegistry {
 
     private val EMOJI_SHORTCODE: Pattern by lazy { Pattern.compile(SHORTCODE) }
 
-    //? if > 1.8.9 {
-    private const val MAX_CHAT_LENGTH = 256
-    //?} else {
-    /*private const val MAX_CHAT_LENGTH = 100
-    *///?}
-
     private val EMOJI: Pattern by lazy {
         val alts = StringBuilder(SHORTCODE)
         for (seq in unicode.keys) alts.append('|').append(Pattern.quote(seq))
         Pattern.compile(alts.toString())
     }
 
-    private val glyphToAlias: Map<String, String> by lazy {
-        val map = HashMap<String, String>()
-        for ((alias, glyph) in shortcodes) {
-            val existing = map[glyph]
-            if (existing == null || alias.length < existing.length) map[glyph] = alias
-        }
-        map
-    }
-
-    private val extraToCanonical: Map<String, String> by lazy {
-        allShortcodes.entries
-            .filter { it.key !in shortcodes }
-            .mapNotNull { (alias, glyph) -> glyphToAlias[glyph]?.let { alias to it } }
-            .toMap()
-    }
-
     private val unicodeToShortcode: Map<String, String> by lazy {
+        val glyphToAlias = HashMap<String, String>()
+        for ((alias, glyph) in shortcodes) {
+            val existing = glyphToAlias[glyph]
+            if (existing == null || alias.length < existing.length) glyphToAlias[glyph] = alias
+        }
         val map = LinkedHashMap<String, String>()
         for (seq in unicode.keys.sortedByDescending { it.length }) {
             val alias = glyphToAlias[unicode[seq]] ?: continue
@@ -314,27 +297,6 @@ object EmojiRegistry {
     @JvmStatic
     fun toShortcodes(text: String): String {
         if (!enabled() || text.isEmpty()) return text
-        val converted = unicodeToShortcodes(text)
-        val canonical = canonicalShortcodes(converted)
-        return if (canonical.length > MAX_CHAT_LENGTH && canonical.length > converted.length) converted else canonical
-    }
-
-    private fun canonicalShortcodes(text: String): String {
-        if (extraToCanonical.isEmpty()) return text
-        val matcher = EMOJI_SHORTCODE.matcher(text)
-        val sb = StringBuilder(text.length)
-        var last = 0
-        while (matcher.find()) {
-            val token = matcher.group()
-            val canonical = extraToCanonical[token.substring(1, token.length - 1)] ?: continue
-            sb.append(text, last, matcher.start()).append(':').append(canonical).append(':')
-            last = matcher.end()
-        }
-        if (last == 0) return text
-        return sb.append(text, last, text.length).toString()
-    }
-
-    private fun unicodeToShortcodes(text: String): String {
         val pattern = UNICODE_SEQ ?: return text
         val matcher = pattern.matcher(text)
         if (!matcher.find()) return text
