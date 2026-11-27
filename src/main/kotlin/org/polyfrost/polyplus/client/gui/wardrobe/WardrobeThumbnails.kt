@@ -119,7 +119,7 @@ internal fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType):
 
     val source = remember(previewId, loadTick, isCape, isPet) {
         when {
-            isCape -> PlayerPreviewSource.Override(CosmeticEquipment(), capeCosmeticId = previewId)
+            isCape -> if (CosmeticAssetCache.isCapeLoaded(previewId)) PlayerPreviewSource.Override(CosmeticEquipment(), capeCosmeticId = previewId) else null
             isPet -> {
                 val attached = CosmeticAssetCache.getAttachedCosmetic(previewId)
                 if (attached != null) {
