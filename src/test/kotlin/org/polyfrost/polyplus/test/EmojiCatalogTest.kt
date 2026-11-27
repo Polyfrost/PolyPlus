@@ -69,4 +69,27 @@ class EmojiCatalogTest {
         assertEquals(1, segments.size)
         assertEquals("no emoji here", (segments.single() as EmojiRegistry.Segment.Text).text)
     }
+
+    @Test
+    fun `catalog follows the unicode category order`() {
+        val first = EmojiRegistry.catalog.take(3).map { it.alias }
+        assertEquals(listOf("grinning", "smiley", "smile"), first)
+        val skull = EmojiRegistry.catalog.indexOfFirst { it.glyph == EmojiRegistry.resolve("skull") }
+        val apple = EmojiRegistry.catalog.indexOfFirst { it.glyph == EmojiRegistry.resolve("apple") }
+        val aries = EmojiRegistry.catalog.indexOfFirst { it.glyph == EmojiRegistry.resolve("aries") }
+        assertTrue(skull in 0 until apple && apple < aries)
+    }
+
+    @Test
+    fun `discord style short names resolve next to the long names`() {
+        val rofl = EmojiRegistry.resolve("rofl")
+        assertNotNull(rofl)
+        assertEquals(rofl, EmojiRegistry.resolve("rolling_on_the_floor_laughing"))
+        assertEquals(EmojiRegistry.resolve("slightly_smiling_face"), EmojiRegistry.resolve("slight_smile"))
+        assertEquals(EmojiRegistry.resolve("thinking_face"), EmojiRegistry.resolve("thinking"))
+        assertNotNull(EmojiRegistry.resolve("face_with_open_eyes_and_hand_over_mouth"))
+        val entry = EmojiRegistry.search("rofl").first()
+        assertEquals(rofl, entry.glyph)
+        assertEquals("rolling_on_the_floor_laughing", entry.alias)
+    }
 }
