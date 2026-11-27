@@ -97,8 +97,6 @@ object AfkProfiler {
         PolyPlusClient.SCOPE.launch(Dispatchers.IO) { upload(file) }
     }
 
-    // Pause menus opened by focus loss count as AFK in multiplayer, where the world keeps running anyway.
-    // Singleplayer is left alone so closing the menu never unpauses a world while the player is away.
     private fun screenAllowed(): Boolean {
         val screen = ClientPlatform.currentScreen() ?: return true
         return startedAt == 0L && !ClientPlatform.windowFocused() && !singleplayer() &&
@@ -113,9 +111,7 @@ object AfkProfiler {
         *///?}
     }
 
-    // ponytail: in-memory flip, an options.save() during the profile would persist it
     private fun hold() {
-        // Singleplayer keeps pausing on focus loss, which opens the pause menu and cancels the profile
         if (!singleplayer()) {
             val options = Minecraft.getInstance().options
             restorePause = options.pauseOnLostFocus
@@ -132,12 +128,10 @@ object AfkProfiler {
         restorePause = null
         if (restoreDynamicFps) {
             restoreDynamicFps = false
-            // Skip if the player toggled it back themselves mid-profile
             if (dynamicFpsCall("disabledByUser") == true) dynamicFpsCall("toggleDisabled")
         }
     }
 
-    // Legacy Dynamic FPS on 1.8.9 keeps the old net.lostluma.dynamic_fps.impl.fabric package
     private fun dynamicFpsClass(name: String): Class<*>? =
         listOf("dynamic_fps.impl.$name", "net.lostluma.dynamic_fps.impl.fabric.$name").firstNotNullOfOrNull {
             runCatching { Class.forName(it) }.getOrNull()
@@ -163,7 +157,6 @@ object AfkProfiler {
         return dynamicFpsIsIdle.isTrue() && !dynamicFpsDisabled.isTrue()
     }
 
-    // Vanilla and Dynamic FPS idle caps would skew the profile
     private fun keepAwake() {
         //? if >= 1.21.4
         Minecraft.getInstance().framerateLimitTracker.onInputReceived()
@@ -200,10 +193,6 @@ object AfkProfiler {
         }
     }
 
-    /**
-     * Masks spark's copy of the JVM arguments and the home directory in place, so protobuf length prefixes stay valid.
-     * Returns null when [vmArgs] is non-empty but missing from [data], since then they can't be masked.
-     */
     @JvmStatic
     fun scrub(data: ByteArray, home: String, vmArgs: String): ByteArray? {
         val written = sparkRedactions.fold(vmArgs) { args, (regex, replacement) -> args.replace(regex) { replacement } }
@@ -215,7 +204,6 @@ object AfkProfiler {
         return data
     }
 
-    // Mirrors spark's VmArgRedactor, which rewrites usernames in the JVM arguments before storing them
     private val sparkRedactions = listOf(
         Regex("""C:\\Users\\\w+""") to """C:\Users\<redacted>""",
         Regex("""/Users/\w+""") to "/Users/<redacted>",

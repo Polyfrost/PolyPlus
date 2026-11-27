@@ -189,7 +189,6 @@ internal object SparkCompat {
         return (result(platform, since, PROFILER_ACTIVITY, SENDER_NAME) as? Result.File)?.value?.also { restoreBroadcast() }
     }
 
-    // The start command runs on spark's executor, so wait for it before checking for a sampler to cancel
     fun cancelQuietProfile() {
         val start = quietStart ?: return restoreBroadcast()
         quietStart = null
@@ -203,7 +202,6 @@ internal object SparkCompat {
         }
     }
 
-    // spark broadcasts profiler progress to the player's chat unless this config flag is set
     private fun broadcastField(platform: Any): Pair<Any, Field>? {
         val manager = call(platform, "getCommandManager") ?: return null
         return manager to (Reflect.field(manager.javaClass, "disableResponseBroadcast") ?: return null)
