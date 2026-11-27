@@ -96,7 +96,7 @@ internal fun OutfitThumbnail(outfit: OutfitInfo, modifier: Modifier) {
     val installs = CosmeticAssetCache.installs
     val textureVersion = MojangCapeService.textureVersion
     val mojangState = MojangCapeService.state
-    LaunchedEffect(outfit.equipped) {
+    LaunchedEffect(outfit.equipped, CosmeticCatalog.version) {
         for ((slot, id) in outfit.equipped) {
             if (!isOutfitAssetLoaded(slot, id)) CosmeticAssetCache.ensureCosmeticLoaded(id)
         }
@@ -136,7 +136,7 @@ internal fun rememberOutfitPreview(outfit: OutfitInfo?): SelectionPreview? {
     val mojangState = MojangCapeService.state
     val skins = SkinLibrary.skins
     val skinVersion = SkinLibrary.textureVersion
-    LaunchedEffect(outfit?.equipped) {
+    LaunchedEffect(outfit?.equipped, CosmeticCatalog.version) {
         for ((slot, id) in outfit?.equipped.orEmpty()) {
             if (!isOutfitAssetLoaded(slot, id)) CosmeticAssetCache.ensureCosmeticLoaded(id)
         }

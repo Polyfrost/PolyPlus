@@ -5,6 +5,9 @@ import org.polyfrost.polyplus.libs.ktor.client.request.get
 import org.polyfrost.polyplus.libs.ktor.client.request.setBody
 import org.polyfrost.polyplus.libs.ktor.http.ContentType
 import org.polyfrost.polyplus.libs.ktor.http.contentType
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusClient
@@ -44,6 +47,9 @@ object CosmeticCatalog {
     private var selectedEmoteId: Int? = null
     private var ownedCosmeticIds: Set<Int> = emptySet()
     private var ownedEmoteIds: Set<Int> = emptySet()
+
+    var version by mutableIntStateOf(0)
+        private set
 
     fun getDefinition(id: Int): CosmeticDefinition? = cosmeticDefinitions[id] ?: emoteDefinitions[id]
 
@@ -139,6 +145,8 @@ object CosmeticCatalog {
             }
         }
 
+        version++
+
         LOGGER.info(
             "Loaded {} cosmetic group(s) ({} variant(s)) and {} emote definition(s) from API",
             cosmeticGroups.size,
@@ -188,7 +196,8 @@ object CosmeticCatalog {
             clearParticleColor(localUuid)
         }
 
-        lock.withLock {
+        val changed = lock.withLock {
+            var changed = false
             localEquipped = EquippedCosmetics(equippedKnown)
             ownedCosmeticIds = ownedDefs.map { it.id }.toSet()
             ownedEmoteIds = player.emotes.map { it.id }.toSet()
@@ -198,15 +207,19 @@ object CosmeticCatalog {
                 }
             }
             for (definition in ownedDefs) {
-                cosmeticDefinitions[definition.id] = definition
+                if (cosmeticDefinitions.put(definition.id, definition) != definition) changed = true
             }
             for (group in ownedGroups) {
-                groupMeta[group.id] = group.toMeta()
+                val meta = group.toMeta()
+                if (groupMeta.put(group.id, meta) != meta) changed = true
             }
             for (definition in player.emotes) {
-                emoteDefinitions[definition.id] = definition.asCosmeticDefinition()
+                val emote = definition.asCosmeticDefinition()
+                if (emoteDefinitions.put(definition.id, emote) != emote) changed = true
             }
+            changed
         }
+        if (changed) version++
 
         //? if >= 1.21.1 || = 1.8.9 {
         val owned = ownedDefs + player.emotes.map { it.asCosmeticDefinition() }
@@ -327,6 +340,7 @@ object CosmeticCatalog {
         selectedEmoteId = null
         ownedCosmeticIds = emptySet()
         ownedEmoteIds = emptySet()
+        version++
     }
 
     private data class GroupMeta(

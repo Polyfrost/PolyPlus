@@ -108,7 +108,7 @@ internal fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType):
     var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
     val loaded = CosmeticAssetCache.installs.let { isPreviewAssetLoaded(previewId, isCape, isPet) }
     // a trim can evict a preview's assets while the screen is closed, so it reloads them when shown again
-    LaunchedEffect(cosmeticId, loaded) {
+    LaunchedEffect(cosmeticId, loaded, CosmeticCatalog.version) {
         val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
         val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
         previewId = id
