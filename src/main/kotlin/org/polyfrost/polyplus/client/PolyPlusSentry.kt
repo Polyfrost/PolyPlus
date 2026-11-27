@@ -218,6 +218,7 @@ object PolyPlusSentry {
 
         val options = SentryOptions().apply {
             dsn = DSN
+            isSendDefaultPii = false
             release = "${PolyPlusConstants.ID}@${PolyPlusConstants.VERSION}"
             environment = if (dev) "development" else "production"
             setTag("minecraft", minecraftVersion)
@@ -226,6 +227,7 @@ object PolyPlusSentry {
             isEnableUncaughtExceptionHandler = true
             isAttachStacktrace = true
             setBeforeSend { event, _ ->
+                event.serverName = null
                 val t = event.throwable
                 when {
                     t != null && isNeverReported(t) -> null
