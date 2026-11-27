@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +40,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
@@ -177,10 +179,11 @@ internal fun StoreDetailPanel(
                 EmptyState("Select a cosmetic to preview it.", Modifier.fillMaxSize())
             } else {
                 val (source, _) = rememberCosmeticPreviewSource(variant.id, info.type)
+                val loading = remember { PlayerPreviewSource.Override(CosmeticEquipment()) }
                 val fades = info.type != CosmeticType.Boots
                 PlayerPreview(
                     Modifier.align(Alignment.Center).fillMaxWidth().height(330.dp),
-                    source = source ?: PlayerPreviewSource.LocalLive,
+                    source = source ?: loading,
                     autoSpin = false,
                     bottomFadeFraction = if (fades) STORE_PREVIEW_FADE_FRACTION else 0f,
                     verticalAnchor = when (info.type) {

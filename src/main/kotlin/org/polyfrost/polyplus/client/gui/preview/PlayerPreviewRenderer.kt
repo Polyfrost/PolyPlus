@@ -982,7 +982,7 @@ object PlayerPreviewRenderer {
     }
 
     private fun hidesCape(source: PlayerPreviewSource): Boolean = when (source) {
-        is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null
+        is PlayerPreviewSource.Override -> capeOverride(source) == null
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden() && mojangCapeChosen()
     }
