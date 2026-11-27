@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.nameplate.NameplateBadges
 import java.util.UUID
 
 //? if >= 26.1 {
@@ -62,13 +63,27 @@ object PolyPlusBadge {
     @JvmField
     val badgeIcon: Component = Component.literal(GLYPH.substring(0, 1)).setStyle(BADGE_STYLE)
 
+    private val GAP_FONT: Identifier = Identifier.fromNamespaceAndPath("polyplus", "badge_gap")
+
+    private val GAP_STYLE: Style =
+        //? if >= 1.21.10 {
+        Style.EMPTY.withFont(FontDescription.Resource(GAP_FONT))
+        //?} else {
+        /*Style.EMPTY.withFont(GAP_FONT)
+        *///?}
+
+    @JvmField
+    val badgeGap: Component = Component.literal(GLYPH).setStyle(GAP_STYLE)
+
     @JvmStatic
     fun decorate(name: Component, uuid: UUID): Component {
         if (!shouldBadge(uuid)) return name
 
-        return Component.empty()
-            .append(badgeGlyph)
-            .append(name)
+        return when (NameplateBadges.placement(uuid)) {
+            NameplateBadges.NONE -> Component.empty().append(badgeGlyph).append(name)
+            NameplateBadges.PLACED -> name
+            else -> Component.empty().append(badgeGap).append(name)
+        }
     }
     //?}
 
@@ -218,15 +233,22 @@ object PolyPlusBadge {
     const val LEGACY_GAP_ADVANCE = PAD_RIGHT
 
     @JvmStatic
+    var inlineHidden: Boolean = false
+
+    @JvmStatic
     fun drawInline(x: Float, y: Float, alpha: Float) {
+        if (inlineHidden) return
         val bx = x + PAD_LEFT
         val by = y + BADGE_Y_OFFSET
         EmojiFont.drawLegacyQuad(BADGE_TEXTURE, bx, by, bx + BADGE_W, by + BADGE_H, 0f, 0f, 1f, 1f, alpha)
     }
 
     @JvmStatic
-    fun decorate(name: String, uuid: UUID): String =
-        if (shouldBadge(uuid)) "$LEGACY_CHAR$LEGACY_GAP$name" else name
+    fun decorate(name: String, uuid: UUID): String = when {
+        !shouldBadge(uuid) -> name
+        NameplateBadges.placement(uuid) == NameplateBadges.PLACED -> name
+        else -> "$LEGACY_CHAR$LEGACY_GAP$name"
+    }
     *///?}
     //?}
 }
