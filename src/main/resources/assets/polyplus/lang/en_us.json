@@ -15,5 +15,8 @@
   "polyplus.session.reconnecting": "Reconnecting...",
   "polyplus.session.refreshFailed": "Refresh failed - click to retry",
   "polyplus.page.wardrobe": "Wardrobe",
+  "polyplus.createWorld.experiments.title": "Experimental features",
+  "polyplus.createWorld.experiments.subtitle": "Try features that are still being worked on.",
+  "polyplus.createWorld.experiments.none": "No experiments are available.",
   "polyplus.sodium.options.view_bobbing.tooltip": "If enabled, the player's view will sway and bob when moving around. Players who experience motion sickness while playing may benefit from disabling this."
 }

@@ -32,6 +32,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.TextField
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.gui.lobbyshell.DrillRow
+import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelHint
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelPageColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelPageSwitch
@@ -69,19 +70,86 @@ private val TYPE_ICONS = mapOf(
 class CreateWorldShell(shell: ScreenShell, private val draft: WorldDraft) : WorldShellScreen(shell) {
     private val step = mutableIntStateOf(0)
     private val invalidRules = mutableStateMapOf<String, String>()
+    private var experiments by mutableStateOf<ExperimentsEdit?>(null)
 
-    override val title: String get() = if (draft.recreated) "Recreate world" else "Create world"
+    override val title: String
+        get() = when {
+            experiments != null -> tr("selectWorld.experiments")
+            draft.recreated -> "Recreate world"
+            else -> "Create world"
+        }
 
-    override fun back() = draft.cancel()
+    override fun back() {
+        if (experiments != null) experiments = null else draft.cancel()
+    }
+
+    private fun openExperiments(edit: WorldExperiments?) {
+        experiments = edit?.let(::ExperimentsEdit)
+    }
 
     @Composable
     override fun Body() {
-        CreateWorldContent(draft, step.intValue, invalidRules) { step.intValue = it }
+        val edit = experiments
+        PanelPageSwitch(edit, edit != null) { shown ->
+            if (shown != null) {
+                ExperimentsContent(shown, onCancel = { experiments = null }) {
+                    experiments = null
+                    shown.experiments.apply(shown.enabled.filterValues { it }.keys, ::openExperiments)
+                }
+            } else {
+                CreateWorldContent(draft, step.intValue, invalidRules, { openExperiments(draft.editExperiments()) }) { step.intValue = it }
+            }
+        }
+    }
+}
+
+private class ExperimentsEdit(val experiments: WorldExperiments) {
+    val enabled = mutableStateMapOf<String, Boolean>().apply { experiments.entries.forEach { put(it.id, it.enabled) } }
+}
+
+@Composable
+private fun ExperimentsContent(edit: ExperimentsEdit, onCancel: () -> Unit, onDone: () -> Unit) {
+    val theme = OneConfigTheme.current
+    WorldContentColumn {
+        Column(Modifier.weight(1f).fillMaxWidth()) {
+            PanelPageColumn {
+                WorldBlock(tr("polyplus.createWorld.experiments.title"), tr("polyplus.createWorld.experiments.subtitle")) {
+                    Row(
+                        Modifier.fillMaxWidth().card(WorldKit.CardRadius).padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        LobbyIcon("alert-triangle", theme.error)
+                        Text(tr("selectWorld.experiments.info"), Modifier.weight(1f), color = theme.error, style = theme.typography.small)
+                    }
+                    val entries = edit.experiments.entries
+                    if (entries.isEmpty()) {
+                        PanelHint(tr("polyplus.createWorld.experiments.none"))
+                    } else {
+                        Column(Modifier.fillMaxWidth().card(WorldKit.CardRadius).padding(4.dp)) {
+                            entries.forEach { entry ->
+                                PanelToggle(
+                                    entry.label,
+                                    edit.enabled[entry.id] == true,
+                                    { edit.enabled[entry.id] = it },
+                                    description = entry.description,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(tr("gui.cancel"), onCancel, style = ControlStyle.Ghost, size = ControlSize.Large)
+            Spacer(Modifier.weight(1f))
+            TextButton(tr("gui.done"), onDone, style = ControlStyle.Primary, size = ControlSize.Large)
+        }
     }
 }
 
 @Composable
-fun CreateWorldContent(draft: WorldDraft, step: Int, invalidRules: MutableMap<String, String>, onStep: (Int) -> Unit) {
+fun CreateWorldContent(draft: WorldDraft, step: Int, invalidRules: MutableMap<String, String>, onExperiments: () -> Unit, onStep: (Int) -> Unit) {
     var previous by remember { mutableIntStateOf(step) }
     val merged = draft.sections.none { it in ADVANCED_ONLY }
     val steps = if (merged) STEPS.take(2) else STEPS
@@ -101,7 +169,7 @@ fun CreateWorldContent(draft: WorldDraft, step: Int, invalidRules: MutableMap<St
                     when (page) {
                         0 -> WorldStep(draft) { go(1) }
                         1 -> GenerationStep(draft)
-                        else -> AdvancedStep(draft, invalidRules)
+                        else -> AdvancedStep(draft, invalidRules, onExperiments)
                     }
                 }
             }
@@ -238,7 +306,7 @@ private fun TypeGrid(draft: WorldDraft, types: List<WorldTypeOption>, selected: 
 }
 
 @Composable
-private fun AdvancedStep(draft: WorldDraft, invalidRules: MutableMap<String, String>) {
+private fun AdvancedStep(draft: WorldDraft, invalidRules: MutableMap<String, String>, onExperiments: () -> Unit) {
     val packs = WorldSection.DataPacks in draft.sections
     val experiments = WorldSection.Experiments in draft.sections
     if (packs || experiments) {
@@ -248,7 +316,7 @@ private fun AdvancedStep(draft: WorldDraft, invalidRules: MutableMap<String, Str
                     val count = draft.dataPackCount
                     DrillRow("package-01", "Data packs", if (count == 0) "None added" else "$count added", draft::openDataPacks)
                 }
-                if (experiments) DrillRow("settings-02", "Experiments", if (draft.experimental) "On" else "Off", draft::openExperiments)
+                if (experiments) DrillRow("settings-02", "Experiments", if (draft.experimental) "On" else "Off", onExperiments)
             }
         }
     }
