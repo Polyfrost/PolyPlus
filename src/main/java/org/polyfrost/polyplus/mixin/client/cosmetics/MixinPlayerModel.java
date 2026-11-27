@@ -61,7 +61,7 @@ public class MixinPlayerModel
 
     @Inject(method = "setupAnim(Lnet/minecraft/world/entity/LivingEntity;FFFFF)V", at = @At("HEAD"))
     private void polyplus$resetRoot(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float yRot, float xRot, CallbackInfo ci) {
-        polyplus$root.resetPose();
+        polyplus$root.getAllParts().forEach(ModelPart::resetPose);
     }
 
     @Unique
@@ -122,7 +122,7 @@ public class MixinPlayerModel
             return;
 
         PlayerModel model = (PlayerModel) (Object) this;
-        renderAccess.polyplus$setLastEmoteSample(controller.applyToModel(model, PlayerRenderContext.Companion.from(state)));
+        controller.applyToModel(model, PlayerRenderContext.Companion.from(state));
         //?}
     }
 }
@@ -130,8 +130,9 @@ public class MixinPlayerModel
 /*import net.minecraft.client.render.model.ModelPart;
 import net.minecraft.client.render.model.entity.HumanoidModel;
 import net.minecraft.entity.Entity;
+import org.polyfrost.polyplus.client.cosmetics.access.ModelPartScaleAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerModelRootAccess;
-import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
+import org.polyfrost.polyplus.client.emotes.playback.EmotePoser;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.spongepowered.asm.mixin.Mixin;
@@ -187,13 +188,29 @@ public abstract class MixinPlayerModel implements PlayerModelRootAccess {
                 part.y = polyplus$pivots[i * 3 + 1];
                 part.z = polyplus$pivots[i * 3 + 2];
                 part.rotationX = part.rotationY = part.rotationZ = 0f;
+                ((ModelPartScaleAccess) part).polyplus$setScale(1f, 1f, 1f);
                 return;
             }
         }
         if (part == polyplus$root) {
             part.x = part.y = part.z = 0f;
             part.rotationX = part.rotationY = part.rotationZ = 0f;
+            ((ModelPartScaleAccess) part).polyplus$setScale(1f, 1f, 1f);
         }
+    }
+
+    @Override
+    public void polyplus$copyRest(ModelPart part, float[] out) {
+        ModelPart[] parts = polyplus$parts();
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i] == part && polyplus$pivots != null) {
+                out[0] = polyplus$pivots[i * 3];
+                out[1] = polyplus$pivots[i * 3 + 1];
+                out[2] = polyplus$pivots[i * 3 + 2];
+                return;
+            }
+        }
+        out[0] = out[1] = out[2] = 0f;
     }
 
     @Override
@@ -234,7 +251,7 @@ public abstract class MixinPlayerModel implements PlayerModelRootAccess {
 
     @Inject(method = "setupAnimation", at = @At("RETURN"))
     private void polyplus$applyEmote(float walkAnimationProgress, float walkAnimationSpeed, float bob, float yaw, float pitch, float scale, Entity entity, CallbackInfo ci) {
-        ModelPoseApplicator.afterSetupAnimation((HumanoidModel) (Object) this, entity, walkAnimationSpeed, bob);
+        EmotePoser.afterSetupAnimation((HumanoidModel) (Object) this, entity, walkAnimationSpeed, bob);
     }
 }
 *///?}

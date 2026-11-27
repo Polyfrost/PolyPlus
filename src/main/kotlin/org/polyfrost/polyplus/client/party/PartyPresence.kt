@@ -39,8 +39,23 @@ object PartyPresence {
         lastSentAt = 0L
     }
 
+    private class ServerKey(val address: String, val key: String)
+
+    @Volatile private var cachedLocation = MemberLocation()
+    @Volatile private var cachedServerKey: ServerKey? = null
+    @Volatile private var cachedHostedSession: String? = null
+    @Volatile private var cachedHostedKey = ""
+
     fun tick() {
-        val next = MemberState(location(), PartyVoice.memberVoice(), scene = PartyScene.localScene())
+        val location = location()
+        val voice = PartyVoice.memberVoice()
+        val scene = PartyScene.localScene()
+        val previous = local
+        val next = if (previous.location === location && previous.voice === voice && previous.scene === scene) {
+            previous
+        } else {
+            MemberState(location, voice, scene = scene)
+        }
         local = next
         val partyId = PartyRepository.party.value?.id
         if (partyId == null) {
@@ -58,9 +73,23 @@ object PartyPresence {
         }
     }
 
+    private fun shared(kind: LocationKind, key: String? = null, display: String? = null): MemberLocation {
+        val cached = cachedLocation
+        if (cached.kind == kind && cached.key == key && cached.display == display) return cached
+        return MemberLocation(kind, key, display).also { cachedLocation = it }
+    }
+
+    private fun cachedServerKey(address: String): String {
+        val cached = cachedServerKey
+        if (cached != null && cached.address == address) return cached.key
+        val key = serverKey(address)
+        cachedServerKey = ServerKey(address, key)
+        return key
+    }
+
     fun location(): MemberLocation {
         val mc = Minecraft.getInstance()
-        if (mc.level == null || LobbyScene.terrainActive()) return MemberLocation(LocationKind.Menu)
+        if (mc.level == null || LobbyScene.terrainActive()) return shared(LocationKind.Menu)
         val hosting = P2PSessionManager.currentSessionId
         //? if > 1.8.9 {
         val integrated = mc.hasSingleplayerServer()
@@ -68,18 +97,24 @@ object PartyPresence {
         /*val integrated = mc.isIntegratedServerRunning
         *///?}
         if (integrated) {
-            return if (hosting != null) hosted(hosting) else MemberLocation(LocationKind.Singleplayer)
+            return if (hosting != null) hosted(hosting) else shared(LocationKind.Singleplayer)
         }
-        val address = mc.currentServer?.ip?.trim() ?: return MemberLocation(LocationKind.Menu)
+        val address = mc.currentServer?.ip?.trim() ?: return shared(LocationKind.Menu)
         if (address == P2PSessionManager.P2P_PLACEHOLDER_IP) {
-            val joined = P2PSessionManager.joinedSessionId ?: return MemberLocation(LocationKind.HostedWorld)
+            val joined = P2PSessionManager.joinedSessionId ?: return shared(LocationKind.HostedWorld)
             return hosted(joined)
         }
         val display = address.take(MAX_DISPLAY).takeIf { PolyPlusPartyConfig.partyShareServer }
-        return MemberLocation(LocationKind.Server, serverKey(address), display)
+        return shared(LocationKind.Server, cachedServerKey(address), display)
     }
 
-    private fun hosted(session: String) = MemberLocation(LocationKind.HostedWorld, "session:$session")
+    private fun hosted(session: String): MemberLocation {
+        if (session != cachedHostedSession) {
+            cachedHostedKey = "session:$session"
+            cachedHostedSession = session
+        }
+        return shared(LocationKind.HostedWorld, cachedHostedKey)
+    }
 
     fun serverKey(address: String): String {
         val (host, port) = split(address.trim())

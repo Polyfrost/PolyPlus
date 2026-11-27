@@ -39,9 +39,11 @@ internal object DiskAssetReader {
         walk(root, predicate).firstOrNull()
 
     /** The bundle's texture (preferring one under `textures/`). */
-    fun findTexture(root: Path): Path? {
+    fun findTexture(root: Path, variant: String? = null): Path? {
         val pngs = walk(root) { it.endsWith(".png") }
         if (pngs.isEmpty()) return null
+        val suffix = variant?.lowercase()?.let { "_$it.png" }
+        if (suffix != null) pngs.firstOrNull { it.relativePath.lowercase().endsWith(suffix) }?.let { return it.file }
         return (pngs.firstOrNull { it.relativePath.startsWith("textures/") } ?: pngs.first()).file
     }
 

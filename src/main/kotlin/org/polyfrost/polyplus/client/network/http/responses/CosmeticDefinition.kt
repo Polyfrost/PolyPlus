@@ -12,12 +12,16 @@ data class CosmeticDefinition(
     val hash: String,
     @SerialName("allowed_slots") val allowedSlots: List<BodySlot> = emptyList(),
     val groupId: Int = id,
+    val grouped: Boolean = false,
     val groupName: String = name,
     val variantName: String = name,
     // "slim"/"wide" or null when the variant is model-independent
     val model: String? = null,
     val coverUrl: String? = null,
+    val variantKey: String? = null,
 ) {
+    val groupKey: CosmeticGroupKey get() = CosmeticGroupKey(groupId, grouped)
+
     fun preferredSlot(): BodySlot? {
         val default = type.defaultSlot()
         if (default != null && (allowedSlots.isEmpty() || default in allowedSlots)) {

@@ -17,23 +17,23 @@ import java.awt.image.BufferedImage
 class CapeFrameCountTest {
     @Test
     fun `a whole-number stack of the static cape is a sheet`() {
-        assertEquals(8, detectVerticalTextureFrameCount(64, 32, 64, 256, 0f, minFrames = 2))
-        assertEquals(2, detectVerticalTextureFrameCount(64, 32, 64, 64, 0f, minFrames = 2), "two frames is a legitimate cape")
-        assertEquals(16, detectVerticalTextureFrameCount(512, 256, 512, 4096, 0f, minFrames = 2), "HD capes stack the same way")
+        assertEquals(8, detectVerticalTextureFrameCount(64, 32, 64, 256))
+        assertEquals(2, detectVerticalTextureFrameCount(64, 32, 64, 64), "two frames is a legitimate cape")
+        assertEquals(16, detectVerticalTextureFrameCount(512, 256, 512, 4096), "HD capes stack the same way")
     }
 
     @Test
     fun `a sheet that is not a clean stack falls back to the static cape`() {
-        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 64, 200, 0f, minFrames = 2), "a ragged multiple is not a stack")
-        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 128, 256, 0f, minFrames = 2), "a different width is not a stack")
-        assertEquals(1, detectVerticalTextureFrameCount(64, 0, 64, 256, 0f, minFrames = 2), "a zero-height cape cannot be divided into")
-        assertEquals(1, detectVerticalTextureFrameCount(0, 32, 0, 256, 0f, minFrames = 2), "a zero-width cape is not a stack")
+        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 64, 200), "a ragged multiple is not a stack")
+        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 128, 256), "a different width is not a stack")
+        assertEquals(1, detectVerticalTextureFrameCount(64, 0, 64, 256), "a zero-height cape cannot be divided into")
+        assertEquals(1, detectVerticalTextureFrameCount(0, 32, 0, 256), "a zero-width cape is not a stack")
     }
 
     @Test
     fun `a sheet that is just the static cape is one frame`() {
-        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 64, 32, 0f, minFrames = 2))
-        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 64, 0, 0f, minFrames = 2), "an empty sheet is one frame, never zero")
+        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 64, 32))
+        assertEquals(1, detectVerticalTextureFrameCount(64, 32, 64, 0), "an empty sheet is one frame, never zero")
     }
 
     @Test

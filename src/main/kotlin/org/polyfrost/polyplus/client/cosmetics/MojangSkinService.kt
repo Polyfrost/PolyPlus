@@ -200,6 +200,9 @@ object MojangSkinService {
         }
 
     @JvmStatic
+    fun localSkinModel(playerId: UUID): SkinModel? =
+        override?.takeIf { it.owner == playerId && playerId == ClientPlatform.localPlayerUuid() }?.skin?.model
+
     fun localPreviewSkin(playerId: UUID): PreviewSkin? {
         val current = override ?: return null
         if (playerId != current.owner || playerId != ClientPlatform.localPlayerUuid()) return null

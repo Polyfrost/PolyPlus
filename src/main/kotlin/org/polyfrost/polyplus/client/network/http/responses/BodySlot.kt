@@ -16,11 +16,21 @@ enum class BodySlot(val serializedName: String, val displayName: String) {
     Boots("boots", "Feet"),
     Aura("aura", "Aura"),
     Pet("pet", "Pet"),
+    Nameplate("nameplate", "Nameplate"),
+    EffectA("effect_a", "Effect A"),
+    EffectB("effect_b", "Effect B"),
+    Tail("tail", "Tail"),
     Unknown("unknown", "Unknown");
+
+    val namedByCatalogue: Boolean
+        get() = this == EffectA || this == EffectB
+
+    fun labelFor(definition: CosmeticDefinition?): String =
+        if (namedByCatalogue) definition?.groupName ?: displayName else displayName
 
     fun cosmeticType(): CosmeticType = when (this) {
         Cape -> CosmeticType.Cape
-        Backpack -> CosmeticType.Backpack
+        Backpack, Tail -> CosmeticType.Backpack
         Glasses -> CosmeticType.Glasses
         Wings -> CosmeticType.Wings
         LeftHand, RightHand -> CosmeticType.Glove
@@ -29,6 +39,8 @@ enum class BodySlot(val serializedName: String, val displayName: String) {
         Boots -> CosmeticType.Boots
         Shoulder -> CosmeticType.Shoulder
         Pet -> CosmeticType.Pet
+        Nameplate -> CosmeticType.Nameplate
+        EffectA, EffectB -> CosmeticType.Effect
         Unknown -> CosmeticType.Unknown
     }
 

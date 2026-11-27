@@ -5,13 +5,12 @@ import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 //?}
 
 //? if >= 1.21.4 {
-import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform;
 import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignalRecord;
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignalsRenderAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import java.util.Collections;
-import java.util.Map;
 //?}
 
 //? if >= 1.21.4 && < 1.21.10 {
@@ -25,14 +24,11 @@ import java.util.Map;
 *///?}
 public class MixinAvatarRenderState
     //? if >= 1.21.4
-    implements AvatarEmoteRenderAccess
+    implements AvatarEmoteRenderAccess, PlayerSignalsRenderAccess
 {
     //? if >= 1.21.4 {
     @Unique
     private EmoteController polyplus$boundEmoteController;
-
-    @Unique
-    private Map<String, BoneTransform> polyplus$lastEmoteSample;
 
     @Override
     public EmoteController polyplus$boundEmoteController() {
@@ -49,15 +45,17 @@ public class MixinAvatarRenderState
         polyplus$boundEmoteController = controller;
     }
 
+    @Unique
+    private PlayerSignalRecord polyplus$signals;
+
     @Override
-    public Map<String, BoneTransform> polyplus$lastEmoteSample() {
-        Map<String, BoneTransform> sample = polyplus$lastEmoteSample;
-        return sample == null ? Collections.emptyMap() : sample;
+    public PlayerSignalRecord polyplus$signals() {
+        return polyplus$signals;
     }
 
     @Override
-    public void polyplus$setLastEmoteSample(Map<String, BoneTransform> sample) {
-        polyplus$lastEmoteSample = sample == null ? Collections.emptyMap() : sample;
+    public void polyplus$setSignals(PlayerSignalRecord record) {
+        polyplus$signals = record;
     }
     //?}
 }

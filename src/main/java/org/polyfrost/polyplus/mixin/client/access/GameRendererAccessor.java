@@ -8,6 +8,8 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.GameRenderer;
 //? if >= 26.1
 import net.minecraft.client.renderer.LightmapRenderStateExtractor;
+//? if >= 1.21.6
+import net.minecraft.client.renderer.fog.FogRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 //? if >= 26.1
@@ -18,6 +20,11 @@ public interface GameRendererAccessor {
     //? if >= 26.1 {
     @Accessor("lightmapRenderStateExtractor")
     LightmapRenderStateExtractor polyplus$lightmapExtractor();
+    //?}
+
+    //? if >= 1.21.6 {
+    @Accessor("fogRenderer")
+    FogRenderer polyplus$fogRenderer();
     //?}
 
     //? if >= 26.3 {

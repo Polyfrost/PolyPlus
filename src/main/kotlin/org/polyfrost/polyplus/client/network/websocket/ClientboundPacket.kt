@@ -1,6 +1,9 @@
 package org.polyfrost.polyplus.client.network.websocket
 
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.BonusRef
+import org.polyfrost.polyplus.client.network.http.responses.EmoteAnchor
+import org.polyfrost.polyplus.client.network.http.responses.EmoteDefinition
 import org.polyfrost.polyplus.client.network.http.responses.HostedJoinResult
 import org.polyfrost.polyplus.client.network.http.responses.MemberState
 import org.polyfrost.polyplus.client.network.http.responses.PlayDestination
@@ -12,6 +15,10 @@ import org.polyfrost.polyplus.client.network.http.responses.PartyInvite
 import org.polyfrost.polyplus.client.network.http.responses.PartyInviteStatus
 import org.polyfrost.polyplus.client.network.http.responses.PartyLeftReason
 import org.polyfrost.polyplus.client.network.http.responses.PlayerStatus
+import org.polyfrost.polyplus.client.network.http.responses.SharedEmote
+import org.polyfrost.polyplus.client.network.http.responses.SharedEmoteResult
+import org.polyfrost.polyplus.client.pets.PetPlay
+import org.polyfrost.polyplus.client.pets.PetPlaySerializer
 import org.polyfrost.polyplus.client.ping.PingKind
 import org.polyfrost.polyplus.client.ping.PingReply
 import org.polyfrost.polyplus.client.ping.PingTarget
@@ -37,11 +44,28 @@ sealed interface ClientboundPacket {
     data class SubscriptionSnapshot(
         val equipped: Map<String, Map<BodySlot, Int>>,
         @SerialName("active_emotes") val activeEmotes: Map<String, Int>,
+        @SerialName("active_emote_starts") val activeEmoteStarts: Map<String, Long> = emptyMap(),
+        @SerialName("active_emote_anchors") val activeEmoteAnchors: Map<String, EmoteAnchor> = emptyMap(),
+        @SerialName("shared_emotes") val sharedEmotes: Map<String, SharedEmote> = emptyMap(),
+        @SerialName("emote_definitions") val emoteDefinitions: Map<String, EmoteDefinition> = emptyMap(),
+        @SerialName("active_emote_definitions") val activeEmoteDefinitions: Map<String, EmoteDefinition> = emptyMap(),
         @SerialName("particle_colors") val particleColors: Map<String, Int> = emptyMap(),
+        val colors: Map<String, Map<String, Map<String, Int>>> = emptyMap(),
+        @SerialName("saved_colors") val savedColors: Map<String, Map<String, Int>>? = null,
+        @SerialName("saved_colors_active") val savedColorsActive: List<Int>? = null,
+        val bonuses: Map<String, List<BonusRef>> = emptyMap(),
+        @SerialName("pet_interactions_off") val petInteractionsOff: List<String> = emptyList(),
+        @SerialName("pet_interactions_friends") val petInteractionsFriends: Map<String, List<String>> = emptyMap(),
         val users: List<String> = emptyList(),
         val rejected: List<String> = emptyList(),
         @SerialName("request_id") val requestId: Long? = null,
-    ) : ClientboundPacket
+        @SerialName("server_time") val serverTime: Long? = null,
+        @SerialName("server_received_time") val serverReceivedTime: Long? = null,
+    ) : ClientboundPacket {
+        fun emoteDefinitionFor(players: Collection<String>, emoteId: Int): EmoteDefinition? =
+            players.firstNotNullOfOrNull { activeEmoteDefinitions[it]?.takeIf { definition -> definition.id == emoteId } }
+                ?: emoteDefinitions[emoteId.toString()]
+    }
 
     @Serializable
     @SerialName("PlayerPresence")
@@ -67,10 +91,64 @@ sealed interface ClientboundPacket {
     ) : ClientboundPacket
 
     @Serializable
+    @SerialName("PlayerColorsChanged")
+    data class PlayerColorsChanged(
+        val player: String,
+        @SerialName("cosmetic_id") val cosmeticId: Int,
+        val colors: Map<String, Int>? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("CosmeticColorsSaved")
+    data class CosmeticColorsSaved(
+        @SerialName("request_id") val requestId: Long,
+        @SerialName("cosmetic_id") val cosmeticId: Int,
+        val colors: Map<String, Int>? = null,
+        val active: Boolean = true,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("ParticleColorSaved")
+    data class ParticleColorSaved(
+        @SerialName("request_id") val requestId: Long,
+        val color: Int? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PlayerBonusesChanged")
+    data class PlayerBonusesChanged(
+        val player: String,
+        val bonuses: List<BonusRef> = emptyList(),
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("PlayerPetPreferencesChanged")
+    data class PlayerPetPreferencesChanged(
+        val player: String,
+        val interactions: Boolean = true,
+        @Serializable(with = PetPlaySerializer::class) @SerialName("pet_play") val petPlay: PetPlay? = null,
+        val friends: List<String> = emptyList(),
+    ) : ClientboundPacket {
+        val play: PetPlay get() = petPlay ?: PetPlay.ofSwitch(interactions)
+    }
+
+    @Serializable
+    @SerialName("BonusDiscovered")
+    data class BonusDiscovered(
+        @SerialName("bonus_id") val bonusId: Int,
+        val name: String,
+        @SerialName("cosmetic_ids") val cosmeticIds: List<Int> = emptyList(),
+    ) : ClientboundPacket
+
+    @Serializable
     @SerialName("PlayerEmoteStarted")
     data class PlayerEmoteStarted(
         val player: String,
         @SerialName("emote_id") val emoteId: Int,
+        @SerialName("start_time") val startTime: Long? = null,
+        val anchor: EmoteAnchor? = null,
+        val emote: EmoteDefinition? = null,
+        @SerialName("request_id") val requestId: Long? = null,
     ) : ClientboundPacket
 
     @Serializable
@@ -80,12 +158,59 @@ sealed interface ClientboundPacket {
     ) : ClientboundPacket
 
     @Serializable
+    @SerialName("SharedEmoteRequested")
+    data class SharedEmoteRequested(
+        @SerialName("request_id") val requestId: String,
+        val from: String,
+        @SerialName("emote_id") val emoteId: Int,
+        @SerialName("expires_at") val expiresAt: Long,
+        val emote: EmoteDefinition? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteRequestSent")
+    data class SharedEmoteRequestSent(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+        @SerialName("emote_id") val emoteId: Int,
+        @SerialName("expires_at") val expiresAt: Long,
+        val emote: EmoteDefinition? = null,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteResolved")
+    data class SharedEmoteResolved(
+        @SerialName("request_id") val requestId: String,
+        val result: SharedEmoteResult = SharedEmoteResult.Unknown,
+    ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteStart")
+    data class SharedEmoteStart(
+        @SerialName("emote_id") val emoteId: Int,
+        val players: List<String>,
+        val anchor: EmoteAnchor,
+        @SerialName("start_time") val startTime: Long,
+        val emote: EmoteDefinition? = null,
+    ) : ClientboundPacket {
+        fun toSharedEmote(): SharedEmote = SharedEmote(emoteId, players, anchor, startTime)
+    }
+
+    @Serializable
+    @SerialName("SharedEmoteStop")
+    data class SharedEmoteStop(val players: List<String> = emptyList()) : ClientboundPacket
+
+    @Serializable
     @SerialName("OwnershipUpdated")
     data class OwnershipUpdated(
         val player: String,
         @SerialName("cosmetic_ids") val cosmeticIds: List<Int>,
         @SerialName("emote_ids") val emoteIds: List<Int>,
     ) : ClientboundPacket
+
+    @Serializable
+    @SerialName("CatalogUpdated")
+    data class CatalogUpdated(val version: Long) : ClientboundPacket
 
     @Serializable
     @SerialName("EmotePlay")

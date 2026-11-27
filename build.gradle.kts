@@ -400,12 +400,20 @@ dependencies {
         modLocalRuntime("maven.modrinth:evergreenhud:$it") { isTransitive = false }
     }
 
+    optionalProperty("deps.soundfix")?.let {
+        modCompileOnly("maven.modrinth:soundfix:$it") { isTransitive = false }
+    }
+
     optionalProperty("deps.iris")?.let {
         modCompileOnly("maven.modrinth:iris:$it") { isTransitive = false }
     }
 
     optionalProperty("deps.distanthorizons")?.let {
         modCompileOnly("maven.modrinth:distanthorizons:$it") { isTransitive = false }
+    }
+
+    optionalProperty("deps.polynametag")?.let {
+        modCompileOnly("org.polyfrost:polynametag-$mcVersion:$it") { isTransitive = false }
     }
 
     compileOnly("maven.modrinth:debugify:26.2.0.0") { isTransitive = false }
@@ -433,6 +441,7 @@ dependencies {
         testCompileOnly("$module:$version")
     }
 
+    implementation(include("org.polyfrost:plusrenderer:${property("deps.plusrenderer")}")!!)
     implementation(include("gg.sona:eos:2.2.0")!!)
     implementation(include("io.github.jaredmdobson:concentus:1.0.2")!!)
 

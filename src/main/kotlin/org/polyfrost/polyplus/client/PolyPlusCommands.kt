@@ -99,6 +99,7 @@ object PolyPlusCommands {
         //? if >= 1.21.1 || = 1.8.9 {
         root = root.then(CosmeticCommands.build())
         root = root.then(ParticleCommands.build())
+        if (PolyPlusConstants.IS_DEV_ENV) root = root.then(DevBundleCommands.build())
         //?}
 
         return root

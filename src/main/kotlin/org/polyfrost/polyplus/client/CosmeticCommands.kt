@@ -9,8 +9,12 @@ import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.emotes.EmoteApi
+import org.polyfrost.polyplus.client.emotes.duo.DuoEmotes
+import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticVariantUi
+import org.polyfrost.polyplus.client.gui.wardrobe.variantChips
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -33,24 +37,35 @@ object CosmeticCommands {
             .then(
                 commands.literal("equip")
                     .then(
-                        commands.argument("id", IntegerArgumentType.integer(1))
+                        commands.literal("emote")
+                            .then(
+                                commands.argument("number", IntegerArgumentType.integer(1))
+                                    .suggests { _, builder ->
+                                        for (id in ownedEmoteIds().sorted()) {
+                                            builder.suggest(id)
+                                        }
+                                        builder.buildFuture()
+                                    }
+                                    .executes { selectEmote(it.source, IntegerArgumentType.getInteger(it, "number")) },
+                            ),
+                    )
+                    .then(
+                        commands.argument("number", IntegerArgumentType.integer(1))
                             .suggests { _, builder ->
-                                for (id in CosmeticCatalog.ownedCosmeticGroupIds().sorted()) {
-                                    builder.suggest(id)
-                                }
-                                for (id in CosmeticCatalog.ownedEmoteIds().sorted()) {
+                                val owned = CosmeticCatalog.ownedCosmeticIds()
+                                for (id in CosmeticCatalog.ownedCosmeticGroups().map { commandNumber(it, owned) }.sorted()) {
                                     builder.suggest(id)
                                 }
                                 builder.buildFuture()
                             }
-                            .executes { equip(it.source, IntegerArgumentType.getInteger(it, "id"), variant = null) }
+                            .executes { equip(it.source, IntegerArgumentType.getInteger(it, "number"), variant = null) }
                             .then(
                                 commands.argument("variant", StringArgumentType.greedyString())
                                     .suggests { ctx, builder ->
-                                        val id = IntegerArgumentType.getInteger(ctx, "id")
+                                        val id = IntegerArgumentType.getInteger(ctx, "number")
                                         CosmeticCatalog.groupContaining(id)?.let { group ->
-                                            for ((label, _) in CosmeticCatalog.userFacingVariants(group)) {
-                                                builder.suggest(label)
+                                            for (chip in lockerChips(group, CosmeticCatalog.ownedCosmeticIds(), equippedIds())) {
+                                                builder.suggest(chip.name)
                                             }
                                         }
                                         builder.buildFuture()
@@ -58,7 +73,7 @@ object CosmeticCommands {
                                     .executes {
                                         equip(
                                             it.source,
-                                            IntegerArgumentType.getInteger(it, "id"),
+                                            IntegerArgumentType.getInteger(it, "number"),
                                             StringArgumentType.getString(it, "variant"),
                                         )
                                     },
@@ -74,14 +89,14 @@ object CosmeticCommands {
                 commands.literal("play")
                     .executes { play(it.source, cosmeticId = null) }
                     .then(
-                        commands.argument("id", IntegerArgumentType.integer(1))
+                        commands.argument("number", IntegerArgumentType.integer(1))
                             .suggests { _, builder ->
                                 for (id in ownedEmoteIds().sorted()) {
                                     builder.suggest(id)
                                 }
                                 builder.buildFuture()
                             }
-                            .executes { play(it.source, IntegerArgumentType.getInteger(it, "id")) },
+                            .executes { play(it.source, IntegerArgumentType.getInteger(it, "number")) },
                     ),
             )
             .then(commands.literal("stop").executes { stop(it.source) })
@@ -92,11 +107,12 @@ object CosmeticCommands {
         }
 
         val ownedCosmetics = CosmeticCatalog.ownedCosmeticIds()
+        val equipped = equippedIds()
         val groups = CosmeticCatalog.cosmeticGroupViews()
             .let { views ->
                 if (ownedOnly) views.filter { group -> group.variants.any { it.id in ownedCosmetics } } else views
             }
-            .sortedWith(compareBy({ it.type.ordinal }, { it.groupId }))
+            .sortedWith(compareBy({ it.type.ordinal }, { commandNumber(it, ownedCosmetics) }))
 
         val emotes = if (ownedOnly) {
             CosmeticCatalog.ownedEmoteIds().mapNotNull(CosmeticCatalog::getEmoteDefinition)
@@ -108,30 +124,37 @@ object CosmeticCommands {
             source.sendFeedback(
                 Component.literal(
                     if (ownedOnly) {
-                        "No owned cosmetics yet. Data loads when you join a world — try again in a moment."
+                        "Your locker is empty or still loading. It loads when you join a world, so try again in a moment."
                     } else {
-                        "Cosmetic catalog is empty. Data loads when you join a world — try again in a moment."
+                        "The cosmetic catalog is empty or still loading. It loads when you join a world, so try again in a moment."
                     },
                 ).withStyle(ChatFormatting.GRAY),
             )
             return Command.SINGLE_SUCCESS
         }
 
-        source.sendFeedback(
-            Component.literal(if (ownedOnly) "Owned cosmetics:" else "Cosmetic catalog:")
-                .withStyle(ChatFormatting.GRAY),
-        )
+        if (groups.isNotEmpty()) {
+            source.sendFeedback(
+                Component.literal(
+                    if (ownedOnly) {
+                        "Your cosmetics (equip one with /polyplus cosmetics equip <number>):"
+                    } else {
+                        "All cosmetics (equip one with /polyplus cosmetics equip <number>):"
+                    },
+                ).withStyle(ChatFormatting.GRAY),
+            )
+        }
         for (group in groups) {
             val typeLabel = group.type.name.lowercase()
             source.sendFeedback(
-                Component.literal("${group.name} ($typeLabel) — #${group.groupId}")
+                Component.literal("#${commandNumber(group, ownedCosmetics)} ${group.name} ($typeLabel)")
                     .withStyle(ChatFormatting.GREEN),
             )
-            val labels = CosmeticCatalog.userFacingVariants(group)
-                .let { variants ->
-                    if (ownedOnly) variants.filter { (_, id) -> id in ownedCosmetics } else variants
-                }
-                .map { it.first }
+            val labels = if (ownedOnly) {
+                lockerChips(group, ownedCosmetics, equipped).filter { chip -> chip.pieces.all { it in ownedCosmetics } }
+            } else {
+                variantChips(group)
+            }.map { it.name }
             if (labels.size > 1) {
                 source.sendFeedback(
                     Component.literal("  ${labels.joinToString(", ")}")
@@ -141,7 +164,10 @@ object CosmeticCommands {
         }
 
         if (emotes.isNotEmpty()) {
-            source.sendFeedback(Component.literal("Emotes:").withStyle(ChatFormatting.GRAY))
+            source.sendFeedback(
+                Component.literal("Emotes (pick one with /polyplus cosmetics equip emote <number>):")
+                    .withStyle(ChatFormatting.GRAY),
+            )
             for (emote in emotes) {
                 source.sendFeedback(formatDefinition(emote))
             }
@@ -151,69 +177,102 @@ object CosmeticCommands {
 
     private fun active(source: Source): Int {
         val active = CosmeticCatalog.localEquipped()
+        val owned = CosmeticCatalog.ownedCosmeticIds()
         source.sendFeedback(Component.literal("Active cosmetics:").withStyle(ChatFormatting.GRAY))
         for (slot in BodySlot.equippableSlots) {
-            source.sendFeedback(formatActiveSlot(slot.displayName, active.equipped[slot]))
+            val id = active.equipped[slot]
+            val definition = id?.let(CosmeticCatalog::getCosmeticDefinition)
+            val value = when {
+                id == null -> null
+                definition == null -> "unknown cosmetic"
+                else -> "${displayName(definition)} #${CosmeticCatalog.groupContaining(id)?.let { commandNumber(it, owned) } ?: id}"
+            }
+            source.sendFeedback(formatActiveSlot(slot.labelFor(definition), value))
         }
-        source.sendFeedback(formatActiveSlot("Selected emote", CosmeticCatalog.selectedEmoteId()))
+        val emote = CosmeticCatalog.selectedEmoteId()
+        val emoteValue = emote?.let { id -> CosmeticCatalog.getEmoteDefinition(id)?.let { "${displayName(it)} #$id" } ?: "emote #$id" }
+        source.sendFeedback(formatActiveSlot("Selected emote", emoteValue))
         return Command.SINGLE_SUCCESS
     }
 
-    private fun equip(source: Source, id: Int, variant: String?): Int {
+    private fun equip(source: Source, number: Int, variant: String?): Int {
         PolyPlusClient.refreshCosmeticsIfNeeded()
 
-        if (variant == null && CosmeticCatalog.getCosmeticDefinition(id) == null && CosmeticCatalog.getEmoteDefinition(id) != null) {
-            return selectEmote(source, id)
-        }
-
-        val group = CosmeticCatalog.groupContaining(id)
+        val group = CosmeticCatalog.groupContaining(number)
         if (group == null) {
             source.sendFeedback(
-                Component.literal("Cosmetic #$id is not in the catalog.")
+                Component.literal("There's no cosmetic #$number. Run /polyplus cosmetics list to see the numbers.")
                     .withStyle(ChatFormatting.RED),
             )
             return Command.SINGLE_SUCCESS
         }
 
-        val targetId = if (variant != null) {
-            val match = CosmeticCatalog.userFacingVariants(group)
-                .firstOrNull { it.first.equals(variant, ignoreCase = true) }
-            if (match == null) {
-                val options = CosmeticCatalog.userFacingVariants(group).joinToString(", ") { it.first }
+        val owned = CosmeticCatalog.ownedCosmeticIds()
+        val target = when (val choice = equipChoice(group, number, variant, owned, equippedIds())) {
+            is EquipChoice.Chosen -> choice.chip
+            is EquipChoice.NotOwned -> {
                 source.sendFeedback(
-                    Component.literal("Unknown variant '$variant' for ${group.name}. Options: $options")
+                    Component.literal("You don't own the ${choice.variant} variant of ${group.name}.")
                         .withStyle(ChatFormatting.RED),
                 )
                 return Command.SINGLE_SUCCESS
             }
-            match.second
-        } else {
-            if (group.variants.any { it.id == id }) id else group.variants.firstOrNull()?.id
+            is EquipChoice.NoSuchVariant -> {
+                val options = choice.options.joinToString(", ")
+                source.sendFeedback(
+                    Component.literal("${group.name} has no '$variant' variant. Try one of these: $options")
+                        .withStyle(ChatFormatting.RED),
+                )
+                return Command.SINGLE_SUCCESS
+            }
+            EquipChoice.Empty -> {
+                source.sendFeedback(
+                    Component.literal("${group.name} has no variant to equip.")
+                        .withStyle(ChatFormatting.RED),
+                )
+                return Command.SINGLE_SUCCESS
+            }
         }
 
-        if (targetId == null) {
-            source.sendFeedback(
-                Component.literal("${group.name} has no variant to equip.")
-                    .withStyle(ChatFormatting.RED),
-            )
+        val missing = target.pieces.count { it !in owned }
+        if (missing > 0) {
+            val message = if (missing < target.pieces.size) {
+                "You only own one side of ${group.name}."
+            } else {
+                "${group.name} isn't in your locker."
+            }
+            source.sendFeedback(Component.literal(message).withStyle(ChatFormatting.RED))
             return Command.SINGLE_SUCCESS
         }
 
-        if (targetId !in CosmeticCatalog.ownedCosmeticIds()) {
-            source.sendFeedback(
-                Component.literal("${group.name} is not in your locker.")
-                    .withStyle(ChatFormatting.RED),
-            )
-            return Command.SINGLE_SUCCESS
-        }
+        val label = commandLabel(group, target)
 
-        val label = CosmeticCatalog.getCosmeticDefinition(targetId)?.let { def ->
-            if (def.groupName == def.variantName) def.groupName else "${def.groupName} — ${def.variantName}"
-        } ?: "cosmetic #$targetId"
-
-        return announce(source, "Equipping $label...", "Equipped $label.", "Failed to equip $label") {
-            CosmeticService.equip(targetId)
+        return announce(source, "Equipping $label...", "Equipped $label.", "Couldn't equip $label") {
+            CosmeticService.awaitSkinChangeFor(if (target.sided) target.pieces else listOf(target.id))
+            CosmeticService.equipQueue.run {
+                if (target.sided) {
+                    val members = group.variants.mapTo(HashSet()) { it.id }
+                    val worn = CosmeticCatalog.localEquipped().equipped.filterValues { it in members }.keys
+                    CosmeticService.equipPieces(target.pieces, worn)
+                } else {
+                    CosmeticService.equip(target.id)
+                }
+            }
         }
+    }
+
+    private fun commandLabel(group: CosmeticGroupView, chip: CosmeticVariantUi): String {
+        val definition = CosmeticCatalog.getCosmeticDefinition(chip.artId)
+        val name = definition?.groupName ?: group.name
+        val finish = definition?.variantName?.takeIf { it != definition.groupName }
+        val hand = when {
+            chip.pieces.size > 1 -> "both hands"
+            chip.side == BodySlot.LeftHand -> "left hand"
+            chip.side == BodySlot.RightHand -> "right hand"
+            else -> null
+        }
+        val details = listOfNotNull(finish, hand)
+        return if (details.isEmpty()) name else "$name (${details.joinToString(", ")})"
     }
 
     /** Reports progress and the outcome of the action on the main thread. */
@@ -245,9 +304,18 @@ object CosmeticCommands {
     }
 
     private fun selectEmote(source: Source, emoteId: Int): Int {
+        PolyPlusClient.refreshCosmeticsIfNeeded()
+        val definition = CosmeticCatalog.getEmoteDefinition(emoteId)
+        if (definition == null) {
+            source.sendFeedback(
+                Component.literal("There's no emote #$emoteId. Run /polyplus cosmetics list to see the numbers.")
+                    .withStyle(ChatFormatting.RED),
+            )
+            return Command.SINGLE_SUCCESS
+        }
         if (emoteId !in CosmeticCatalog.ownedEmoteIds()) {
             source.sendFeedback(
-                Component.literal("Emote #$emoteId is not in your locker.")
+                Component.literal("${displayName(definition)} isn't in your locker.")
                     .withStyle(ChatFormatting.RED),
             )
             return Command.SINGLE_SUCCESS
@@ -255,27 +323,27 @@ object CosmeticCommands {
 
         CosmeticCatalog.setSelectedEmote(emoteId)
         source.sendFeedback(
-            Component.literal("Selected emote #$emoteId.")
+            Component.literal("Selected the ${displayName(definition)} emote.")
                 .withStyle(ChatFormatting.GREEN),
         )
         return Command.SINGLE_SUCCESS
     }
 
     private fun clear(source: Source, slot: BodySlot): Int {
-        val label = slot.displayName.lowercase()
+        val equipped = CosmeticCatalog.localEquipped().equipped[slot]?.let(CosmeticCatalog::getCosmeticDefinition)
+        val label = if (slot.namedByCatalogue) slot.labelFor(equipped) else slot.displayName.lowercase()
         return announce(
             source,
             "Clearing active $label...",
             "Cleared active $label.",
             "Failed to clear $label",
         ) {
-            CosmeticService.clearSlot(slot)
+            CosmeticService.equipQueue.run { CosmeticService.clearSlot(slot) }
         }
     }
 
     private fun clearEmote(source: Source): Int {
-        CosmeticCatalog.setSelectedEmote(null)
-        CosmeticService.stopEmote()
+        CosmeticService.clearEmote()
         source.sendFeedback(
             Component.literal("Cleared selected emote.")
                 .withStyle(ChatFormatting.GREEN),
@@ -296,7 +364,7 @@ object CosmeticCommands {
         val id = cosmeticId ?: CosmeticCatalog.selectedEmoteId()
         if (id == null) {
             source.sendFeedback(
-                Component.literal("No selected emote. Use /polyplus cosmetics equip <id> or play <id>.")
+                Component.literal("You haven't picked an emote. Use /polyplus cosmetics equip emote <number> or play <number>.")
                     .withStyle(ChatFormatting.RED),
             )
             return Command.SINGLE_SUCCESS
@@ -344,6 +412,7 @@ object CosmeticCommands {
             return Command.SINGLE_SUCCESS
         }
 
+        DuoEmotes.stopAll()
         CosmeticService.stopEmote()
         EmoteApi.stop(player)
         source.sendFeedback(
@@ -353,24 +422,19 @@ object CosmeticCommands {
         return Command.SINGLE_SUCCESS
     }
 
-    private fun formatDefinition(definition: CosmeticDefinition): Component {
-        val typeLabel = definition.type.name.lowercase()
-        val label = if (definition.groupName == definition.variantName) {
-            definition.name
-        } else {
-            "${definition.groupName} — ${definition.variantName}"
-        }
-        val model = definition.model?.let { " ($it)" } ?: ""
-        return Component.literal("#${definition.id} $typeLabel $label$model")
-            .withStyle(ChatFormatting.GREEN)
-    }
+    private fun equippedIds(): Set<Int> = CosmeticCatalog.localEquipped().ids().toHashSet()
 
-    private fun formatActiveSlot(label: String, id: Int?): Component {
-        val value = id?.let { "#$it" } ?: "none"
-        return Component.literal("  $label: ")
+    private fun formatDefinition(definition: CosmeticDefinition): Component =
+        Component.literal("#${definition.id} ${displayName(definition)}")
+            .withStyle(ChatFormatting.GREEN)
+
+    private fun displayName(definition: CosmeticDefinition): String =
+        if (definition.groupName == definition.variantName) definition.name else "${definition.groupName} (${definition.variantName})"
+
+    private fun formatActiveSlot(label: String, value: String?): Component =
+        Component.literal("  $label: ")
             .withStyle(ChatFormatting.GRAY)
-            .append(Component.literal(value).withStyle(if (id != null) ChatFormatting.GREEN else ChatFormatting.DARK_GRAY))
-    }
+            .append(Component.literal(value ?: "none").withStyle(if (value != null) ChatFormatting.GREEN else ChatFormatting.DARK_GRAY))
 
     private fun ownedEmoteIds(): List<Int> =
         CosmeticCatalog.ownedEmoteIds()

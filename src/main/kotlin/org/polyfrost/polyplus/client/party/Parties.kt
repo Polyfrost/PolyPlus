@@ -15,15 +15,26 @@ import kotlinx.coroutines.flow.onEach
 object Parties {
     private val LOGGER = LogManager.getLogger()
 
-    private val ticks: List<Pair<String, () -> Unit>> = listOf(
-        "voice" to PartyVoice::tick,
-        "scene transfer" to SceneTransfer::tick,
-        "scene" to PartyScene::tick,
-        "leader follow" to LeaderFollow::tick,
-        "host join requests" to HostJoinRequests::tick,
-        "play together" to PlayTogether::tick,
-        "presence" to PartyPresence::tick,
-        "join" to PartyJoin::tick,
+    private val tickNames = arrayOf(
+        "voice",
+        "scene transfer",
+        "scene",
+        "leader follow",
+        "host join requests",
+        "play together",
+        "presence",
+        "join",
+    )
+
+    private val tickSteps: Array<() -> Unit> = arrayOf(
+        PartyVoice::tick,
+        SceneTransfer::tick,
+        PartyScene::tick,
+        LeaderFollow::tick,
+        HostJoinRequests::tick,
+        PlayTogether::tick,
+        PartyPresence::tick,
+        PartyJoin::tick,
     )
 
     private val tickThrottle = EosLogThrottle()
@@ -38,7 +49,13 @@ object Parties {
         PartyRepository.refreshed.onEach { PartyPresence.forceSend() }.launchIn(PolyPlusClient.SCOPE)
         PolyConnection.onClosed { ClientPlatform.runOnMain(::resetSession) }
         eventHandler<TickEvent.End> {
-            ticks.forEach { (name, step) -> runCatching(step).onFailure { error -> reportTickFailure(name, error) } }
+            for (i in tickSteps.indices) {
+                try {
+                    tickSteps[i]()
+                } catch (error: Throwable) {
+                    reportTickFailure(tickNames[i], error)
+                }
+            }
         }
     }
 

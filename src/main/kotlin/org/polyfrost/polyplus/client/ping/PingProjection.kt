@@ -32,6 +32,14 @@ internal object PingProjection {
     private const val NEAR = 0.05f
     private const val BLEND = 0.2f
 
+    //? if > 1.8.9 {
+    private val scratchRotation = Quaternionf()
+    private val scratchInverse = Quaternionf()
+    private val scratchView = Vector3f()
+    private val scratchUp = Vector3f()
+    private val scratchProbe = Vector3f()
+    //?}
+
     //? if = 1.8.9 {
     /*private const val THIRD_PERSON_DISTANCE = 4.0
     private const val CLIP_JITTER = 0.1
@@ -65,11 +73,11 @@ internal object PingProjection {
         val renderer = mc.gameRenderer
         val camera = LobbyCompat.camera(renderer)
         val origin = LobbyCompat.cameraPosition(renderer)
-        val rotation = Quaternionf(camera.rotation())
-        val inverse = Quaternionf(rotation).conjugate()
-        val view = Vector3f((x - origin.x).toFloat(), (y - origin.y).toFloat(), (z - origin.z).toFloat()).rotate(inverse)
-        val up = Vector3f(0f, 1f, 0f).rotate(inverse)
-        val probe = Vector3f(1f, 1f, -1f).rotate(rotation)
+        val rotation = scratchRotation.set(camera.rotation())
+        val inverse = scratchInverse.set(rotation).conjugate()
+        val view = scratchView.set((x - origin.x).toFloat(), (y - origin.y).toFloat(), (z - origin.z).toFloat()).rotate(inverse)
+        val up = scratchUp.set(0f, 1f, 0f).rotate(inverse)
+        val probe = scratchProbe.set(1f, 1f, -1f).rotate(rotation)
         //? if >= 1.21.8 {
         val fov = 0f
         //?} else {

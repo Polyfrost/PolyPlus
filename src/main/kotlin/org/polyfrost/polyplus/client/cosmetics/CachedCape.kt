@@ -4,6 +4,8 @@ import net.minecraft.client.Minecraft
 import net.minecraft.resources.Identifier
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.PolyPlusConstants
+import org.polyfrost.polyplus.client.CosmeticMotion
+import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import java.awt.image.BufferedImage
 
 //? if > 1.8.9 {
@@ -104,7 +106,12 @@ class CachedCape(
             register()
         }
         if (frames > 1) {
-            drawFrame(capeFrameIndex(System.nanoTime() / 1_000_000L, frames, millisPerFrame))
+            val frame = if (PolyPlusCosmeticsConfig.cosmeticMotion == CosmeticMotion.OFF) {
+                0
+            } else {
+                capeFrameIndex(System.nanoTime() / 1_000_000L, frames, millisPerFrame)
+            }
+            drawFrame(frame)
         }
         return location
     }

@@ -328,7 +328,12 @@ object OnboardingFeatures {
         return changed
     }
 
-    private fun hasPendingModOptions(): Boolean = ModCard.entries.any { it.pending }
+    private val modCards = ModCard.entries.toTypedArray()
+
+    private fun hasPendingModOptions(): Boolean {
+        for (i in modCards.indices) if (modCards[i].pending) return true
+        return false
+    }
 
     private fun logModApplyFailure(key: String, message: String, error: Throwable) {
         if (error is ClassNotFoundException) return
