@@ -46,7 +46,7 @@ enum class WorldDifficulty(val label: String) {
     *///?}
 }
 
-private fun tr(key: String): String = Platform.i18n().getUnformattedText(Component.translatable(key))
+internal fun tr(key: String): String = Platform.i18n().getUnformattedText(Component.translatable(key))
 
 data class WorldTypeOption(val id: String, val label: String)
 
@@ -86,11 +86,19 @@ interface WorldDraft {
     val dataPackCount: Int
     val experimental: Boolean
     fun openDataPacks()
-    fun openExperiments()
+    fun editExperiments(): WorldExperiments?
 
     fun create()
     fun cancel()
     fun useVanilla()
+}
+
+class WorldExperiment(val id: String, val label: String, val description: String?, val enabled: Boolean)
+
+interface WorldExperiments {
+    val entries: List<WorldExperiment>
+
+    fun apply(enabled: Set<String>, onRetry: (WorldExperiments?) -> Unit)
 }
 
 enum class WorldRuleKind { Toggle, Number }

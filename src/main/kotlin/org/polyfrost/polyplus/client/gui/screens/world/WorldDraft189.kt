@@ -194,7 +194,7 @@ internal class WorldDraft189(private val screen: CreateWorldScreen) : WorldDraft
 
     override fun openDataPacks() {}
 
-    override fun openExperiments() {}
+    override fun editExperiments(): WorldExperiments? = null
 
     override fun create() {
         ClientPlatform.setScreen(null)

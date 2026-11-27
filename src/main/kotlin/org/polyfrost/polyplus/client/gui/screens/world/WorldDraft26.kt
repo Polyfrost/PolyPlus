@@ -22,11 +22,16 @@ import net.minecraft.client.gui.screens.worldselection.EditWorldScreen
 import net.minecraft.client.gui.screens.worldselection.OptimizeWorldScreen
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState
 import net.minecraft.client.multiplayer.resolver.ServerAddress
+import net.minecraft.locale.Language
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.ComponentUtils
 import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.server.packs.repository.Pack
+import net.minecraft.server.packs.repository.PackRepository
+import net.minecraft.server.packs.repository.PackSource
 import net.minecraft.world.Difficulty
 import net.minecraft.world.flag.FeatureFlags
+import net.minecraft.world.level.WorldDataConfiguration
 //? if >= 1.21.11 {
 import net.minecraft.util.FileUtil
 import net.minecraft.world.level.gamerules.GameRule
@@ -203,7 +208,42 @@ internal class WorldDraft26(private val screen: CreateWorldScreen) : WorldDraft 
 
     override fun openDataPacks() = access.polyplusOpenDataPacks(ui.settings.dataConfiguration())
 
-    override fun openExperiments() = access.polyplusOpenExperiments(ui.settings.dataConfiguration())
+    override fun editExperiments(): WorldExperiments? = experimentsFor(ui.settings.dataConfiguration())
+
+    private fun experimentsFor(configuration: WorldDataConfiguration): WorldExperiments? {
+        val repository = access.polyplusDataPackSettings(configuration)?.second ?: return null
+        return WorldExperiments26(repository)
+    }
+
+    private inner class WorldExperiments26(private val repository: PackRepository) : WorldExperiments {
+        private val packs = repository.availablePacks.filter { it.packSource == PackSource.FEATURE }
+
+        override val entries: List<WorldExperiment> = packs.map { pack ->
+            val key = "dataPack.${pack.id}.name"
+            val description = pack.description.string
+            WorldExperiment(
+                id = pack.id,
+                label = if (Language.getInstance().has(key)) Component.translatable(key).string else pack.title.string,
+                description = description.takeIf { it.isNotBlank() },
+                enabled = pack in repository.selectedPacks,
+            )
+        }
+
+        override fun apply(enabled: Set<String>, onRetry: (WorldExperiments?) -> Unit) {
+            val selected = ArrayList(repository.selectedPacks)
+            val features = ArrayList<Pack>()
+            packs.forEach { pack ->
+                selected.remove(pack)
+                if (pack.id in enabled) features.add(pack)
+            }
+            selected.addAll(features.asReversed())
+            repository.setSelected(selected.map { it.id })
+            access.polyplusTryApplyNewDataPacks(repository, false) { configuration ->
+                onRetry(experimentsFor(configuration))
+                ClientPlatform.setScreen(screen)
+            }
+        }
+    }
 
     override fun create() = access.polyplusOnCreate()
 
