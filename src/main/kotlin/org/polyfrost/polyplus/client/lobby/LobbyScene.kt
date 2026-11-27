@@ -65,6 +65,8 @@ import net.minecraft.nbt.NbtOps
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData
 import net.minecraft.resources.Identifier
 //? if > 1.8.9
+import net.minecraft.resources.ResourceKey
+//? if > 1.8.9
 import net.minecraft.server.ServerLinks
 //? if > 1.8.9
 import net.minecraft.stats.StatsCounter
@@ -1254,6 +1256,7 @@ object LobbyScene {
         val factory = LobbyCompat.containers(level)
         val biomeLookup = level.registryAccess().lookupOrThrow(Registries.BIOME)
         val blockLookup = level.registryAccess().lookupOrThrow(Registries.BLOCK)
+        val blockEntityTypes = level.registryAccess().lookupOrThrow(Registries.BLOCK_ENTITY_TYPE)
         val native = LobbySnapshot.native(root)
         val filled = HashMap<ChunkPos, Int>()
         cache.updateViewCenter(center.x, center.z)
@@ -1284,6 +1287,8 @@ object LobbyScene {
                 val blockPos = LobbyCompat.blockEntityPos(pos, blockEntity)
                 if (level.isOutsideBuildHeight(blockPos)) return@forEach
                 val state = chunk.getBlockState(blockPos)
+                val type = Identifier.tryParse(blockEntity.getStringOr("id", ""))?.let { blockEntityTypes.get(ResourceKey.create(Registries.BLOCK_ENTITY_TYPE, it)).orElse(null) }
+                if (type?.value()?.isValid(state) != true) return@forEach
                 BlockEntity.loadStatic(blockPos, state, blockEntity, level.registryAccess())?.let(chunk::addAndRegisterBlockEntity)
             }
         }
