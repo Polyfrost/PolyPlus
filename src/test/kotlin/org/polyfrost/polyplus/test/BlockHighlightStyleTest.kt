@@ -79,7 +79,7 @@ class BlockHighlightStyleTest {
     @Test
     fun `picking a colour turns a rainbow or gradient solid, as CBH 2_94 reads it`() {
         val rainbow = BlockHighlightStyle.parse(config(fill = true)).fill!!.colors
-        assertTrue(rainbow.at(0).first != rainbow.at(0).second, "a rainbow gradient offsets its end colour")
+        assertTrue(rainbow.at(0).first != rainbow.at(0).second, "a rainbow gradient offsets its end color")
 
         val draft = BlockHighlightDraft(config(fill = true))
         draft.fillColor = 0x46C35A

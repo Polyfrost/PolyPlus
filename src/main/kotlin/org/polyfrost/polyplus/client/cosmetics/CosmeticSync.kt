@@ -22,27 +22,50 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.polyplus.client.PolyPlusBadge
 import org.polyfrost.polyplus.client.PolyPlusClient
+import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerCosmeticsAccess
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
+import org.polyfrost.polyplus.client.cosmetics.colors.CosmeticColors
+import org.polyfrost.polyplus.client.cosmetics.render.CosmeticEquips
+import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
+import org.polyfrost.polyplus.client.cosmetics.sets.BonusState
+import org.polyfrost.polyplus.client.cosmetics.sets.DiscoveredBonuses
+import org.polyfrost.polyplus.client.emotes.EmoteApi
+import org.polyfrost.polyplus.client.emotes.EmoteServerClock
+import org.polyfrost.polyplus.client.emotes.endsDevPlayback
+import org.polyfrost.polyplus.client.emotes.snapshotActive
+import org.polyfrost.polyplus.client.emotes.snapshotSessions
+import org.polyfrost.polyplus.client.emotes.snapshotSkips
+import org.polyfrost.polyplus.client.emotes.duo.DuoEmoteState
+import org.polyfrost.polyplus.client.emotes.duo.DuoEmotes
 import org.polyfrost.polyplus.client.gui.MainMenuReplacement
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
+import org.polyfrost.polyplus.client.gui.preview.PreviewTryOn
 import org.polyfrost.polyplus.client.lobby.LobbyScene
+import org.polyfrost.polyplus.client.nameplate.NameplateWearers
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.polyplus.client.network.http.responses.EmoteAnchor
+import org.polyfrost.polyplus.client.network.http.responses.EmoteDefinition
 import org.polyfrost.polyplus.client.network.websocket.ClientboundPacket
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
-import org.polyfrost.polyplus.client.pets.PetEntity
 import org.polyfrost.polyplus.client.utils.Batcher
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.pets.PetEquips
+import org.polyfrost.polyplus.client.pets.PetInteractions
 import org.polyfrost.polyplus.client.pets.PetManager
+import org.polyfrost.polyplus.client.pets.PetPlay
 import org.polyfrost.polyplus.events.WebSocketMessage
 import java.time.Duration
 import java.util.UUID
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 object CosmeticSync {
     private val LOGGER = LogManager.getLogger()
@@ -53,7 +76,9 @@ object CosmeticSync {
     private val watchedFriends: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val visiblePlayers: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-    private val pendingSubscriptions = ConcurrentHashMap<Long, List<String>>()
+    private class PendingSubscription(val players: List<String>, val sentAtMs: Long)
+
+    private val pendingSubscriptions = ConcurrentHashMap<Long, PendingSubscription>()
     private val nextRequestId = AtomicLong()
 
     private const val MAX_PLAYERS_PER_REQUEST = 64
@@ -75,10 +100,36 @@ object CosmeticSync {
 
     private val loading: MutableSet<Int> = ConcurrentHashMap.newKeySet()
     private val pendingEmotes = ConcurrentHashMap<Int, Int>()
+    private val pendingRevisions = ConcurrentHashMap<EmoteRevision, Int>()
+
+    private class RemoteEmote(
+        val emoteId: Int,
+        val startedAtMs: Long,
+        val token: Long,
+        val serverStart: Long?,
+        val revision: EmoteRevision?,
+        val dev: Boolean = false,
+    ) {
+        val receivedAtMs: Long = System.currentTimeMillis()
+    }
+
+    private class AppliedEmote(val token: Long, var offsetMs: Long)
+
+    private data class PlayPin(val player: UUID)
+
+    private const val CLOCK_WAIT_MS = 1500L
+    private const val RESYNC_OFFSET_MS = 100L
+
+    private val remoteEmotes = ConcurrentHashMap<UUID, RemoteEmote>()
+    private val emoteTokens = AtomicLong()
+    private val appliedEmotes = WeakHashMap<AbstractClientPlayer, AppliedEmote>()
+    private val emoteLoads: MutableSet<Any> = ConcurrentHashMap.newKeySet()
+    private val partnerWatchers = ConcurrentHashMap<UUID, MutableSet<UUID>>()
 
     // gives a closed cosmetics screen's last preview captures time to finish first
     private const val TRIM_DELAY_TICKS = 20
-    private var trimCountdown = 0
+    private const val DEPARTURE_TRIM_DELAY_TICKS = 100
+    private val trimTimer = AssetTrimTimer(TRIM_DELAY_TICKS, DEPARTURE_TRIM_DELAY_TICKS)
     private var configUiWasOpen = false
 
     @Volatile
@@ -100,6 +151,7 @@ object CosmeticSync {
             if (++reconcileTicks >= RECONCILE_INTERVAL_TICKS) {
                 reconcileTicks = 0
                 reconcileVisiblePlayers()
+                CosmeticAssetCache.releaseRetired(wornCosmetics())
             }
             if (++resubscribeTicks >= RESUBSCRIBE_INTERVAL_TICKS) {
                 resubscribeTicks = 0
@@ -112,6 +164,7 @@ object CosmeticSync {
         //? if > 1.8.9 {
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             unsubscribeAllPlayers()
+            NameplateWearers.forgetAll()
             CosmeticCatalog.reset()
             //? if >= 1.21.1 {
             PolyPlusBadge.clearTabCache()
@@ -125,6 +178,7 @@ object CosmeticSync {
             val connected = Minecraft.getInstance().networkHandler != null
             if (wasConnected && !connected) {
                 unsubscribeAllPlayers()
+                NameplateWearers.forgetAll()
                 CosmeticCatalog.reset()
                 PolyPlusBadge.clearTabCache()
                 CosmeticAssetCache.reset()
@@ -136,19 +190,21 @@ object CosmeticSync {
         }.register()
         *///?}
 
-        //? if >= 1.21.1 {
-        eventHandler<WorldEvent.Unload> { trimCountdown = TRIM_DELAY_TICKS }
+        //? if >= 1.21.1 || = 1.8.9 {
+        eventHandler<WorldEvent.Unload> { trimTimer.settle() }
         eventHandler<TickEvent.End> {
+            //? if >= 1.21.1 {
             if (assetResetPending) {
                 assetResetPending = false
                 CosmeticAssetCache.reset()
                 PolyPlusClient.refreshCosmetics()
             }
+            //?}
             // polled since ScreenOpenEvent misses screens changed through Gui#setScreen, which 26.2+ uses to close them
             val configUiOpen = previewUiOpen()
-            if (configUiWasOpen && !configUiOpen) trimCountdown = TRIM_DELAY_TICKS
+            if (configUiWasOpen && !configUiOpen) trimTimer.settle()
             configUiWasOpen = configUiOpen
-            if (trimCountdown > 0 && --trimCountdown == 0) trimAssets()
+            if (trimTimer.tick()) trimAssets()
         }
         //?}
 
@@ -158,17 +214,38 @@ object CosmeticSync {
                 is ClientboundPacket.SubscriptionSnapshot -> handleSubscriptionSnapshot(packet)
                 is ClientboundPacket.PlayerCosmeticEquipped -> handlePlayerCosmeticEquipped(packet)
                 is ClientboundPacket.PlayerParticleColorChanged -> handleParticleColorChanged(packet)
+                is ClientboundPacket.PlayerColorsChanged -> CosmeticColors.handle(packet)
+                is ClientboundPacket.CosmeticColorsSaved -> CosmeticColors.handle(packet)
+                is ClientboundPacket.ParticleColorSaved -> CosmeticColors.handle(packet)
+                is ClientboundPacket.PlayerBonusesChanged -> if (BonusState.handle(packet)) assetsDeparted()
+                is ClientboundPacket.PlayerPetPreferencesChanged ->
+                    PetInteractions.setPetPlay(UUID.fromString(packet.player), packet.play, parseUuids(packet.friends))
+                is ClientboundPacket.BonusDiscovered -> DiscoveredBonuses.handle(packet)
+                is ClientboundPacket.SharedEmoteRequested -> DuoEmoteState.handle(packet)
+                is ClientboundPacket.SharedEmoteRequestSent -> DuoEmoteState.handle(packet)
+                is ClientboundPacket.SharedEmoteResolved -> DuoEmoteState.handle(packet)
+                is ClientboundPacket.SharedEmoteStart -> handleSharedEmoteStart(packet)
+                is ClientboundPacket.SharedEmoteStop -> handleSharedEmoteStop(packet)
                 is ClientboundPacket.PlayerPresence -> {
                     LOGGER.info("PolyPlus presence: {} is now {}", packet.player, if (packet.online) "online" else "offline")
                     CosmeticCatalog.setPolyPlusUser(UUID.fromString(packet.player), packet.online)
                 }
                 is ClientboundPacket.OwnershipUpdated -> handleOwnershipUpdated(packet)
+                is ClientboundPacket.CatalogUpdated -> CosmeticCatalog.onCatalogUpdated()
                 is ClientboundPacket.Error -> handleError(packet)
                 //? if >= 1.21.1 || = 1.8.9 {
-                is ClientboundPacket.PlayerEmoteStarted -> handleEmotePlay(packet.player, packet.emoteId)
-                is ClientboundPacket.PlayerEmoteStopped -> handleEmoteStop(packet.player)
-                is ClientboundPacket.EmotePlay -> handleEmotePlay(packet.player, packet.emoteId)
-                is ClientboundPacket.EmoteStop -> handleEmoteStop(packet.player)
+                is ClientboundPacket.PlayerEmoteStarted -> if (
+                    !EmoteApi.skipsEcho(packet.player, packet.emoteId, packet.startTime, packet.requestId) && !ignoresCancelledStart(packet)
+                ) {
+                    DuoEmoteState.handleSoloStart(packet)
+                    handleEmotePlay(packet.player, packet.emoteId, packet.startTime, packet.emote)
+                }
+                is ClientboundPacket.PlayerEmoteStopped -> if (!playsLocalDevEmote(packet.player)) {
+                    DuoEmoteState.handleSoloStop(packet.player)
+                    handleEmoteStop(packet.player)
+                }
+                is ClientboundPacket.EmotePlay -> handleEmotePlay(packet.player, packet.emoteId, packet.startTime)
+                is ClientboundPacket.EmoteStop -> if (!playsLocalDevEmote(packet.player)) handleEmoteStop(packet.player)
                 //?}
                 else -> Unit
             }
@@ -205,6 +282,11 @@ object CosmeticSync {
         *///?}
                 if (!uuid.isRealPlayer()) continue
                 CosmeticCatalog.removeRemote(uuid)
+                CosmeticColors.forget(uuid)
+                BonusState.forget(uuid)
+                DuoEmoteState.forget(uuid)
+                NameplateWearers.forget(uuid)
+                PetInteractions.forgetPetPlay(listOf(uuid))
                 removed.add(uuid.toString())
                 //? if >= 1.21.1 || = 1.8.9 {
                 handleEmoteStop(uuid.toString())
@@ -215,6 +297,7 @@ object CosmeticSync {
             }
             visiblePlayers.removeAll(removed.toSet())
             unsubscribePlayers(removed)
+            if (removed.isNotEmpty()) assetsDeparted()
             Unit
         }
 
@@ -223,6 +306,11 @@ object CosmeticSync {
         // reconcileVisiblePlayers respawns them in the new one
         eventHandler<WorldEvent.Unload> { PetManager.despawnAll() }
         //?}
+    }
+
+    fun equipmentKnown(uuid: UUID): Boolean {
+        val player = CosmeticCatalog.accountId(uuid).toString()
+        return player in subscribedPlayers && pendingSubscriptions.values.none { player in it.players }
     }
 
     fun applyLocalActiveFromCatalog() {
@@ -238,10 +326,13 @@ object CosmeticSync {
             mc.execute { refreshVisibleSubscriptions() }
             return Result.success(Unit)
         }
-        val level = mc.level
-            ?: return Result.failure(IllegalStateException("No world is loaded"))
+        val level = mc.level ?: run {
+            subscribeLocalAccount()
+            return Result.failure(IllegalStateException("No world is loaded"))
+        }
 
         val visible = LinkedHashSet<String>()
+        normalizePlayerUuid(ClientPlatform.localPlayerUuid().toString())?.let(visible::add)
         val self = mc.player
         val loaded = level.players().let { players ->
             if (self == null) players else players.sortedBy { it.distanceToSqr(self) }
@@ -256,10 +347,13 @@ object CosmeticSync {
             mc.tell { refreshVisibleSubscriptions() }
             return Result.success(Unit)
         }
-        val level = mc.world
-            ?: return Result.failure(IllegalStateException("No world is loaded"))
+        val level = mc.world ?: run {
+            subscribeLocalAccount()
+            return Result.failure(IllegalStateException("No world is loaded"))
+        }
 
         val visible = LinkedHashSet<String>()
+        normalizePlayerUuid(ClientPlatform.localPlayerUuid().toString())?.let(visible::add)
         val self = mc.player
         val loaded = level.players.let { players ->
             if (self == null) players else players.sortedBy { it.squaredDistanceTo(self) }
@@ -285,6 +379,11 @@ object CosmeticSync {
         return subscribePlayers(wanted)
     }
 
+    internal fun nextRequestId(): Long = nextRequestId.incrementAndGet()
+
+    internal fun subscribeLocalAccount(): Result<Unit> =
+        subscribePlayers(listOfNotNull(normalizePlayerUuid(ClientPlatform.localPlayerUuid().toString())))
+
     fun subscribeFriends(players: Collection<String>): Result<Unit> = subscribePlayers(players)
 
     fun watchFriends(players: Collection<String>): Result<Unit> {
@@ -308,10 +407,17 @@ object CosmeticSync {
         return subscribePlayers(incoming)
     }
 
+    fun syncPetPreferences(play: PetPlay = PolyPlusCosmeticsConfig.petPlay): Result<Unit> =
+        PolyConnection.sendPacket(ServerboundPacket.SetPetPreferences(play))
+
     fun resubscribeVisiblePlayers(): Result<Unit> {
         subscribedPlayers.clear()
         pendingSubscriptions.clear()
+        PetInteractions.clearPetPlay()
+        EmoteApi.forgetUnanswered()
+        DuoEmoteState.forgetUnanswered()
         capWarned = false
+        subscribeLocalAccount()
         return refreshVisibleSubscriptions()
     }
 
@@ -324,7 +430,8 @@ object CosmeticSync {
     }
 
     private fun handleSubscriptionSnapshot(packet: ClientboundPacket.SubscriptionSnapshot) {
-        packet.requestId?.let(pendingSubscriptions::remove)
+        val pending = packet.requestId?.let(pendingSubscriptions::remove)
+        if (pending != null && packet.serverTime != null) EmoteServerClock.sample(packet.serverTime, pending.sentAtMs, packet.serverReceivedTime)
         if (packet.rejected.isNotEmpty()) {
             rollBackSubscriptions(packet.rejected)
             LOGGER.warn("PolyPlus server rejected {} subscription(s).", packet.rejected.size)
@@ -337,9 +444,49 @@ object CosmeticSync {
         for ((uuidString, color) in packet.particleColors) {
             CosmeticCatalog.setParticleColor(UUID.fromString(uuidString), color)
         }
+        CosmeticColors.applySnapshot(
+            packet.equipped.keys,
+            packet.colors,
+            packet.savedColors,
+            packet.savedColorsActive,
+            pending?.players,
+            packet.rejected,
+            packet.equipped,
+        )
+        BonusState.applySnapshot(packet.equipped.keys, packet.bonuses)
+        PetInteractions.applyPetPlaySnapshot(
+            parseUuids(packet.equipped.keys),
+            parseUuids(packet.petInteractionsOff),
+            packet.petInteractionsFriends.entries
+                .mapNotNull { (player, friends) -> parseUuid(player)?.let { it to parseUuids(friends) } }
+                .toMap(),
+        )
+        val devPlayer = localDevPlayer()
+        val sharedEmotes = snapshotSessions(packet.sharedEmotes, devPlayer)
+        val activeEmotes = snapshotActive(packet.activeEmotes, packet.activeEmoteStarts, packet.sharedEmotes, devPlayer)
+        DuoEmoteState.applySnapshot(
+            packet.equipped.keys.filterNot { snapshotSkips(it, devPlayer) },
+            activeEmotes,
+            packet.activeEmoteStarts,
+            packet.activeEmoteAnchors,
+            sharedEmotes,
+            packet::emoteDefinitionFor,
+        )
         //? if >= 1.21.1 || = 1.8.9 {
-        for ((uuidString, emoteId) in packet.activeEmotes) {
-            handleEmotePlay(uuidString, emoteId)
+        for (uuidString in packet.equipped.keys - activeEmotes.keys) {
+            if (snapshotSkips(uuidString, devPlayer)) continue
+            if (remoteEmotes.containsKey(UUID.fromString(uuidString))) handleEmoteStop(uuidString)
+        }
+        for ((uuidString, emoteId) in activeEmotes) {
+            if (snapshotSkips(uuidString, devPlayer)) continue
+            handleEmotePlay(uuidString, emoteId, packet.activeEmoteStarts[uuidString], packet.emoteDefinitionFor(listOf(uuidString), emoteId))
+        }
+        for (session in sharedEmotes.values.toSet()) {
+            for (player in session.players) {
+                if (player in activeEmotes || snapshotSkips(player, devPlayer) || runCatching { UUID.fromString(player) }.isFailure) continue
+                notePartner(player, session.players)
+                handleEmotePlay(player, session.emoteId, session.startTime, packet.emoteDefinitionFor(listOf(player) + session.players, session.emoteId))
+            }
         }
         //?}
         if (packet.users.isNotEmpty()) {
@@ -352,6 +499,9 @@ object CosmeticSync {
 
     private fun handlePlayerCosmeticEquipped(packet: ClientboundPacket.PlayerCosmeticEquipped) {
         val uuid = UUID.fromString(packet.player)
+        CosmeticEquips.changed(uuid, packet.slot, packet.cosmeticId)
+        if (packet.slot == BodySlot.Pet) PetEquips.changed(uuid, packet.cosmeticId)
+        if (packet.slot == BodySlot.Aura && uuid == ClientPlatform.localPlayerUuid()) CosmeticColors.auraEquipObserved(packet.cosmeticId)
         CosmeticCatalog.applyRemoteEquippedSlot(uuid, packet.slot, packet.cosmeticId)
         applyActiveToPlayer(uuid, packet.cosmeticId?.let(::listOf).orEmpty())
         if (uuid == ClientPlatform.localPlayerUuid() &&
@@ -374,6 +524,63 @@ object CosmeticSync {
         } else {
             CosmeticCatalog.clearParticleColor(uuid)
         }
+        if (uuid == ClientPlatform.localPlayerUuid()) CosmeticColors.handleParticleEcho(packet.color)
+    }
+
+    private fun handleSharedEmoteStart(packet: ClientboundPacket.SharedEmoteStart) {
+        val skipped = cancelledStartPlayer(packet)
+        //? if >= 1.21.1 || = 1.8.9 {
+        for (player in packet.players) {
+            val uuid = runCatching { UUID.fromString(player) }.getOrNull() ?: continue
+            if (uuid == skipped) continue
+            CosmeticCatalog.pinEmote(PlayPin(uuid), packet.emoteId, packet.emote)
+        }
+        //?}
+        DuoEmoteState.handle(packet, skipped)
+        //? if >= 1.21.1 || = 1.8.9 {
+        for (player in packet.players) {
+            val uuid = runCatching { UUID.fromString(player) }.getOrNull() ?: continue
+            if (uuid == skipped) continue
+            notePartner(player, packet.players)
+            handleEmotePlay(player, packet.emoteId, packet.startTime, packet.emote)
+        }
+        //?}
+    }
+
+    internal fun endSharedLocally(players: List<String>) = handleSharedEmoteStop(ClientboundPacket.SharedEmoteStop(players))
+
+    private fun handleSharedEmoteStop(packet: ClientboundPacket.SharedEmoteStop) {
+        val session = packet.players.firstNotNullOfOrNull { player ->
+            runCatching { UUID.fromString(player) }.getOrNull()?.let(DuoEmoteState::sharedFor)
+        }
+        DuoEmoteState.handle(packet)
+        //? if >= 1.21.1 || = 1.8.9 {
+        if (session == null) return
+        for (player in packet.players) {
+            val uuid = runCatching { UUID.fromString(player) }.getOrNull() ?: continue
+            val active = remoteEmotes[uuid] ?: continue
+            if (active.emoteId == session.emoteId && active.startedAtMs == session.startTime) handleEmoteStop(player)
+        }
+        //?}
+    }
+
+    private fun localDevPlayer(): UUID? {
+        val local = ClientPlatform.localPlayerUuid()
+        return local.takeIf { remoteEmotes[it]?.dev == true }
+    }
+
+    private fun cancelledStartPlayer(packet: ClientboundPacket.SharedEmoteStart): UUID? {
+        val local = localDevPlayer() ?: return null
+        val players = packet.players.mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+        if (local !in players) return null
+        return local.takeIf { DuoEmoteState.cancelledStart(packet.emoteId, players.firstOrNull { it != local }) }
+    }
+
+    private fun ignoresCancelledStart(packet: ClientboundPacket.PlayerEmoteStarted): Boolean {
+        if (packet.requestId != null) return false
+        val local = localDevPlayer() ?: return false
+        if (runCatching { UUID.fromString(packet.player) }.getOrNull() != local) return false
+        return DuoEmoteState.cancelledStart(packet.emoteId, null)
     }
 
     private fun handleOwnershipUpdated(packet: ClientboundPacket.OwnershipUpdated) {
@@ -384,29 +591,168 @@ object CosmeticSync {
     }
 
     //? if >= 1.21.1 || = 1.8.9 {
-    private fun handleEmotePlay(playerUuid: String, emoteId: Int) = playEmoteWhenLoaded(UUID.fromString(playerUuid), emoteId)
+    private fun handleEmotePlay(
+        playerUuid: String,
+        emoteId: Int,
+        startedAtMs: Long? = null,
+        emote: EmoteDefinition? = null,
+        dev: Boolean = false,
+    ) {
+        val uuid = UUID.fromString(playerUuid)
+        val revision = CosmeticCatalog.pinEmote(PlayPin(uuid), emoteId, emote)
+        val known = remoteEmotes[uuid]
+        if (startedAtMs == null || known == null || known.emoteId != emoteId || known.startedAtMs != startedAtMs ||
+            known.revision != revision || known.dev != dev
+        ) {
+            val startedAt = startedAtMs ?: EmoteServerClock.now()
+            remoteEmotes[uuid] = RemoteEmote(emoteId, startedAt, emoteTokens.incrementAndGet(), startedAtMs, revision, dev)
+        }
+        whenEmoteLoaded(emoteId, revision) { emoteTargets(uuid).forEach(::syncEmote) }
+    }
 
-    private fun playEmoteWhenLoaded(uuid: UUID, emoteId: Int) {
+    private fun whenEmoteLoaded(emoteId: Int, revision: EmoteRevision? = null, block: () -> Unit) {
         // keeps a trim from evicting the emote between its install and this playback
         pendingEmotes.merge(emoteId, 1, Int::plus)
+        revision?.let { pendingRevisions.merge(it, 1, Int::plus) }
         PolyPlusClient.SCOPE.launch {
-            val loaded = CosmeticAssetCache.ensureEmoteLoaded(emoteId)
+            val loaded = loadEmote(emoteId, revision)
             ClientPlatform.runOnMain {
                 pendingEmotes.computeIfPresent(emoteId) { _, count -> (count - 1).takeIf { it > 0 } }
-                if (!loaded) return@runOnMain
-                val emote = CosmeticAssetCache.getEmote(emoteId) ?: return@runOnMain
-                val player = findPlayer(uuid) ?: return@runOnMain
-                (player as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
+                revision?.let { pendingRevisions.computeIfPresent(it) { _, count -> (count - 1).takeIf { left -> left > 0 } } }
+                if (loaded) block()
             }
         }
     }
 
+    private suspend fun loadEmote(emoteId: Int, revision: EmoteRevision?): Boolean =
+        if (revision != null && CosmeticCatalog.getEmoteDefinition(revision) != null) {
+            CosmeticAssetCache.ensureEmoteLoaded(revision)
+        } else {
+            CosmeticAssetCache.ensureEmoteLoaded(emoteId)
+        }
+
+    private fun playableRevision(active: RemoteEmote): EmoteRevision? =
+        active.revision?.takeIf { CosmeticAssetCache.getEmote(it) != null || CosmeticCatalog.getEmoteDefinition(it) != null }
+
+    fun syncEmote(player: AbstractClientPlayer) {
+        val active = remoteEmotes[emoteKey(player)] ?: return
+        val applied = appliedEmotes[player]
+        if (applied != null && applied.token == active.token) {
+            val serverStart = active.serverStart ?: return
+            val offset = EmoteServerClock.offset()
+            if (abs(offset - applied.offsetMs) < RESYNC_OFFSET_MS) return
+            applied.offsetMs = offset
+            (player as PlayerEmotesAccess).`polyplus$emoteController`().retime(serverStart, EmoteServerClock.elapsedSince(active.startedAtMs))
+            return
+        }
+        if (active.serverStart != null && !EmoteServerClock.synced &&
+            System.currentTimeMillis() - active.receivedAtMs < CLOCK_WAIT_MS
+        ) {
+            return
+        }
+        val revision = playableRevision(active)
+        val emote = if (revision != null) CosmeticAssetCache.getEmote(revision) else CosmeticAssetCache.getEmote(active.emoteId)
+        if (emote == null || (revision == null && !CosmeticAssetCache.isEmoteCurrent(active.emoteId))) {
+            loadEmoteInBackground(active.emoteId, revision)
+            return
+        }
+        appliedEmotes[player] = AppliedEmote(active.token, EmoteServerClock.offset())
+        val elapsedMs = EmoteServerClock.elapsedSince(active.startedAtMs)
+        (player as PlayerEmotesAccess).`polyplus$emoteController`()
+            .play(emote, elapsedMs, active.emoteId, startTime = active.serverStart, dev = active.dev)
+        val serverStart = active.serverStart ?: return
+        if (emoteKey(player) == ClientPlatform.localPlayerUuid()) EmoteApi.onLocalApplied(active.emoteId, serverStart)
+    }
+
+    internal fun dropLocalEmote(emoteId: Int, startTime: Long) {
+        val local = ClientPlatform.localPlayerUuid()
+        val active = remoteEmotes[local] ?: return
+        if (active.emoteId != emoteId || active.serverStart != startTime) return
+        handleEmoteStop(local.toString())
+    }
+
+    internal fun playLocalDevEmote(emoteId: Int, anchor: EmoteAnchor?) {
+        val player = ClientPlatform.localPlayerUuid().toString()
+        DuoEmoteState.handleSoloStart(ClientboundPacket.PlayerEmoteStarted(player, emoteId, anchor = anchor))
+        handleEmotePlay(player, emoteId, dev = true)
+    }
+
+    internal fun dropLocalDevEmote(emoteId: Int? = null) {
+        val local = ClientPlatform.localPlayerUuid()
+        val active = remoteEmotes[local] ?: return
+        if (!endsDevPlayback(active.emoteId, active.dev, emoteId)) return
+        DuoEmoteState.dropSolo(local, active.emoteId)
+        handleEmoteStop(local.toString())
+    }
+
+    private fun playsLocalDevEmote(playerUuid: String): Boolean =
+        snapshotSkips(playerUuid, localDevPlayer())
+
+    private fun emoteKey(player: AbstractClientPlayer): UUID =
+        if (player === Minecraft.getInstance().player) ClientPlatform.localPlayerUuid() else player.uuid
+
+    private fun loadEmoteInBackground(emoteId: Int, revision: EmoteRevision? = null) {
+        val key: Any = revision ?: emoteId
+        if (!emoteLoads.add(key)) return
+        PolyPlusClient.SCOPE.launch {
+            try {
+                loadEmote(emoteId, revision)
+            } finally {
+                emoteLoads.remove(key)
+            }
+        }
+    }
+
+    private fun emoteTargets(uuid: UUID): List<AbstractClientPlayer> =
+        listOfNotNull(findPlayer(uuid), LobbyScene.emoteAvatar(uuid)).distinct()
+
     private fun handleEmoteStop(playerUuid: String) {
         val uuid = UUID.fromString(playerUuid)
-        ClientPlatform.runOnMain {
-            val player = findPlayer(uuid) ?: return@runOnMain
-            (player as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+        partnerWatchers.remove(uuid)
+        remoteEmotes.remove(uuid)
+        CosmeticCatalog.releaseEmotePin(PlayPin(uuid))
+        ClientPlatform.runOnMain { stopEmoteOn(uuid) }
+    }
+
+    private fun stopEmoteOn(uuid: UUID) {
+        for (player in emoteTargets(uuid)) {
+            appliedEmotes.remove(player)
+            val controller = (player as PlayerEmotesAccess).`polyplus$emoteController`()
+            if (controller.networkedEmoteId != null) controller.stop(notifyServer = false)
         }
+    }
+
+    private fun forgetEmotes(players: Collection<String>) {
+        val gone = HashSet<UUID>()
+        for (uuidString in players) {
+            val uuid = UUID.fromString(uuidString)
+            gone += uuid
+            partnerWatchers.remove(uuid)
+            remoteEmotes.remove(uuid)
+            CosmeticCatalog.releaseEmotePin(PlayPin(uuid))
+        }
+        val orphaned = ArrayList<UUID>()
+        for ((partner, watchers) in partnerWatchers) {
+            watchers.removeAll(gone)
+            if (watchers.isEmpty()) orphaned += partner
+        }
+        for (partner in orphaned) {
+            partnerWatchers.remove(partner)
+            if (partner.toString() !in subscribedPlayers) handleEmoteStop(partner.toString())
+        }
+    }
+
+    private fun notePartner(player: String, session: List<String>) {
+        val uuid = UUID.fromString(player)
+        if (uuid.toString() in subscribedPlayers || uuid == ClientPlatform.localPlayerUuid()) {
+            partnerWatchers.remove(uuid)
+            return
+        }
+        val watched = session
+            .mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+            .filter { it != uuid && it.toString() in subscribedPlayers }
+        if (watched.isEmpty()) return
+        partnerWatchers.computeIfAbsent(uuid) { ConcurrentHashMap.newKeySet() }.addAll(watched)
     }
     //?}
 
@@ -417,6 +763,7 @@ object CosmeticSync {
             // a pet stays in the level without its owner, and reconcileVisiblePlayers only sees loaded owners
             if (CosmeticCatalog.getActiveId(uuid, BodySlot.Pet) == null) PetManager.despawn(uuid)
             //?}
+            reconcileNameplate(uuid, CosmeticCatalog.getActiveId(uuid, BodySlot.Nameplate))
             LOGGER.debug("Deferred cosmetic apply for {} ({} id(s)) — player not loaded", uuid, cosmeticIds.size)
             return@runOnMain
         }
@@ -440,6 +787,7 @@ object CosmeticSync {
     //? if >= 1.21.1 || = 1.8.9 {
     private val ATTACHED_SLOTS = listOf(
         BodySlot.Backpack,
+        BodySlot.Tail,
         BodySlot.Glasses,
         BodySlot.Wings,
         BodySlot.LeftHand,
@@ -449,12 +797,15 @@ object CosmeticSync {
         BodySlot.Boots,
         BodySlot.Shoulder,
         BodySlot.Pet,
+        BodySlot.EffectA,
+        BodySlot.EffectB,
     )
 
     // loads run in the background, one per cosmetic at a time, and the next reconcile applies whatever has loaded
     private fun reconcileAttachedCosmetics(player: AbstractClientPlayer, uuid: UUID) {
         val equipped = CosmeticCatalog.getRemoteEquipped(uuid).orEmpty()
-        reconcileCape(equipped[BodySlot.Cape])
+        reconcileCape(player, equipped[BodySlot.Cape])
+        reconcileNameplate(uuid, equipped[BodySlot.Nameplate])
         for (slot in ATTACHED_SLOTS) {
             val desiredId = equipped[slot]
             val current = CosmeticApi.equippedSlot(player, slot)
@@ -464,9 +815,14 @@ object CosmeticSync {
                 continue
             }
 
+            CosmeticCatalog.requestRefreshForUnknown(desiredId)
             // also picks up a new asset hash for one that is already loaded
             loadInBackground(desiredId)
-            val attached = CosmeticAssetCache.getAttachedCosmetic(desiredId)?.copy(slot = slot) ?: continue
+            val attached = CosmeticAssetCache.getAttachedCosmetic(desiredId)?.copy(slot = slot)
+            if (attached == null) {
+                if (current != null && current.cosmetic.cosmeticId != desiredId) CosmeticApi.unequipSlot(player, slot)
+                continue
+            }
             if (current?.cosmetic == attached) continue
             CosmeticApi.unequipSlot(player, slot)
             CosmeticApi.equipLocal(player, attached)
@@ -479,7 +835,8 @@ object CosmeticSync {
         val level = Minecraft.getInstance().level ?: return
         for (player in level.players()) {
             val uuid = player.uuid
-            if (!uuid.isRealPlayer() && player !== Minecraft.getInstance().player) continue
+            if (!uuid.isRealPlayer() && player !== Minecraft.getInstance().player && !DevCrowd.isMember(uuid)) continue
+            syncEmote(player)
             if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
             reconcileAttachedCosmetics(player, uuid)
             reconcilePet(uuid)
@@ -487,9 +844,39 @@ object CosmeticSync {
     }
     //?}
 
+    private fun reconcileNameplate(uuid: UUID, cosmeticId: Int?) {
+        if (cosmeticId == null) {
+            NameplateWearers.forget(uuid)
+            return
+        }
+        val definition = CosmeticCatalog.getCosmeticDefinition(cosmeticId)
+        if (definition == null) {
+            NameplateWearers.bind(uuid, cosmeticId)
+            CosmeticCatalog.requestRefreshForUnknown(cosmeticId)
+            return
+        }
+        if (definition.type != CosmeticType.Nameplate) {
+            NameplateWearers.forget(uuid)
+            return
+        }
+        NameplateWearers.bind(uuid, cosmeticId)
+        //? if >= 1.21.1 || = 1.8.9 {
+        if (!CosmeticAssetCache.isCurrent(cosmeticId)) loadInBackground(cosmeticId)
+        //?}
+    }
+
     //? if >= 1.21.1 || = 1.8.9 {
-    private fun reconcileCape(cosmeticId: Int?) {
-        if (cosmeticId == null || CosmeticAssetCache.isCapeLoaded(cosmeticId)) return
+    private fun reconcileCape(player: AbstractClientPlayer, cosmeticId: Int?) {
+        val current = CosmeticApi.equippedSlot(player, BodySlot.Cape)
+        val attached = cosmeticId?.let(CosmeticAssetCache::getAttachedCosmetic)?.takeIf { it.slot == BodySlot.Cape }
+        if (attached == null) {
+            if (current != null) CosmeticApi.unequipSlot(player, BodySlot.Cape)
+        } else if (current?.cosmetic != attached) {
+            CosmeticApi.unequipSlot(player, BodySlot.Cape)
+            CosmeticApi.equipLocal(player, attached)
+        }
+        if (cosmeticId == null || CosmeticAssetCache.isCurrent(cosmeticId)) return
+        CosmeticCatalog.requestRefreshForUnknown(cosmeticId)
         loadInBackground(cosmeticId)
     }
     //?}
@@ -506,9 +893,26 @@ object CosmeticSync {
 
         if (PetManager.currentPetCosmeticId(uuid) == desiredId) return
 
+        CosmeticCatalog.requestRefreshForUnknown(desiredId)
         loadInBackground(desiredId)
         // shoulder pets load as attached cosmetics and are equipped like one instead
-        if (CosmeticAssetCache.getPetDefinition(desiredId) != null) PetManager.ensurePet(uuid, desiredId)
+        PetManager.ensurePet(uuid, desiredId)
+    }
+
+    private fun wornCosmetics(): List<AttachedCosmetic> {
+        //? if > 1.8.9 {
+        val players = Minecraft.getInstance().level?.players().orEmpty()
+        //?} else {
+        /*val players = Minecraft.getInstance().world?.players.orEmpty()
+        *///?}
+        val worn = ArrayList<AttachedCosmetic>()
+        for (player in players) {
+            val access = player as? PlayerCosmeticsAccess ?: continue
+            access.`polyplus$cosmeticEquipment`().equipped().mapTo(worn) { it.cosmetic }
+        }
+        worn += LobbyScene.wornCosmetics()
+        worn += PlayerPreviewRenderer.heldCosmetics()
+        return worn
     }
 
     private fun loadInBackground(cosmeticId: Int) {
@@ -523,32 +927,50 @@ object CosmeticSync {
     }
     //?}
 
-    //? if >= 1.21.1 {
+    internal fun assetsDeparted() {
+        //? if >= 1.21.1 || = 1.8.9 {
+        trimTimer.departed()
+        //?}
+    }
+
+    //? if >= 1.21.1 || = 1.8.9 {
     private fun previewUiOpen(): Boolean = ClientPlatform.currentScreen().let { OneConfigUI.isOneConfigScreen(it) || MainMenuReplacement.isMenu(it) }
 
     private fun trimAssets() {
         // the cosmetics screen can preview anything in the catalog - closing it calls trim again
         if (previewUiOpen()) return
         val keep = CosmeticCatalog.ownedIds() + CosmeticCatalog.localEquipped().ids() +
-            CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys
+            CosmeticCatalog.remoteEquippedIds() + pendingEmotes.keys + remoteEmotes.values.map { it.emoteId }
         val inUse = HashSet<Identifier>()
+        //? if > 1.8.9 {
         Minecraft.getInstance().level?.entitiesForRendering()?.forEach { entity ->
             when (entity) {
                 is AbstractClientPlayer -> {
                     (entity as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equipped().mapTo(inUse) { it.cosmetic.texture }
-                    (entity as PlayerEmotesAccess).`polyplus$emoteController`().playbackSnapshot()
-                        ?.emote?.effects?.mapTo(inUse) { it.texture }
                 }
-                is PetEntity -> entity.definition?.let { inUse += it.texture }
             }
         }
+        //?} else {
+        /*Minecraft.getInstance().world?.players?.forEach { player ->
+            if (player is AbstractClientPlayer) {
+                (player as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equipped().mapTo(inUse) { it.cosmetic.texture }
+            }
+        }
+        *///?}
         inUse += LobbyScene.wornTextures()
-        CosmeticAssetCache.trim(keep, inUse)
+        val keepEmotes = remoteEmotes.values.mapNotNullTo(HashSet()) { it.revision }
+        keepEmotes += pendingRevisions.keys
+        CosmeticAssetCache.trim(keep, inUse, BonusState.activeRefs() + PreviewTryOn.previewBonuses(), keepEmotes)
+
     }
     //?}
 
     //? if >= 1.21.1 || = 1.8.9 {
-    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) = playEmoteWhenLoaded(player.uuid, cosmeticId)
+    private fun applyEmote(player: AbstractClientPlayer, cosmeticId: Int) = whenEmoteLoaded(cosmeticId) {
+        val emote = CosmeticAssetCache.getEmote(cosmeticId) ?: return@whenEmoteLoaded
+        val target = findPlayer(player.uuid) ?: return@whenEmoteLoaded
+        (target as PlayerEmotesAccess).`polyplus$emoteController`().play(emote, 0L, cosmeticId)
+    }
     //?}
 
     //? if = 1.8.9 {
@@ -558,7 +980,8 @@ object CosmeticSync {
         val level = Minecraft.getInstance().world ?: return
         for (player in level.players) {
             val uuid = player.uuid
-            if (!uuid.isRealPlayer() && player !== Minecraft.getInstance().player) continue
+            if (!uuid.isRealPlayer() && player !== Minecraft.getInstance().player && !DevCrowd.isMember(uuid)) continue
+            (player as? AbstractClientPlayer)?.let(::syncEmote)
             if (CosmeticCatalog.getRemoteEquipped(uuid) == null) continue
             reconcileAttachedCosmetics(player as? AbstractClientPlayer ?: continue, uuid)
             reconcilePet(uuid)
@@ -612,7 +1035,7 @@ object CosmeticSync {
 
         for (chunk in added.chunked(MAX_PLAYERS_PER_REQUEST)) {
             val requestId = nextRequestId.incrementAndGet()
-            pendingSubscriptions[requestId] = chunk
+            pendingSubscriptions[requestId] = PendingSubscription(chunk, System.currentTimeMillis())
             val result = PolyConnection.sendPacket(ServerboundPacket.SubscribePlayers(chunk, requestId))
             if (result.isFailure) {
                 pendingSubscriptions.remove(requestId)
@@ -629,8 +1052,11 @@ object CosmeticSync {
     }
 
     private fun handleError(packet: ClientboundPacket.Error) {
+        CosmeticColors.handleError(packet)
+        EmoteApi.onPlayFailed(packet.requestId)
+        ClientPlatform.runOnMain { DuoEmotes.onError(packet.code, packet.message, packet.requestId) }
         val requestId = packet.requestId ?: return
-        val players = pendingSubscriptions.remove(requestId) ?: return
+        val players = pendingSubscriptions.remove(requestId)?.players ?: return
         rollBackSubscriptions(players)
         LOGGER.warn(
             "PolyPlus subscription request {} was rejected ({}): rolled back {} player(s).",
@@ -650,6 +1076,9 @@ object CosmeticSync {
         for (uuidString in removed) {
             CosmeticCatalog.clearPolyPlusUser(UUID.fromString(uuidString))
         }
+        PetInteractions.forgetPetPlay(parseUuids(removed))
+        //? if >= 1.21.1 || = 1.8.9
+        forgetEmotes(removed)
         val result = PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(removed))
         if (rewatchFriends) subscribePlayers(removed.filter(watchedFriends::contains))
         return result
@@ -660,11 +1089,21 @@ object CosmeticSync {
         subscribedPlayers.clear()
         visiblePlayers.clear()
         pendingSubscriptions.clear()
+        //? if >= 1.21.1 || = 1.8.9 {
+        remoteEmotes.clear()
+        partnerWatchers.clear()
+        CosmeticCatalog.releaseEmotePins { it is PlayPin }
+        //?}
+        CosmeticColors.reset()
+        BonusState.reset()
+        DuoEmoteState.leaveServer()
+        PetInteractions.clearPetPlay()
         capWarned = false
         if (players.isNotEmpty()) {
             PolyConnection.sendPacket(ServerboundPacket.UnsubscribePlayers(players))
         }
         subscribePlayers(watchedFriends.toList())
+        subscribeLocalAccount()
     }
 
     private fun findPlayer(uuid: UUID): AbstractClientPlayer? {
@@ -679,6 +1118,10 @@ object CosmeticSync {
 
     private fun localPlayerFor(uuid: UUID): AbstractClientPlayer? =
         Minecraft.getInstance().player?.takeIf { uuid == ClientPlatform.localPlayerUuid() }
+
+    private fun parseUuid(uuidString: String): UUID? = runCatching { UUID.fromString(uuidString) }.getOrNull()
+
+    private fun parseUuids(uuidStrings: Collection<String>): List<UUID> = uuidStrings.mapNotNull(::parseUuid)
 
     private fun normalizePlayerUuid(uuidString: String): String? {
         val uuid = runCatching { UUID.fromString(uuidString) }.getOrNull() ?: return null

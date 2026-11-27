@@ -162,6 +162,7 @@ class PartyVoiceHud : Hud(id = "party_voice.json", title = "Party Voice", catego
     }
 
     private fun visible(all: List<VoiceRow>): List<VoiceRow> {
+        if (all.isEmpty()) return all
         if (hideWhenAlone && all.none { !it.self }) return emptyList()
         return all.filter { (showSelf || !it.self) && (membersMode != MEMBERS_SPEAKING || it.speaking) }
     }

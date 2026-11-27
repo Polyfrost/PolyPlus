@@ -1,15 +1,21 @@
 package org.polyfrost.polyplus.client.render
 
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignalRecord
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignals
+
 //? if >= 1.21.4 {
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState
 //?}
 
 //? if = 1.21.1 {
 /*import net.minecraft.client.player.AbstractClientPlayer
+import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer
+import org.polyfrost.polyplus.client.gui.preview.PreviewTryOn
 *///?}
 
 //? if = 1.8.9 {
 /*import net.minecraft.client.entity.living.player.ClientPlayerEntity
+import org.polyfrost.polyplus.client.gui.preview.PreviewTryOn
 *///?}
 
 data class PlayerRenderContext(
@@ -20,15 +26,14 @@ data class PlayerRenderContext(
     val isInWater: Boolean,
     val swimAmount: Float,
     val isInvisible: Boolean,
+    val signals: PlayerSignalRecord = PlayerSignals.NEUTRAL,
 ) {
     companion object {
         //? if >= 1.21.4 {
-        fun from(state: HumanoidRenderState): PlayerRenderContext = PlayerRenderContext(
+        fun from(state: HumanoidRenderState): PlayerRenderContext = from(
+            PlayerSignals.of(state),
             ageInTicks = state.ageInTicks,
             walkAnimationSpeed = state.walkAnimationSpeed,
-            isCrouching = state.isCrouching,
-            isOnGround = state.walkAnimationSpeed > 0.01f || state.isCrouching,
-            isInWater = state.isInWater,
             swimAmount = state.swimAmount,
             isInvisible = state.isInvisible,
         )
@@ -38,12 +43,10 @@ data class PlayerRenderContext(
             partialTicks: Float,
             limbSwingAmount: Float,
             ageInTicks: Float,
-        ): PlayerRenderContext = PlayerRenderContext(
+        ): PlayerRenderContext = from(
+            if (PlayerPreviewRenderer.isPreviewEntity(player)) PreviewTryOn.previewSignals() else PreviewTryOn.lobbySignals(player) ?: PlayerSignals.sample(player),
             ageInTicks = ageInTicks,
             walkAnimationSpeed = limbSwingAmount,
-            isCrouching = player.isCrouching,
-            isOnGround = player.onGround(),
-            isInWater = player.isInWater,
             swimAmount = player.getSwimAmount(partialTicks),
             isInvisible = player.isInvisible,
         )
@@ -54,15 +57,30 @@ data class PlayerRenderContext(
             @Suppress("UNUSED_PARAMETER") partialTicks: Float,
             limbSwingAmount: Float,
             ageInTicks: Float,
-        ): PlayerRenderContext = PlayerRenderContext(
+        ): PlayerRenderContext = from(
+            PreviewTryOn.lobbySignals(player) ?: PlayerSignals.sample(player),
             ageInTicks = ageInTicks,
             walkAnimationSpeed = limbSwingAmount,
-            isCrouching = player.isSneaking,
-            isOnGround = player.onGround,
-            isInWater = player.isInWater,
             swimAmount = 0f,
             isInvisible = player.isInvisible,
         )
         *///?}
+
+        private fun from(
+            signals: PlayerSignalRecord,
+            ageInTicks: Float,
+            walkAnimationSpeed: Float,
+            swimAmount: Float,
+            isInvisible: Boolean,
+        ): PlayerRenderContext = PlayerRenderContext(
+            ageInTicks = ageInTicks,
+            walkAnimationSpeed = walkAnimationSpeed,
+            isCrouching = signals.flag(PlayerSignals.IS_SNEAKING),
+            isOnGround = signals.flag(PlayerSignals.IS_ON_GROUND),
+            isInWater = signals.flag(PlayerSignals.IS_IN_WATER),
+            swimAmount = swimAmount,
+            isInvisible = isInvisible,
+            signals = signals,
+        )
     }
 }

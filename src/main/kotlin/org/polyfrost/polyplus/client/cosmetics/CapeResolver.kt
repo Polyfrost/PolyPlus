@@ -68,6 +68,7 @@ object CapeResolver {
         if (foreign && !PolyPlusCosmeticsConfig.forcePolyPlusCapes) return result(CapeDecision.KEEP, null)
         val polyCape = CosmeticAssetCache.getCapeTexture(playerId)
         if (polyCape != null) return result(CapeDecision.POLYPLUS, polyCape)
+        if (CosmeticAssetCache.hasEngineCape(playerId)) return result(CapeDecision.NONE, null)
 
         val mojangKnown = MojangCapeService.overridesLocalCape(playerId) ||
             (foreign && local && MojangCapeService.isLoaded())
@@ -95,6 +96,9 @@ object CapeResolver {
                 CapeDecision.KEEP -> Keep
             }
         }
+
+    @JvmStatic
+    fun keepsModCape(skin: PlayerSkin): Boolean = keepsModCape(capeNamespace(skin))
 
     internal fun withCapeChange(original: PlayerSkin, change: Any?): PlayerSkin = when (change) {
         Keep -> original

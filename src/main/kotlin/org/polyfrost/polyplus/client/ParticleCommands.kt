@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.Component
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -49,8 +50,16 @@ object ParticleCommands {
                 ),
             )
 
+    private fun refused(source: Source): Boolean {
+        if (!ColourSaves.auraPending()) return false
+        source.sendFeedback(Component.literal(ColourSaves.STILL_SAVING).withStyle(ChatFormatting.RED))
+        return true
+    }
+
     private fun setColor(source: Source, r: Int, g: Int, b: Int, a: Int): Int {
+        if (refused(source)) return Command.SINGLE_SUCCESS
         val color = (a shl 24) or (r shl 16) or (g shl 8) or b
+        ColourSaves.particleChoices.made()
         CosmeticCatalog.setParticleColor(ClientPlatform.localPlayerUuid(), color)
 
         val result = PolyConnection.sendPacket(ServerboundPacket.SetParticleColor(color))
@@ -72,6 +81,8 @@ object ParticleCommands {
     }
 
     private fun reset(source: Source): Int {
+        if (refused(source)) return Command.SINGLE_SUCCESS
+        ColourSaves.particleChoices.made()
         CosmeticCatalog.clearParticleColor(ClientPlatform.localPlayerUuid())
 
         val result = PolyConnection.sendPacket(ServerboundPacket.SetParticleColor(null))

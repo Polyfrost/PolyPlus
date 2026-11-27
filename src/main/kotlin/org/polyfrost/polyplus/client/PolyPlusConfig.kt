@@ -18,6 +18,7 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind
 import org.polyfrost.polyplus.BackendUrl
 import org.polyfrost.polyplus.PolyPlusConstants
 import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
+import org.polyfrost.polyplus.client.emotes.duo.DuoEmotes
 import org.polyfrost.polyplus.client.features.OnboardingFeatures
 import org.polyfrost.polyplus.client.gui.ClientWatermark
 import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
@@ -473,6 +474,36 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     )
     var emoteWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
         EmoteWheelKeybind.onKeybindState(state)
+        true
+    }
+
+    @Keybind(
+        title = "Stop Emote",
+        subcategory = "Keybinds",
+        description = "Stop the emote you're doing, or cancel a duo emote request",
+    )
+    var stopEmoteKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        DuoEmotes.onStopKey(state)
+        true
+    }
+
+    @Keybind(
+        title = "Accept Duo Emote",
+        subcategory = "Keybinds",
+        description = "Join a duo emote someone asked you to do",
+    )
+    var acceptDuoEmoteKeybind = OneConfigKeybind(intArrayOf(InputConstants.KEY_Y), null, KeyModifiers.NONE, 0L) { state ->
+        DuoEmotes.onAcceptKey(state)
+        true
+    }
+
+    @Keybind(
+        title = "Decline Duo Emote",
+        subcategory = "Keybinds",
+        description = "Say no to a duo emote someone asked you to do",
+    )
+    var declineDuoEmoteKeybind = OneConfigKeybind(intArrayOf(InputConstants.KEY_N), null, KeyModifiers.NONE, 0L) { state ->
+        DuoEmotes.onDeclineKey(state)
         true
     }
 

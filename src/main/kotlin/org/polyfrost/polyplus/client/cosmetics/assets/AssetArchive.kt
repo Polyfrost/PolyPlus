@@ -15,7 +15,18 @@ internal class OutOfDiskSpaceException(cause: IOException) :
 
 internal class RejectedArchiveException(message: String) : IOException(message)
 
-internal data class ArchiveLimits(val maxDownloadBytes: Long, val maxExtractedBytes: Long, val maxEntries: Int)
+internal data class ArchiveLimits(
+    val maxDownloadBytes: Long,
+    val maxExtractedBytes: Long,
+    val maxEntries: Int,
+    val maxEntryBytes: Long = Long.MAX_VALUE,
+)
+
+internal fun InputStream.readAtMost(limit: Int): ByteArray {
+    val bytes = readNBytes(limit + 1)
+    if (bytes.size > limit) throw RejectedArchiveException("Archive entry is over the $limit byte limit")
+    return bytes
+}
 
 internal object AssetArchive {
     private val OUT_OF_SPACE_MARKERS =
@@ -50,11 +61,23 @@ internal object AssetArchive {
         return OUT_OF_SPACE_MARKERS.any { messages.contains(it, ignoreCase = true) }
     }
 
+    fun verify(bytes: ByteArray, limits: ArchiveLimits) {
+        if (isZip(bytes)) forEachFile(bytes, limits) { OutputStream.nullOutputStream() }
+    }
+
     private fun isZip(bytes: ByteArray): Boolean =
         bytes.size >= 2 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte()
 
     private fun extractZip(bytes: ByteArray, targetDir: Path, limits: ArchiveLimits) {
         val root = targetDir.toAbsolutePath().normalize()
+        forEachFile(bytes, limits) { name ->
+            val out = entryPath(root, name)
+            out.parent?.createDirectories()
+            out.outputStream()
+        }
+    }
+
+    private inline fun forEachFile(bytes: ByteArray, limits: ArchiveLimits, open: (String) -> OutputStream) {
         var entries = 0
         var extracted = 0L
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
@@ -64,9 +87,8 @@ internal object AssetArchive {
                     throw RejectedArchiveException("Archive has more than ${limits.maxEntries} entries")
                 }
                 if (!entry.isDirectory) {
-                    val out = entryPath(root, entry.name)
-                    out.parent?.createDirectories()
-                    extracted += out.outputStream().use { copyAtMost(zip, it, limits.maxExtractedBytes - extracted) }
+                    val budget = minOf(limits.maxEntryBytes, limits.maxExtractedBytes - extracted)
+                    extracted += open(entry.name).use { copyAtMost(zip, it, budget) }
                 }
                 zip.closeEntry()
                 entry = zip.nextEntry
@@ -95,20 +117,14 @@ internal object AssetArchive {
     }
 }
 
-private const val MIN_SHEET_FRAMES = 3
-
 internal fun detectVerticalTextureFrameCount(
     declaredWidth: Int,
     declaredHeight: Int,
     actualWidth: Int,
     actualHeight: Int,
-    maxUvV: Float,
-    minFrames: Int = MIN_SHEET_FRAMES,
 ): Int {
     if (declaredWidth <= 0 || declaredHeight <= 0) return 1
     if (actualWidth != declaredWidth || actualHeight <= declaredHeight) return 1
     if (actualHeight % declaredHeight != 0) return 1
-    if (maxUvV > declaredHeight) return 1
-    val frames = actualHeight / declaredHeight
-    return if (frames >= minFrames) frames else 1
+    return actualHeight / declaredHeight
 }

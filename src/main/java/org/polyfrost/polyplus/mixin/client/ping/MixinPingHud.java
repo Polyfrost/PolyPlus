@@ -1,5 +1,6 @@
 package org.polyfrost.polyplus.mixin.client.ping;
 
+import org.polyfrost.polyplus.client.emotes.duo.DuoEmoteHud;
 import org.polyfrost.polyplus.client.gui.WheelOverlay;
 import org.polyfrost.polyplus.client.ping.PingInput;
 import org.polyfrost.polyplus.client.ping.PingMarkers;
@@ -39,6 +40,7 @@ public class MixinPingHud {
     private void polyplus$drawPings(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker, CallbackInfo ci) {
         PingMarkers.render(graphics, deltaTracker.getGameTimeDeltaPartialTick(true));
         PingInput.renderHint(graphics);
+        DuoEmoteHud.render(graphics, deltaTracker.getGameTimeDeltaPartialTick(true));
         WheelOverlay.render(graphics);
     }
     //?} elif > 1.8.9 {
@@ -46,6 +48,7 @@ public class MixinPingHud {
     private void polyplus$drawPings(GuiGraphics graphics, DeltaTracker deltaTracker, CallbackInfo ci) {
         PingMarkers.render(graphics, deltaTracker.getGameTimeDeltaPartialTick(true));
         PingInput.renderHint(graphics);
+        DuoEmoteHud.render(graphics, deltaTracker.getGameTimeDeltaPartialTick(true));
         WheelOverlay.render(graphics);
     }
     *///?} else {
@@ -53,6 +56,7 @@ public class MixinPingHud {
     private void polyplus$drawPings(float tickDelta, CallbackInfo ci) {
         PingMarkers.render(null, tickDelta);
         PingInput.renderHint(null);
+        DuoEmoteHud.render(null, tickDelta);
         WheelOverlay.render(null);
     }
     *///?}

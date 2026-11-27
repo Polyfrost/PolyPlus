@@ -16,7 +16,12 @@ enum class CosmeticType(val serializedName: String, val displayName: String) {
     Aura("aura", "Aura"),
     Pet("pet", "Pet"),
     Emote("emote", "Emote"),
+    Nameplate("nameplate", "Nameplates"),
+    Effect("effect", "Effects"),
     Unknown("unknown", "Unknown");
+
+    fun labelFor(definition: CosmeticDefinition?): String =
+        if (this == Effect) definition?.groupName ?: displayName else displayName
 
     val searchTerms: List<String>
         get() = when (this) {
@@ -38,7 +43,8 @@ enum class CosmeticType(val serializedName: String, val displayName: String) {
         Boots -> BodySlot.Boots
         Shoulder -> BodySlot.Shoulder
         Pet -> BodySlot.Pet
-        Emote, Unknown -> null
+        Nameplate -> BodySlot.Nameplate
+        Effect, Emote, Unknown -> null
     }
 
     internal object Serializer : KSerializer<CosmeticType> by ApiEnumSerializer(

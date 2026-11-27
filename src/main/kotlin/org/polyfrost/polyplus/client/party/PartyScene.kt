@@ -88,8 +88,18 @@ object PartyScene {
 
     private var consents: Map<String, Boolean> = parseConsents(PolyPlusPartyConfig.partySceneConsents)
 
+    private var retaggedFrom: MemberScene? = null
+    private var retagged: MemberScene? = null
+
     fun localScene(): MemberScene? {
-        followed()?.let { return if (it.mcVersion == mcVersion) it else it.copy(mcVersion = mcVersion) }
+        followed()?.let {
+            if (it.mcVersion == mcVersion) return it
+            if (retaggedFrom !== it) {
+                retaggedFrom = it
+                retagged = it.copy(mcVersion = mcVersion)
+            }
+            return retagged
+        }
         val entry = ownEntry() ?: return published
         val scene = describe(entry)
         val previous = published

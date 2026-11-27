@@ -1,10 +1,13 @@
 package org.polyfrost.polyplus.client.network.websocket
 
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.network.http.responses.EmoteAnchor
 import org.polyfrost.polyplus.client.network.http.responses.MemberState
 import org.polyfrost.polyplus.client.network.http.responses.PlayDestination
 import org.polyfrost.polyplus.client.network.http.responses.PlayReason
 import org.polyfrost.polyplus.client.network.http.responses.PlayResponse
+import org.polyfrost.polyplus.client.pets.PetPlay
+import org.polyfrost.polyplus.client.pets.PetPlaySerializer
 import org.polyfrost.polyplus.client.ping.PingKind
 import org.polyfrost.polyplus.client.ping.PingReply
 import org.polyfrost.polyplus.client.ping.PingTarget
@@ -43,15 +46,72 @@ sealed interface ServerboundPacket {
 
     @Serializable
     @SerialName("SetParticleColor")
-    data class SetParticleColor(val color: Int?) : ServerboundPacket
+    data class SetParticleColor(
+        val color: Int?,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SetCosmeticColors")
+    data class SetCosmeticColors(
+        @SerialName("cosmetic_id") val cosmeticId: Int,
+        val colors: Map<String, Int>? = null,
+        val active: Boolean = true,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SetPetPreferences")
+    data class SetPetPreferences(
+        @Serializable(with = PetPlaySerializer::class) val interactions: PetPlay,
+    ) : ServerboundPacket
 
     @Serializable
     @SerialName("PlayEmote")
-    data class PlayEmote(@SerialName("emote_id") val emoteId: Int) : ServerboundPacket
+    data class PlayEmote(
+        @SerialName("emote_id") val emoteId: Int,
+        val anchor: EmoteAnchor? = null,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteRequest")
+    data class SharedEmoteRequest(
+        @SerialName("emote_id") val emoteId: Int,
+        val target: String,
+        @SerialName("request_id") val requestId: Long? = null,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteResponse")
+    data class SharedEmoteResponse(
+        @SerialName("request_id") val requestId: String,
+        val accept: Boolean,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteCancel")
+    data class SharedEmoteCancel(
+        @SerialName("request_id") val requestId: String,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteStart")
+    data class SharedEmoteStart(
+        @SerialName("request_id") val requestId: String,
+        val anchor: EmoteAnchor,
+    ) : ServerboundPacket
+
+    @Serializable
+    @SerialName("SharedEmoteStop")
+    data object SharedEmoteStop : ServerboundPacket
 
     @Serializable
     @SerialName("StopEmote")
-    data object StopEmote : ServerboundPacket
+    data class StopEmote(
+        @SerialName("emote_id") val emoteId: Int? = null,
+        @SerialName("start_time") val startTime: Long? = null,
+    ) : ServerboundPacket
 
     @Serializable
     @SerialName("SetPartyState")

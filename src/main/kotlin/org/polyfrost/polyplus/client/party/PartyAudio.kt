@@ -6,6 +6,7 @@ import io.github.jaredmdobson.concentus.OpusEncoder
 import io.github.jaredmdobson.concentus.OpusSignal
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.PolyPlusConfig
+import java.util.Arrays
 import java.util.concurrent.LinkedBlockingQueue
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
@@ -63,12 +64,16 @@ internal object PartyAudio {
         return order.firstOrNull { it.start() }
     }
 
-    fun deliver(raw: ShortArray, gain: Float, onFrame: (ShortArray, Float) -> Unit) {
-        val frame = ShortArray(raw.size)
+    fun deliver(raw: ShortArray, frame: ShortArray, gain: Float, onFrame: (ShortArray, Float) -> Unit) {
         for (i in raw.indices) {
-            frame[i] = (raw[i] * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            val scaled = (raw[i] * gain).toInt()
+            frame[i] = (if (scaled > Short.MAX_VALUE) Short.MAX_VALUE.toInt() else if (scaled < Short.MIN_VALUE) Short.MIN_VALUE.toInt() else scaled).toShort()
         }
-        runCatching { onFrame(frame, rms(frame)) }.onFailure { LOGGER.warn("Microphone frame handler failed", it) }
+        try {
+            onFrame(frame, rms(frame))
+        } catch (error: Throwable) {
+            LOGGER.warn("Microphone frame handler failed", error)
+        }
     }
 
     private fun devices(type: Class<out Line>, format: AudioFormat): List<String> = runCatching {
@@ -128,10 +133,16 @@ internal class MicCapture(
 
     private fun loop(target: TargetDataLine) {
         val bytes = ByteArray(PartyAudio.FRAME_SAMPLES * 2)
+        val raw = ShortArray(PartyAudio.FRAME_SAMPLES)
+        val frame = ShortArray(PartyAudio.FRAME_SAMPLES)
         while (running) {
             var read = 0
             while (read < bytes.size && running) {
-                val got = runCatching { target.read(bytes, read, bytes.size - read) }.getOrDefault(-1)
+                val got = try {
+                    target.read(bytes, read, bytes.size - read)
+                } catch (error: Throwable) {
+                    -1
+                }
                 if (got < 0) {
                     if (running) {
                         running = false
@@ -142,8 +153,8 @@ internal class MicCapture(
                 read += got
             }
             if (!running) break
-            val raw = ShortArray(PartyAudio.FRAME_SAMPLES) { i -> ((bytes[i * 2].toInt() and 0xFF) or (bytes[i * 2 + 1].toInt() shl 8)).toShort() }
-            PartyAudio.deliver(raw, gain(), onFrame)
+            for (i in raw.indices) raw[i] = ((bytes[i * 2].toInt() and 0xFF) or (bytes[i * 2 + 1].toInt() shl 8)).toShort()
+            PartyAudio.deliver(raw, frame, gain(), onFrame)
         }
     }
 
@@ -204,7 +215,8 @@ internal class JitterBuffer {
     private class Packet(val seq: Int, val last: Boolean, val data: ByteArray)
 
     private val inbound = LinkedBlockingQueue<Packet>(MAX_INBOUND)
-    private val pending = HashMap<Int, Packet>()
+    private val slots = arrayOfNulls<Packet>(MAX_INBOUND + MAX_PENDING + 1)
+    private var count = 0
     private val decoder = PartyAudio.decoder()
     private val pcm = ShortArray(PartyAudio.FRAME_SAMPLES)
 
@@ -223,7 +235,8 @@ internal class JitterBuffer {
 
     fun clear() {
         inbound.clear()
-        pending.clear()
+        Arrays.fill(slots, 0, count, null)
+        count = 0
         playing = false
     }
 
@@ -231,19 +244,23 @@ internal class JitterBuffer {
         while (true) {
             val packet = inbound.poll() ?: break
             if (playing && behind(packet.seq, expected)) continue
-            pending[packet.seq] = packet
+            put(packet)
         }
-        while (pending.size > MAX_PENDING) pending.remove(oldest())
+        while (count > MAX_PENDING) removeAt(oldestIndex())
         if (!playing) {
-            if (pending.size < START_DEPTH && pending.values.none { it.last }) return null
-            expected = oldest() ?: return null
+            if (count < START_DEPTH && !anyLast()) return null
+            val first = oldestIndex()
+            if (first < 0) return null
+            expected = slots[first]!!.seq
             playing = true
             misses = 0
             ending = false
         }
-        val packet = pending.remove(expected)
+        val index = indexOf(expected)
+        val packet = if (index >= 0) slots[index] else null
+        if (index >= 0) removeAt(index)
         expected = (expected + 1) and 0xFFFF
-        val decoded = runCatching {
+        val decoded = try {
             if (packet != null) {
                 misses = 0
                 if (packet.last) ending = true
@@ -256,14 +273,47 @@ internal class JitterBuffer {
                 }
                 decoder.decode(null, 0, 0, pcm, 0, PartyAudio.FRAME_SAMPLES, false)
             }
-        }.getOrDefault(0)
-        if (ending && pending.isEmpty() && packet != null && packet.last) playing = false
+        } catch (error: Exception) {
+            0
+        }
+        if (ending && count == 0 && packet != null && packet.last) playing = false
         return if (decoded > 0) pcm else null
     }
 
-    private fun oldest(): Int? {
-        if (pending.isEmpty()) return null
-        return pending.keys.minWithOrNull { a, b -> if (a == b) 0 else if (behind(a, b)) -1 else 1 }
+    private fun put(packet: Packet) {
+        val existing = indexOf(packet.seq)
+        if (existing >= 0) {
+            slots[existing] = packet
+        } else {
+            slots[count++] = packet
+        }
+    }
+
+    private fun indexOf(seq: Int): Int {
+        for (i in 0 until count) if (slots[i]!!.seq == seq) return i
+        return -1
+    }
+
+    private fun anyLast(): Boolean {
+        for (i in 0 until count) if (slots[i]!!.last) return true
+        return false
+    }
+
+    private fun removeAt(index: Int) {
+        count--
+        slots[index] = slots[count]
+        slots[count] = null
+    }
+
+    private fun oldestIndex(): Int {
+        if (count == 0) return -1
+        var best = 0
+        for (i in 1 until count) {
+            val candidate = slots[i]!!.seq
+            val current = slots[best]!!.seq
+            if (candidate != current && !behind(current, candidate)) best = i
+        }
+        return best
     }
 
     private fun behind(a: Int, b: Int): Boolean {

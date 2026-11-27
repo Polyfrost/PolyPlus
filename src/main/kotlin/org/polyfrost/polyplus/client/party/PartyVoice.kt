@@ -229,14 +229,37 @@ object PartyVoice {
         if (P2PSessionManager.status.value == EosStatus.Ready) add(VoiceTransport.P2p)
     }
 
-    fun memberVoice(): MemberVoice = MemberVoice(
-        inVoice = inVoice,
-        muted = muted,
-        deafened = deafened,
-        micBlocked = micBlocked,
-        capabilities = capabilities(),
-        transport = if (inVoice) active else null,
-    )
+    private var voiceCache = MemberVoice()
+    private var voiceCacheRtc = false
+    private var voiceCacheP2p = false
+
+    fun memberVoice(): MemberVoice {
+        val rtc = rtcCapable()
+        val p2p = P2PSessionManager.status.value == EosStatus.Ready
+        val transport = if (inVoice) active else null
+        val cached = voiceCache
+        if (cached.inVoice == inVoice && cached.muted == muted && cached.deafened == deafened &&
+            cached.micBlocked == micBlocked && cached.transport == transport &&
+            voiceCacheRtc == rtc && voiceCacheP2p == p2p
+        ) {
+            return cached
+        }
+        val fresh = MemberVoice(
+            inVoice = inVoice,
+            muted = muted,
+            deafened = deafened,
+            micBlocked = micBlocked,
+            capabilities = buildList {
+                if (rtc) add(VoiceTransport.Rtc)
+                if (p2p) add(VoiceTransport.P2p)
+            },
+            transport = transport,
+        )
+        voiceCache = fresh
+        voiceCacheRtc = rtc
+        voiceCacheP2p = p2p
+        return fresh
+    }
 
     private fun startCapture() {
         if (capture != null) return
@@ -389,22 +412,55 @@ object PartyVoice {
             "if $name is listed there, or play through OneLauncher to talk. You can still hear your party."
     }
 
+    private var selfSpeakingBase: Set<String>? = null
+    private var selfSpeakingId: String? = null
+    private var selfSpeaking: Set<String> = emptySet()
+    private var noticeKey = -1
+    private var noticeText: String? = null
+
+    private fun selfSpeakingWith(self: String): Set<String> {
+        if (selfSpeakingBase === speakingPlayers && selfSpeakingId == self) return selfSpeaking
+        val next = speakingPlayers + self
+        selfSpeakingBase = speakingPlayers
+        selfSpeakingId = self
+        selfSpeaking = next
+        return next
+    }
+
+    private fun noticeNow(): String? {
+        val key = (if (micBlocked) 1 else 0) or (if (micSilent) 2 else 0)
+        if (key == noticeKey) return noticeText
+        noticeKey = key
+        noticeText = blockedNotice()
+        return noticeText
+    }
+
     private fun publish() {
         val self = PartyRepository.localId()
         val talkingNow = talking && inVoice
-        val speaking = if (talkingNow) speakingPlayers + self else speakingPlayers
-        val next = Ui(
+        val speaking = if (talkingNow && self !in speakingPlayers) selfSpeakingWith(self) else speakingPlayers
+        val transport = if (inVoice) active else null
+        val silent = micSilent && !micBlocked
+        val notice = noticeNow()
+        val current = _ui.value
+        if (current.inVoice == inVoice && current.transport == transport && current.muted == muted &&
+            current.deafened == deafened && current.micBlocked == micBlocked && current.micSilent == silent &&
+            current.blockedNotice == notice && current.talking == talkingNow && current.speaking == speaking &&
+            current.noticeOpen == noticeOpen
+        ) {
+            return
+        }
+        _ui.value = Ui(
             inVoice = inVoice,
-            transport = if (inVoice) active else null,
+            transport = transport,
             muted = muted,
             deafened = deafened,
             micBlocked = micBlocked,
-            micSilent = micSilent && !micBlocked,
-            blockedNotice = blockedNotice(),
+            micSilent = silent,
+            blockedNotice = notice,
             talking = talkingNow,
             speaking = speaking,
             noticeOpen = noticeOpen,
         )
-        if (next != _ui.value) _ui.value = next
     }
 }

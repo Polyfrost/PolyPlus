@@ -15,13 +15,20 @@ import net.minecraft.client.gui.screens.Screen
 import org.joml.Quaternionf
 import org.polyfrost.oneconfig.api.platform.v1.DesktopHelper
 import org.polyfrost.oneconfig.utils.v1.Multithreading
+import org.polyfrost.polyplus.client.cosmetics.LocalAccountSkin
+import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
+import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.delay
 
+//? if > 1.8.9 {
+import net.minecraft.client.resources.DefaultPlayerSkin
+//?}
 //? if >= 1.21.10 {
 import net.minecraft.world.entity.player.PlayerModelType
 //?}
@@ -41,6 +48,8 @@ object ClientPlatform {
     private const val VANILLA_UNLIMITED_FRAMERATE = 260
     private const val MAX_UNLIMITED_FRAMERATE = 10_000
     private const val MINIMIZED_FRAME_LIMIT = 10
+    private const val SKIN_MODEL_WAIT_MS = 3_000L
+    private const val SKIN_MODEL_POLL_MS = 100L
 
     val isWindows: Boolean
         get() = System.getProperty("os.name").lowercase().contains("windows")
@@ -181,14 +190,35 @@ object ClientPlatform {
 
     fun localPlayerName(): String = Minecraft.getInstance().user.name
 
-    fun localSkinSlim(): Boolean =
+    fun localSkinSlim(): Boolean = knownLocalSkinSlim() ?: LocalAccountSkin.slim()
+
+    suspend fun awaitLocalSkinSlim(): Boolean? {
+        val deadline = System.currentTimeMillis() + SKIN_MODEL_WAIT_MS
+        while (true) {
+            runOnMainSync { knownLocalSkinSlim() }?.let { return it }
+            if (System.currentTimeMillis() >= deadline) return null
+            delay(SKIN_MODEL_POLL_MS)
+        }
+    }
+
+    fun knownLocalSkinSlim(): Boolean? =
+        MojangSkinService.localSkinModel(localPlayerUuid())?.let { it == SkinModel.Slim } ?: worldSkinSlim() ?: LocalAccountSkin.knownSlim()
+
+    private fun worldSkinSlim(): Boolean? {
+        val player = Minecraft.getInstance().player ?: return null
         //? if >= 1.21.10 {
-        Minecraft.getInstance().player?.skin?.model() == PlayerModelType.SLIM
+        val skin = player.skin
+        if (skin.body() == DefaultPlayerSkin.get(player.uuid).body()) return null
+        return skin.model() == PlayerModelType.SLIM
         //?} elif > 1.8.9 {
-        /*Minecraft.getInstance().player?.skin?.model() == PlayerSkin.Model.SLIM
+        /*val skin = player.skin
+        if (skin.texture() == DefaultPlayerSkin.get(player.uuid).texture()) return null
+        return skin.model() == PlayerSkin.Model.SLIM
         *///?} else {
-        /*Minecraft.getInstance().player?.modelType == "slim"
+        /*if (!player.hasSkinTexture()) return null
+        return player.modelType == "slim"
         *///?}
+    }
 }
 
 //? if = 1.8.9 {

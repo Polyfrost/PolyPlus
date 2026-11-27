@@ -75,8 +75,14 @@ internal class OpenAlCapture(
     private fun loop(available: () -> Int, read: (ByteBuffer) -> Unit) {
         val buffer = ByteBuffer.allocateDirect(PartyAudio.FRAME_SAMPLES * 2).order(ByteOrder.nativeOrder())
         val raw = ShortArray(PartyAudio.FRAME_SAMPLES)
+        val frame = ShortArray(PartyAudio.FRAME_SAMPLES)
+        val shorts = buffer.asShortBuffer()
         while (running) {
-            val count = runCatching(available).getOrDefault(-1)
+            val count = try {
+                available()
+            } catch (error: Throwable) {
+                -1
+            }
             if (count < 0) break
             if (count < PartyAudio.FRAME_SAMPLES) {
                 Thread.sleep(POLL_MS)
@@ -85,8 +91,9 @@ internal class OpenAlCapture(
             buffer.clear()
             read(buffer)
             buffer.rewind()
-            buffer.asShortBuffer().get(raw)
-            PartyAudio.deliver(raw, gain(), onFrame)
+            shorts.clear()
+            shorts.get(raw)
+            PartyAudio.deliver(raw, frame, gain(), onFrame)
         }
     }
 
@@ -149,11 +156,13 @@ internal class OpenAlSpeaker(private val device: String, private val next: (Shor
         val buffers = IntArray(QUEUED_BUFFERS).also(AL10::alGenBuffers)
         val frame = ShortArray(PartyAudio.FRAME_SAMPLES * 2)
         val data = ByteBuffer.allocateDirect(frame.size * 2).order(ByteOrder.nativeOrder())
+        val shorts = data.asShortBuffer()
         fun fill(buffer: Int) {
             frame.fill(0)
             runCatching { next(frame) }.onFailure { logger.warn("Party voice mixer failed", it) }
             data.clear()
-            data.asShortBuffer().put(frame)
+            shorts.clear()
+            shorts.put(frame)
             data.limit(frame.size * 2)
             AL10.alBufferData(buffer, AL10.AL_FORMAT_STEREO16, data, PartyAudio.SAMPLE_RATE)
             AL10.alSourceQueueBuffers(source, buffer)

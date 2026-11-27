@@ -8,12 +8,15 @@ import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
-import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
+import org.polyfrost.polyplus.client.emotes.props.EmotePropLayer;
 import org.polyfrost.polyplus.compat.EntityModelFeaturesCompat;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import com.llamalad7.mixinextras.sugar.Local;
+import net.minecraft.client.model.geom.ModelPart;
+import org.polyfrost.polyplus.client.cosmetics.render.FirstPersonHands;
 
 //? if >= 1.21.11 {
 import net.minecraft.client.model.player.PlayerModel;
@@ -21,6 +24,7 @@ import net.minecraft.client.model.player.PlayerModel;
 
 //? if >= 1.21.10 {
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.world.entity.Avatar;
@@ -30,6 +34,8 @@ import org.polyfrost.polyplus.client.cosmetics.render.PreviewCapeLayer;
 //? if >= 1.21.4 {
 import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess;
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess;
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignals;
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignalsRenderAccess;
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 import org.polyfrost.polyplus.client.lobby.LobbyAvatar;
@@ -45,7 +51,8 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewRenderer;
 *///?}
 
 //? if >= 1.21.4 && < 1.21.10 {
-/*import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+/*import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.entity.state.PlayerRenderState;
 *///?}
 
 //? if < 1.21.10 {
@@ -56,6 +63,7 @@ import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 //? if = 1.21.1 {
 /*import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
+import org.polyfrost.polyplus.client.emotes.duo.MarkerGhost;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 *///?}
 
@@ -84,7 +92,7 @@ public class MixinAvatarRenderer {
             (RenderLayerParent<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>>) this;
         *///?}
 
-        invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer(parent));
+        invoker.polyplus$invokeAddLayer(new EmotePropLayer(parent));
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer(parent));
         invoker.polyplus$invokeAddLayer(new LobbyHerobrineLayer(parent));
 
@@ -131,6 +139,24 @@ public class MixinAvatarRenderer {
             renderAccess.polyplus$bindEmoteController(controller);
         }
     }
+
+    //? if >= 1.21.10 {
+    @Inject(
+        method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V",
+        at = @At("RETURN")
+    )
+    private void polyplus$extractSignals(Avatar entity, AvatarRenderState state, float partialTicks, CallbackInfo ci) {
+    //?} else {
+    /*@Inject(
+        method = "extractRenderState(Lnet/minecraft/client/player/AbstractClientPlayer;Lnet/minecraft/client/renderer/entity/state/PlayerRenderState;F)V",
+        at = @At("RETURN")
+    )
+    private void polyplus$extractSignals(AbstractClientPlayer entity, PlayerRenderState state, float partialTicks, CallbackInfo ci) {
+    *///?}
+        if (state instanceof PlayerSignalsRenderAccess signalsAccess) {
+            PlayerSignals.extract(entity, signalsAccess, partialTicks);
+        }
+    }
     //?}
 
     //? if >= 1.21.10 {
@@ -167,7 +193,45 @@ public class MixinAvatarRenderer {
         cancellable = true
     )
     private void polyplus$hidePauseAvatarName(AbstractClientPlayer player, Component name, PoseStack poseStack, MultiBufferSource buffers, int light, float partialTick, CallbackInfo ci) {
-        if (PauseAvatar.hidesName(player)) ci.cancel();
+        if (PauseAvatar.hidesName(player) || MarkerGhost.isGhost(player)) ci.cancel();
+    }
+    *///?}
+
+    //? if >= 1.21.10 {
+    @Inject(method = "renderHand", at = @At("RETURN"))
+    private void polyplus$drawHandCosmetics(
+        CallbackInfo ci,
+        @Local(argsOnly = true) PoseStack poseStack,
+        @Local(argsOnly = true) SubmitNodeCollector collector,
+        @Local(argsOnly = true) int light,
+        @Local(argsOnly = true) ModelPart arm
+    ) {
+        PlayerModel model = ((AvatarRenderer<?>) (Object) this).getModel();
+        FirstPersonHands.submit(poseStack, collector, light, arm, arm == model.rightArm);
+    }
+    //?} elif >= 1.21.4 {
+    /*@Inject(method = "renderHand", at = @At("RETURN"))
+    private void polyplus$drawHandCosmetics(
+        CallbackInfo ci,
+        @Local(argsOnly = true) PoseStack poseStack,
+        @Local(argsOnly = true) MultiBufferSource buffers,
+        @Local(argsOnly = true) int light,
+        @Local(argsOnly = true) ModelPart arm
+    ) {
+        PlayerModel model = ((PlayerRenderer) (Object) this).getModel();
+        FirstPersonHands.render(poseStack, buffers, light, arm, arm == model.rightArm);
+    }
+    *///?} elif > 1.8.9 {
+    /*@Inject(method = "renderHand", at = @At("RETURN"))
+    private void polyplus$drawHandCosmetics(
+        CallbackInfo ci,
+        @Local(argsOnly = true) PoseStack poseStack,
+        @Local(argsOnly = true) MultiBufferSource buffers,
+        @Local(argsOnly = true) int light,
+        @Local(argsOnly = true, ordinal = 0) ModelPart arm
+    ) {
+        PlayerModel<AbstractClientPlayer> model = ((PlayerRenderer) (Object) this).getModel();
+        FirstPersonHands.render(poseStack, buffers, light, arm, arm == model.rightArm);
     }
     *///?}
 //? if > 1.8.9
@@ -180,8 +244,9 @@ import net.minecraft.client.render.entity.PlayerRenderer;
 import org.polyfrost.polyplus.client.lobby.LobbyAntics;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrine;
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderLayer;
-import org.polyfrost.polyplus.client.emotes.effects.EmoteEffectRenderLayer;
-import org.polyfrost.polyplus.client.emotes.playback.ModelPoseApplicator;
+import org.polyfrost.polyplus.client.cosmetics.render.FirstPersonHands;
+import org.polyfrost.polyplus.client.emotes.playback.EmotePoser;
+import org.polyfrost.polyplus.client.emotes.props.EmotePropLayer;
 import org.polyfrost.polyplus.client.lobby.LobbyHerobrineLayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -193,19 +258,29 @@ public class MixinAvatarRenderer {
     @Inject(method = "<init>(Lnet/minecraft/client/render/entity/EntityRenderDispatcher;Z)V", at = @At("RETURN"))
     private void polyplus$addCosmeticLayer(EntityRenderDispatcher dispatcher, boolean thinArms, CallbackInfo ci) {
         LivingEntityRendererInvoker invoker = (LivingEntityRendererInvoker) this;
-        invoker.polyplus$invokeAddLayer(new EmoteEffectRenderLayer((PlayerRenderer) (Object) this));
+        invoker.polyplus$invokeAddLayer(new EmotePropLayer((PlayerRenderer) (Object) this));
         invoker.polyplus$invokeAddLayer(new CosmeticRenderLayer((PlayerRenderer) (Object) this));
         invoker.polyplus$invokeAddLayer(new LobbyHerobrineLayer((PlayerRenderer) (Object) this));
     }
 
     @Inject(method = {"renderRightArm", "renderLeftArm"}, at = @At("HEAD"))
     private void polyplus$enterFirstPersonHand(CallbackInfo ci) {
-        ModelPoseApplicator.firstPersonHand = true;
+        EmotePoser.firstPersonHand = true;
     }
 
     @Inject(method = {"renderRightArm", "renderLeftArm"}, at = @At("RETURN"))
     private void polyplus$exitFirstPersonHand(CallbackInfo ci) {
-        ModelPoseApplicator.firstPersonHand = false;
+        EmotePoser.firstPersonHand = false;
+    }
+
+    @Inject(method = "renderRightArm", at = @At("RETURN"))
+    private void polyplus$drawRightHandCosmetics(ClientPlayerEntity player, CallbackInfo ci) {
+        FirstPersonHands.render(player, ((PlayerRenderer) (Object) this).getModel().rightArm, true);
+    }
+
+    @Inject(method = "renderLeftArm", at = @At("RETURN"))
+    private void polyplus$drawLeftHandCosmetics(ClientPlayerEntity player, CallbackInfo ci) {
+        FirstPersonHands.render(player, ((PlayerRenderer) (Object) this).getModel().leftArm, false);
     }
 
     @Inject(method = "applyRotation(Lnet/minecraft/client/entity/living/player/ClientPlayerEntity;FFF)V", at = @At("HEAD"))

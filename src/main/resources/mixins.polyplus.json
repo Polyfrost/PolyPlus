@@ -252,15 +252,39 @@
     //? if <1.21.8
     //"client.cosmetics.EntityRenderDispatcherAccessor",
     "client.cosmetics.LivingEntityRendererInvoker",
+    //? if < 1.21.10
+    //"client.cosmetics.LivingEntityPoseInvoker",
     "client.cosmetics.MixinAbstractClientPlayer",
     "client.cosmetics.MixinAvatarRenderer",
     //? if >= 1.21.4
     "client.cosmetics.MixinAvatarRenderState",
+    //? if >= 1.21.10
+    "client.cosmetics.MixinCustomGeometryPose",
     //? if >= 1.21.4
     "client.cosmetics.MixinCapeLayer",
+    //? if >= 1.21.4
+    "client.cosmetics.MixinWearerJumpSync",
+    "client.cosmetics.MixinCosmeticEffectsRender",
+    "client.cosmetics.MixinCosmeticSounds",
+    //? if = 1.8.9
+    //"client.cosmetics.MixinCosmeticSoundPool",
+    //? if > 1.8.9
+    "client.cosmetics.MixinEmoteLayerPose",
     //? if = 1.21.1 || = 1.8.9
     //"client.cosmetics.MixinLivingEntityRenderer",
+    //? if = 1.8.9
+    //"client.cosmetics.MixinModelPartScale",
     "client.cosmetics.MixinPlayerModel",
+    //? if = 1.21.1 || = 1.8.9
+    //"client.cosmetics.PlayerRendererPoseInvoker",
+    "client.emotes.MixinMarkerGhostRender",
+    //? if >= 1.21.10
+    "client.pets.MixinPetExtract",
+    "client.pets.MixinPetRender",
+    "client.pets.MixinPetOwnerParts",
+    "client.signals.MixinLivingEntitySwing",
+    //? if = 1.8.9
+    //"client.signals.SignalsTimerAccessor",
     //? if > 1.8.9
     "client.lobby.MixinCamera",
     //? if > 1.8.9
@@ -356,15 +380,50 @@
     "client.privacy.MixinAnvilScreen",
     //? if = 1.8.9
     //"client.MixinEmojiTextRenderer",
+    //? if >= 1.21.4
+    "client.nameplate.render.MixinNameTagState",
+    "client.nameplate.render.MixinNameTagPlayer",
+    //? if >= 26.1 || = 1.8.9
+    "client.nameplate.render.MixinNameTagEntity",
+    //? if > 1.8.9
+    "client.nameplate.render.MixinNameTagCapture",
+    //? if >= 1.21.10 || = 1.8.9
+    "client.nameplate.render.MixinNameTagFrame",
+    //? if > 1.8.9
+    "client.nameplate.render.MixinNameTagFrameEnd",
+    //? if = 1.8.9
+    //"client.nameplate.render.MixinNameTagSneak",
+    //? if >= 1.21.4
+    "client.nameplate.render.MixinDisplayTagState",
+    //? if > 1.8.9
+    "client.nameplate.render.MixinDisplayTag",
+    //? if >= 1.21.5
+    "client.nameplate.MixinNameplateMaterialDraw",
+    //? if = 26.2
+    //"client.nameplate.MixinNameplatePreparedType",
+    //? if >= 26.3
+    "client.nameplate.NameplatePipelineCacheAccessor",
+    //? if >= 26.3
+    "client.nameplate.NameplatePipelineCacheMapAccessor",
+    //? if >= 1.21.5 && < 26.3
+    //"client.nameplate.NameplateGlPipelinesAccessor",
+    //? if >= 26.1 && < 26.3
+    //"client.nameplate.NameplateDeviceBackendAccessor",
+    //? if = 26.2
+    //"client.nameplate.NameplateVulkanPipelinesAccessor",
+    //? if >= 1.21.5
+    "client.nameplate.MixinNameplatePackEncoder",
+    //? if >= 26.3
+    "client.nameplate.MixinNameplatePackPipeline",
+    //? if > 1.8.9 && < 1.21.5
+    //"client.nameplate.MixinNameplatePackVertexBuffer",
+    "client.nameplate.MixinNameplateOwnTag",
     "client.network.MixinClientCommonPacketListenerImpl",
   ],
   "mixins": [
     "MixinCrashReport",
     //? if > 1.8.9
     "MixinSystemReport",
-    //? if > 1.8.9
-    "client.access.HolderReferenceInvoker",
-    "client.access.MappedRegistryAccessor",
     //? if > 1.8.9
     "client.access.TranslatableContentsInvoker",
     "client.network.MixinConnection",
@@ -443,6 +502,10 @@
     "compat.sodium.MixinShaderChunkRendererPipelineLobby",
     //? if > 1.8.9
     "compat.sodium.MixinSodiumConfigBuilder",
+    //? if = 1.8.9
+    //"compat.soundfix.MixinSoundBufferLibrary",
+    //? if = 1.8.9
+    //"compat.soundfix.SoundBufferAccessor",
     //? if sodium && >= 1.21.10 && < 26.1
     //"compat.sodium.MixinSodiumWorldRendererLobby",
     //? if > 1.8.9

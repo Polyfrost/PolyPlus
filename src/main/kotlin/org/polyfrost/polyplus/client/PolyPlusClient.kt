@@ -26,6 +26,8 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.CosmeticSync
+import org.polyfrost.polyplus.client.cosmetics.moments.Moments
+import org.polyfrost.polyplus.client.cosmetics.sets.DiscoveredBonuses
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.features.AdaptiveBlurDefaults
 import org.polyfrost.polyplus.client.features.AdvancedModCards
@@ -50,8 +52,7 @@ import org.polyfrost.polyplus.client.network.http.PolyAuthorization
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.network.websocket.ServerboundPacket
-//? if > 1.8.9
-import org.polyfrost.polyplus.client.pets.PetEntities
+import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.privacy.PrivacyGate
 import org.polyfrost.polyplus.client.privacy.RichTextPrivacy
@@ -209,6 +210,7 @@ object PolyPlusClient {
         step("featured servers") { FeaturedServers.warmUp() }
         step("status page") { StatusPage.start() }
         step("oneclient server api") { OneClientServerApi.initialize() }
+        step("moments") { Moments.initialize() }
         //? if wwaypoints
         step("wwaypoints compat") { WWaypointsCompat.initialize() }
 
@@ -222,8 +224,8 @@ object PolyPlusClient {
         step("early init P2PSessionManager") { P2PSessionManager.earlyInitialize() }
         step("parties") { Parties.initialize() }
 
-        //? if >= 1.21.1
-        step("pet entities") { PetEntities.register() }
+        //? if >= 1.21.1 || = 1.8.9
+        step("pets") { PetManager.register() }
         //? if = 1.21.1 || >= 1.21.8
         step("player preview") { PlayerPreviewRenderer.initialize() }
         step("vanilla menu button") { VanillaMenuButton.register() }
@@ -235,6 +237,7 @@ object PolyPlusClient {
 
                 SCOPE.launch {
                     PolyConnection.sendPacket(ServerboundPacket.GetActiveCosmetics(ClientPlatform.localPlayerUuid().toString()))
+                    CosmeticSync.syncPetPreferences()
                     //? if >= 1.21.1 || = 1.8.9
                     CosmeticSync.resubscribeVisiblePlayers()
                     if (Minecraft.getInstance().player != null) {
@@ -273,6 +276,7 @@ object PolyPlusClient {
                 CosmeticCatalog.reset()
                 CosmeticAssetCache.reset()
             }
+            runCatching { DiscoveredBonuses.syncAccount() }
 
             runCatching { PolyConnection.reconnect() }
             runCatching { P2PSessionManager.reconnect() }
@@ -317,7 +321,7 @@ object PolyPlusClient {
         try {
             runSuspendCatching { CosmeticCatalog.refreshCatalog() }
                 .onFailure { LOGGER.error("Cosmetic catalog refresh failed", it) }
-            runSuspendCatching { CosmeticCatalog.refreshPlayer() }
+            runSuspendCatching { CosmeticCatalog.refreshPlayer().getOrThrow() }
                 .onFailure { LOGGER.error("Player cosmetics refresh failed", it) }
             //? if >= 1.21.1 {
             runSuspendCatching { CosmeticService.syncLocalActive() }
@@ -326,6 +330,7 @@ object PolyPlusClient {
             /*CosmeticCatalog.applyRemoteEquipped(ClientPlatform.localPlayerUuid(), CosmeticCatalog.localEquipped().equipped)
             runCatching { CosmeticSync.applyLocalActiveFromCatalog() }
                 .onFailure { LOGGER.error("Local active cosmetics apply failed", it) }
+            CosmeticService.syncLocalPalettes()
             *///?}
         } finally {
             CosmeticLoadProgress.onMetadataComplete()

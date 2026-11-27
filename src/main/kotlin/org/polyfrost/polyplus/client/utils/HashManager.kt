@@ -22,6 +22,12 @@ class HashManager(private val file: File) {
 
     fun isCurrent(key: String, hash: String): Boolean = hashes[key] == hash
 
+    fun keys(): Set<String> = HashSet(hashes.keys)
+
+    fun remove(key: String) {
+        if (hashes.remove(key) != null) dirty = true
+    }
+
     fun updateHash(key: String, hash: String): Boolean {
         if (hashes.put(key, hash) == hash) {
             return false

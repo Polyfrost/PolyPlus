@@ -6,6 +6,8 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
+//? if >= 1.21.4
+import org.polyfrost.polyplus.client.emotes.duo.MarkerGhost;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -23,6 +25,7 @@ public class MixinEntityRenderer {
     //? if >= 1.21.4 {
     @ModifyReturnValue(method = "getNameTag", at = @At("RETURN"))
     private Component polyplus$badgeNameTag(Component original, Entity entity) {
+        if (MarkerGhost.isGhost(entity)) return null;
         if (original != null && entity instanceof AbstractClientPlayer player) {
             return PolyPlusBadge.decorate(original, player.getUUID());
         }
@@ -45,6 +48,7 @@ import net.minecraft.client.entity.living.player.ClientPlayerEntity;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.entity.living.LivingEntity;
 import org.polyfrost.polyplus.client.PolyPlusBadge;
+import org.polyfrost.polyplus.client.emotes.duo.MarkerGhost;
 import org.polyfrost.polyplus.client.gui.pausescreen.PauseAvatar;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -55,7 +59,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinEntityRenderer {
     @Inject(method = "renderNameTag(Lnet/minecraft/entity/living/LivingEntity;DDD)V", at = @At("HEAD"), cancellable = true)
     private void polyplus$hidePauseAvatarName(LivingEntity entity, double x, double y, double z, CallbackInfo ci) {
-        if (PauseAvatar.hidesName(entity)) ci.cancel();
+        if (PauseAvatar.hidesName(entity) || MarkerGhost.isGhost(entity)) ci.cancel();
     }
 
     @ModifyExpressionValue(method = "renderNameTag(Lnet/minecraft/entity/living/LivingEntity;DDD)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/text/Text;getFormattedString()Ljava/lang/String;"))

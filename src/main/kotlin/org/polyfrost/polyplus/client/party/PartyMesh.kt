@@ -225,6 +225,9 @@ internal object PartyMesh {
     }
 
     private val encoded = ByteArray(PartyAudio.MAX_PACKET)
+    private val audioFrame = ByteBuffer.allocate(2 + 3 + PartyAudio.MAX_PACKET)
+    private val silence = ShortArray(PartyAudio.FRAME_SAMPLES)
+    private val DEFAULT_MIX = PeerMix(1f, 0f, false)
 
     fun onCapture(frame: ShortArray, transmit: Boolean) {
         if (partyId == null) return
@@ -232,16 +235,22 @@ internal object PartyMesh {
         if (!transmit && !sending) return
         val last = !transmit
         sending = transmit
-        val pcm = if (last) ShortArray(PartyAudio.FRAME_SAMPLES) else frame
+        val pcm = if (last) silence else frame
         val length = runCatching { encoder.encode(pcm, 0, PartyAudio.FRAME_SAMPLES, encoded, 0, encoded.size) }.getOrDefault(0)
         if (length <= 0) return
-        val body = encoded.copyOf(length)
         val sequence = seq
         seq = (seq + 1) and 0xFFFF
         val packetPrefix = (sequence shl 8) or (if (last) 1 else 0)
+        val packet = audioFrame
+        packet.clear()
+        packet.put(AUDIO).put(VERSION)
+        packet.putShort((packetPrefix shr 8).toShort()).put(packetPrefix.toByte())
+        packet.put(encoded, 0, length)
+        packet.flip()
         for (peer in peers.values) {
             if (!peer.accepted) continue
-            bridge.sendPacket(SOCKET, peer.puid, frame(AUDIO, body, packetPrefix, 3), EosSdkBridge.PacketReliability.UnreliableUnordered)
+            packet.rewind()
+            bridge.sendPacket(SOCKET, peer.puid, packet, EosSdkBridge.PacketReliability.UnreliableUnordered)
         }
     }
 
@@ -262,7 +271,7 @@ internal object PartyMesh {
         val master = outputGain
         for (peer in peers.values) {
             val pcm = peer.jitter.next() ?: continue
-            val setting = mix[peer.puid.raw] ?: PeerMix(1f, 0f, false)
+            val setting = mix[peer.puid.raw] ?: DEFAULT_MIX
             if (setting.silenced) continue
             val gain = setting.gain * master
             if (gain <= 0f) continue

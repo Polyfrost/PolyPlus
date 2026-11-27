@@ -14,6 +14,8 @@ public interface PlayerModelRootAccess {
 
     void polyplus$resetPart(ModelPart part);
 
+    void polyplus$copyRest(ModelPart part, float[] out);
+
     void polyplus$markPosed();
 }
 *///?}

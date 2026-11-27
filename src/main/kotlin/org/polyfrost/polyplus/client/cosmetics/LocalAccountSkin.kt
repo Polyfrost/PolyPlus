@@ -10,12 +10,14 @@ import org.polyfrost.polyplus.client.cosmetics.outfits.SkinModel
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.UUID
 //? if >= 1.21.10 {
+import net.minecraft.world.entity.player.PlayerModelType
 import net.minecraft.world.entity.player.PlayerSkin
 import java.util.function.Supplier
 //?} elif > 1.8.9 {
 /*import net.minecraft.client.resources.PlayerSkin
 *///?} else {
 /*import com.mojang.authlib.minecraft.MinecraftProfileTexture
+import net.minecraft.client.resource.skin.DefaultSkinUtils
 import net.minecraft.resource.Identifier
 import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 *///?}
@@ -95,6 +97,13 @@ object LocalAccountSkin {
         }
     }
 
+    fun knownSlim(): Boolean? {
+        val profile = profile()
+        if (!hasTextures(profile)) return null
+        val texture = runCatching { launchTexture(profile) }.getOrNull() ?: return slim()
+        return texture.getMetadata("model") == "slim"
+    }
+
     fun launchSkin(): MojangSkin? = runCatching {
         val texture = launchTexture(profile()) ?: return null
         MojangSkin(texture.url, SkinModel.fromSerialized(texture.getMetadata("model")))
@@ -142,8 +151,12 @@ object LocalAccountSkin {
             ?: (profile to Minecraft.getInstance().skinManager.createLookup(profile, false)).also { lookup = it }
         return current.second.get()
     }
+
+    fun slim(): Boolean = skin().model() == PlayerModelType.SLIM
     //?} elif > 1.8.9 {
     /*fun skin(): PlayerSkin = Minecraft.getInstance().skinManager.getInsecureSkin(profile())
+
+    fun slim(): Boolean = skin().model() == PlayerSkin.Model.SLIM
     *///?} else {
     /*class Textures {
         @Volatile
@@ -176,5 +189,7 @@ object LocalAccountSkin {
         }
         return textures
     }
+
+    fun slim(): Boolean = textures()?.slim ?: (DefaultSkinUtils.getDefaultModelType(ClientPlatform.localPlayerUuid()) == "slim")
     *///?}
 }
