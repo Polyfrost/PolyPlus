@@ -26,9 +26,11 @@ object EmojiRegistry {
 
     private val shortcodes: Map<String, String> by lazy { loadMap("shortcodes.json") }
 
+    private val allShortcodes: Map<String, String> by lazy { shortcodes + loadMap("shortcodes_extra.json") }
+
     private val unicode: Map<String, String> by lazy { loadMap("unicode.json") }
 
-    private val aliasesSorted: List<String> by lazy { shortcodes.keys.sorted() }
+    private val aliasesSorted: List<String> by lazy { allShortcodes.keys.sorted() }
 
     private val EMOJI_SHORTCODE: Pattern by lazy { Pattern.compile(SHORTCODE) }
 
@@ -76,19 +78,19 @@ object EmojiRegistry {
     }
 
     @JvmStatic
-    fun resolve(alias: String): String? = shortcodes[alias]
+    fun resolve(alias: String): String? = allShortcodes[alias]
 
     @JvmStatic
     fun suggestionRow(alias: String): FormattedCharSequence {
         val comp = Component.empty()
-        shortcodes[alias]?.let { comp.append(EmojiFont.glyph(it, Style.EMPTY)).append(Component.literal(" ")) }
+        allShortcodes[alias]?.let { comp.append(EmojiFont.glyph(it, Style.EMPTY)).append(Component.literal(" ")) }
         comp.append(Component.literal(":$alias:"))
         return comp.visualOrderText
     }
 
     private fun glyphFor(token: String): String? =
         if (token.length >= 2 && token[0] == ':' && token[token.length - 1] == ':') {
-            shortcodes[token.substring(1, token.length - 1)]
+            allShortcodes[token.substring(1, token.length - 1)]
         } else {
             unicode[token]
         }
@@ -144,7 +146,7 @@ object EmojiRegistry {
 
     @JvmStatic
     fun suggestionText(alias: String): String =
-        (shortcodes[alias]?.let { EmojiFont.legacyChar(it) + " " } ?: "") + ":$alias:"
+        (allShortcodes[alias]?.let { EmojiFont.legacyChar(it) + " " } ?: "") + ":$alias:"
     *///?}
 
     fun transform(component: Component): Component {
@@ -239,10 +241,15 @@ object EmojiRegistry {
     val catalog: List<EmojiEntry> by lazy {
         val byGlyph = LinkedHashMap<String, MutableList<String>>()
         for ((alias, glyph) in shortcodes) byGlyph.getOrPut(glyph) { ArrayList() }.add(alias)
+        val extras = HashMap<String, MutableList<String>>()
+        for ((alias, glyph) in allShortcodes) {
+            if (alias !in shortcodes) extras.getOrPut(glyph) { ArrayList() }.add(alias)
+        }
         byGlyph.entries
             .sortedBy { atlasIndex(it.key) }
             .map { (glyph, aliases) ->
-                EmojiEntry(glyph, aliases.minByOrNull { it.length } ?: "", aliases.sorted())
+                val all = aliases + extras[glyph].orEmpty()
+                EmojiEntry(glyph, aliases.minByOrNull { it.length } ?: "", all.sorted())
             }
     }
 

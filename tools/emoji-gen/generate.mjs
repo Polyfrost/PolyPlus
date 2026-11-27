@@ -20,6 +20,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DS_ROOT = path.join(HERE, 'node_modules', 'emoji-datasource-twitter');
 const data = JSON.parse(fs.readFileSync(path.join(DS_ROOT, 'emoji.json'), 'utf8'));
 const IMG_DIR = path.join(DS_ROOT, 'img', 'twitter', '64');
+const EMOJIBASE_SHORTCODES = ['joypixels', 'github'].map((preset) =>
+  JSON.parse(fs.readFileSync(
+    path.join(HERE, 'node_modules', 'emojibase-data', 'en', 'shortcodes', `${preset}.json`), 'utf8',
+  )),
+);
 
 const OUT_ASSETS = path.resolve(HERE, '..', '..', 'src', 'main', 'resources', 'assets', 'polyplus');
 const OUT_FONT = path.join(OUT_ASSETS, 'font', 'emoji.json');
@@ -29,6 +34,7 @@ const OUT_FONT = path.join(OUT_ASSETS, 'font', 'emoji.json');
 const OUT_ATLAS = path.join(OUT_ASSETS, 'textures', 'emoji', 'emoji_0.png');
 const OUT_EMOJI_DIR = path.join(OUT_ASSETS, 'emoji');
 const OUT_SHORTCODES = path.join(OUT_EMOJI_DIR, 'shortcodes.json');
+const OUT_SHORTCODES_EXTRA = path.join(OUT_EMOJI_DIR, 'shortcodes_extra.json');
 const OUT_UNICODE = path.join(OUT_EMOJI_DIR, 'unicode.json');
 const OUT_LEGACY_FONT = path.resolve(OUT_ASSETS, '..', 'minecraft', 'font', 'default.json');
 const BADGE_FONT = path.join(OUT_ASSETS, 'font', 'badge.json');
@@ -71,12 +77,24 @@ const FORCE_INCLUDE = new Set([
 const withImg = data.filter((e) => e.has_img_twitter && e.category !== 'Component');
 const bySortOrder = (a, b) => a.sort_order - b.sort_order;
 
+const ALIAS = /^[a-z0-9_+\-]+$/;
+const bareHex = (unified) => unified.split('-').filter((h) => h !== 'FE0F' && h !== 'FE0E').join('-');
+const extraAliases = (e) => {
+  const out = [];
+  for (const presets of EMOJIBASE_SHORTCODES) {
+    const codes = presets[e.unified] ?? presets[bareHex(e.unified)];
+    if (codes !== undefined) out.push(...[].concat(codes));
+  }
+  return out.filter((alias) => ALIAS.test(alias) && !e.short_names.includes(alias));
+};
+const aliasesOf = (e) => [...e.short_names, ...extraAliases(e)];
+
 // Select the subset.
 const perCatCount = {};
 const selected = [];
 const seenUnified = new Set();
 for (const e of [...withImg].sort(bySortOrder)) {
-  const forced = e.short_names.some((n) => FORCE_INCLUDE.has(n));
+  const forced = aliasesOf(e).some((n) => FORCE_INCLUDE.has(n));
   const cap = CATEGORY_CAPS[e.category] ?? 0;
   const used = perCatCount[e.category] ?? 0;
   if (!forced && used >= cap) continue;
@@ -85,8 +103,7 @@ for (const e of [...withImg].sort(bySortOrder)) {
   perCatCount[e.category] = used + 1;
   selected.push(e);
 }
-// Deterministic final order: by unified codepoint (stable regeneration).
-selected.sort((a, b) => (a.unified < b.unified ? -1 : a.unified > b.unified ? 1 : 0));
+selected.sort(bySortOrder);
 
 console.log(`selected ${selected.length} emoji`);
 for (const [c, n] of Object.entries(perCatCount)) console.log(`  ${c}: ${n}`);
@@ -140,6 +157,15 @@ for (let i = 0; i < selected.length; i++) {
     legacyRowBuf = '';
   }
 }
+const extraShortcodes = {};
+selected.forEach((e, i) => {
+  const glyph = String.fromCodePoint(PUA_START + i);
+  for (const alias of extraAliases(e)) {
+    if (shortcodes[alias] === undefined && extraShortcodes[alias] === undefined) {
+      extraShortcodes[alias] = glyph;
+    }
+  }
+});
 if (selected.length % COLS !== 0) {
   // Pad the final row to a full COLS *codepoints* with U+0000, which MC's bitmap
   // provider treats as an empty (no-glyph) cell. Count codepoints, not UTF-16
@@ -190,6 +216,10 @@ console.log(`wrote ${path.relative(process.cwd(), OUT_LEGACY_FONT)}`);
 const sortedShort = Object.fromEntries(Object.entries(shortcodes).sort(([a], [b]) => (a < b ? -1 : 1)));
 fs.writeFileSync(OUT_SHORTCODES, JSON.stringify(sortedShort, null, 0) + '\n');
 console.log(`wrote ${path.relative(process.cwd(), OUT_SHORTCODES)} (${Object.keys(sortedShort).length} aliases)`);
+
+const sortedExtra = Object.fromEntries(Object.entries(extraShortcodes).sort(([a], [b]) => (a < b ? -1 : 1)));
+fs.writeFileSync(OUT_SHORTCODES_EXTRA, JSON.stringify(sortedExtra, null, 0) + '\n');
+console.log(`wrote ${path.relative(process.cwd(), OUT_SHORTCODES_EXTRA)} (${Object.keys(sortedExtra).length} aliases)`);
 
 // Unicode map: also add a variant with the U+FE0F emoji variation selector stripped, so both
 // the fully-qualified (picker output) and unqualified forms match. Longer keys win at match time.

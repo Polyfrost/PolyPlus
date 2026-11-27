@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "emoji-datasource-twitter": "^16.0.0",
+    "emojibase-data": "^18.0.0",
     "sharp": "^0.35.3"
   }
 }
