@@ -65,7 +65,7 @@ object PerfTelemetry {
         eventHandler(sampler)
     }
 
-    private fun enabled(): Boolean = PolyPlusConfig.performanceTelemetry && PrivacyConsent.allowsOnlineServices()
+    fun enabled(): Boolean = PolyPlusConfig.performanceTelemetry && PrivacyConsent.allowsOnlineServices()
 
     private fun onFrame() {
         if (!PolyPlusConfig.performanceTelemetry) {
@@ -91,7 +91,7 @@ object PerfTelemetry {
             if (!sampling || account != windowAccount) reset()
             windowAccount = account
         }
-        if (!sampling || now - inWorldSince < WARMUP_NANOS || !ClientPlatform.windowFocused() || ClientPlatform.currentScreen() != null) {
+        if (!sampling || now - inWorldSince < WARMUP_NANOS || !ClientPlatform.windowFocused() || ClientPlatform.currentScreen() != null || AfkProfiler.idleThrottled()) {
             lastFrameNanos = 0L
             return
         }
@@ -201,7 +201,7 @@ object PerfTelemetry {
             .associate { it.metadata.id to it.metadata.version.friendlyString }
     }
 
-    private val packHash: String by lazy { packHash(mods) }
+    val packHash: String by lazy { packHash(mods) }
 
     @Volatile
     private var modsSent = false

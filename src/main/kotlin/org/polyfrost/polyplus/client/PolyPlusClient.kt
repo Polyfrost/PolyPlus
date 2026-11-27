@@ -34,6 +34,7 @@ import org.polyfrost.polyplus.client.features.DefaultModOrder
 import org.polyfrost.polyplus.client.features.PylonRawInput
 import org.polyfrost.polyplus.client.features.DefaultSettings
 import org.polyfrost.polyplus.client.features.GenericModNames
+import org.polyfrost.polyplus.client.features.AfkProfiler
 import org.polyfrost.polyplus.client.features.JvmAdvisor
 import org.polyfrost.polyplus.client.features.PerfTelemetry
 import org.polyfrost.polyplus.client.features.StartupTimeNotice
@@ -203,6 +204,7 @@ object PolyPlusClient {
         step("adaptive blur") { AdaptiveBlurDefaults.initialize() }
         step("jvm advisor") { JvmAdvisor.initialize() }
         step("performance telemetry") { PerfTelemetry.initialize() }
+        step("afk profiler") { AfkProfiler.initialize() }
         step("startup time notice") { StartupTimeNotice.register() }
         step("modpack diff") { ModpackDiff.logAsync() }
         step("bad mods") { BadMods.checkAsync() }
