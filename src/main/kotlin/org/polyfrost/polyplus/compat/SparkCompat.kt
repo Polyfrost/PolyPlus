@@ -13,9 +13,11 @@ import org.polyfrost.polyplus.client.gui.SocialNotices
 import org.polyfrost.polyplus.client.gui.pausescreen.OneClientPauseScreen
 import org.polyfrost.polyplus.client.social.SocialErrors
 import org.polyfrost.polyplus.client.utils.ClientPlatform
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Stream
 
@@ -158,6 +160,69 @@ internal object SparkCompat {
             if (watcher?.isActive != true) watch(platform, since, 0)
             true
         }.getOrDefault(false)
+    }
+
+    @Volatile
+    private var broadcastSetting: Boolean? = null
+
+    @Volatile
+    private var quietStart: CompletableFuture<*>? = null
+
+    fun startQuietProfile(seconds: Int): Long? {
+        if (profile is SparkProfile.Running || profile is SparkProfile.Uploading) return null
+        val platform = platform() ?: return null
+        val sender = menuSender ?: return null
+        return runCatching {
+            if (activeForeground(platform)) return null
+            muteBroadcast(platform)
+            val since = System.currentTimeMillis()
+            quietStart = call(platform, "executeCommand", sender, arrayOf("profiler", "start", "--timeout", seconds.toString(), "--save-to-file")) as CompletableFuture<*>
+            since
+        }.getOrElse {
+            restoreBroadcast()
+            null
+        }
+    }
+
+    fun quietProfileFile(since: Long): String? {
+        val platform = clientPlatform ?: return null
+        return (result(platform, since, PROFILER_ACTIVITY, SENDER_NAME) as? Result.File)?.value?.also { restoreBroadcast() }
+    }
+
+    fun cancelQuietProfile() {
+        val start = quietStart ?: return restoreBroadcast()
+        quietStart = null
+        start.whenComplete { _, _ ->
+            runCatching {
+                val platform = clientPlatform
+                if (platform == null || !activeForeground(platform)) return@whenComplete restoreBroadcast()
+                val done = call(platform, "executeCommand", menuSender, arrayOf("profiler", "cancel")) as CompletableFuture<*>
+                done.whenComplete { _, _ -> restoreBroadcast() }
+            }.onFailure { restoreBroadcast() }
+        }
+    }
+
+    private fun broadcastField(platform: Any): Pair<Any, Field>? {
+        val manager = call(platform, "getCommandManager") ?: return null
+        return manager to (Reflect.field(manager.javaClass, "disableResponseBroadcast") ?: return null)
+    }
+
+    @Synchronized
+    private fun muteBroadcast(platform: Any) {
+        val (manager, field) = broadcastField(platform) ?: return
+        if (broadcastSetting == null) broadcastSetting = field.getBoolean(manager)
+        field.setBoolean(manager, true)
+    }
+
+    @Synchronized
+    fun restoreBroadcast() {
+        val original = broadcastSetting ?: return
+        broadcastSetting = null
+        val platform = clientPlatform ?: return
+        runCatching {
+            val (manager, field) = broadcastField(platform) ?: return
+            field.setBoolean(manager, original)
+        }
     }
 
     fun healthReport(): Boolean {
@@ -310,13 +375,14 @@ internal object SparkCompat {
         class File(val value: String) : Result
     }
 
-    private fun result(platform: Any, since: Long, type: String): Result? = runCatching {
+    private fun result(platform: Any, since: Long, type: String, user: String? = null): Result? = runCatching {
         val log = call(call(platform, "getActivityLog") ?: return null, "getLog") as? List<*> ?: return null
         for (entry in log) {
             if (entry == null) continue
             val time = call(entry, "getTime") as? Long ?: continue
             if (time < since) break
             if (call(entry, "getType") != type) continue
+            if (user != null && call(call(entry, "getUser") ?: continue, "getName") != user) continue
             val value = call(entry, "getDataValue") as? String ?: continue
             return when (call(entry, "getDataType")) {
                 "url" -> Result.Url(value)
