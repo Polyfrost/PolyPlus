@@ -2,6 +2,7 @@ package org.polyfrost.polyplus.compat
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.utils.AnimationActivity
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.lang.reflect.Method
 
 object DynamicFpsCompat {
@@ -24,7 +25,7 @@ object DynamicFpsCompat {
     fun frame() {
         if (hook.broken) return
         val now = hook.attempt("Could not read animation state; Dynamic FPS will no longer be paused during animations", false) {
-            AnimationActivity.update()
+            AnimationActivity.update() && !ClientPlatform.windowMinimized()
         }
         if (now == holding) return
         holding = now
