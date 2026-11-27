@@ -10,10 +10,16 @@ import org.polyfrost.polyplus.client.network.http.responses.Party
 import org.polyfrost.polyplus.client.network.http.responses.VoiceTransport
 import org.polyfrost.polyplus.client.network.p2p.EosStatus
 import org.polyfrost.polyplus.client.network.p2p.P2PSessionManager
+import org.polyfrost.polyplus.client.party.soundboard.Soundboard
+import org.polyfrost.polyplus.client.party.soundboard.SoundboardStream
+import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.social.SocialOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.max
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 object PartyVoice {
     private val LOGGER = LogManager.getLogger()
@@ -21,6 +27,9 @@ object PartyVoice {
     private const val RTC_RETRY_MS = 5 * 60_000L
     private const val VAD_HANGOVER_MS = 400L
     private const val SILENCE_HINT_MS = 10_000L
+    private const val LEVEL_EVERY_FRAMES = 3
+    private const val SPEECH_PROBABILITY = 0.5f
+    private const val AUTO_FLOOR = 0.001f
 
     data class Ui(
         val inVoice: Boolean = false,
@@ -33,16 +42,23 @@ object PartyVoice {
         val talking: Boolean = false,
         val speaking: Set<String> = emptySet(),
         val noticeOpen: Boolean = false,
+        val micTest: Boolean = false,
+        val micTestFailed: Boolean = false,
+        val soundsReady: Boolean = false,
     )
 
     private val _ui = MutableStateFlow(Ui())
     val ui = _ui.asStateFlow()
+
+    private val _inputLevel = MutableStateFlow(0f)
+    val inputLevel = _inputLevel.asStateFlow()
 
     @Volatile private var inVoice = false
     @Volatile private var muted = false
     @Volatile private var deafened = false
     @Volatile private var micBlocked = false
     @Volatile private var pttHeld = false
+    @Volatile private var ptmHeld = false
     @Volatile private var rtcFailedAt = 0L
     @Volatile private var rtcSessionFailed = false
     @Volatile private var linuxRtcChecked = false
@@ -56,6 +72,15 @@ object PartyVoice {
     @Volatile private var silentSince = 0L
     @Volatile private var micHeard = false
     @Volatile private var micSilent = false
+    @Volatile private var micTest = false
+    @Volatile private var micTestFailed = false
+    @Volatile private var suppressor: NoiseSuppressor? = null
+    private val suppressorLock = Any()
+    @Volatile private var captureToken = 0
+    @Volatile private var soundClockStarted = false
+    private val silence = ShortArray(PartyAudio.FRAME_SAMPLES)
+    private var levelPeak = 0f
+    private var levelFrames = 0
     private var speakingPlayers: Set<String> = emptySet()
     private var autoJoinedParty: String? = null
     private var voicePartyId: String? = null
@@ -78,6 +103,7 @@ object PartyVoice {
         }
         if (inVoice) return
         LOGGER.info("Joining party voice for party {}", party.id)
+        startSoundClock()
         inVoice = true
         voicePartyId = party.id
         micBlocked = false
@@ -101,7 +127,11 @@ object PartyVoice {
         if (!inVoice) return
         inVoice = false
         stopTransport()
-        stopCapture()
+        if (!micTest) stopCapture()
+        Soundboard.onVoiceStopped()
+        SoundboardStream.reset()
+        VoiceLinks.reset()
+        VoiceAnnouncer.reset()
         talking = false
         speakingPlayers = emptySet()
         publish()
@@ -158,14 +188,64 @@ object PartyVoice {
         publish()
     }
 
+    fun setMicTest(enabled: Boolean) {
+        if (micTest == enabled && !(enabled && micTestFailed)) return
+        micTest = enabled
+        micTestFailed = false
+        LocalMonitor.setHearSelf(enabled)
+        if (enabled) {
+            if (inVoice && micBlocked) micBlocked = false
+            startCapture()
+        } else if (!inVoice) {
+            stopCapture()
+        }
+        publish()
+    }
+
+    fun canSendSounds(): Boolean = inVoice && !deafened && !soundboardBlocked() && soundTransportReady()
+
+    private fun soundTransportReady(): Boolean = when (active) {
+        VoiceTransport.P2p -> PartyMesh.hasListeners()
+        VoiceTransport.Rtc -> RtcVoice.dataReady
+        else -> false
+    }
+
+    private fun startSoundClock() {
+        if (soundClockStarted) return
+        soundClockStarted = true
+        val clock = Executors.newSingleThreadScheduledExecutor { task -> Thread(task, "polyplus-soundboard").apply { isDaemon = true } }
+        clock.scheduleAtFixedRate({
+            runCatching { if (inVoice && capture == null) SoundboardStream.pump(active, canSendSounds()) }
+                .onFailure { LOGGER.warn("Soundboard clock failed", it) }
+        }, PartyAudio.FRAME_MILLIS, PartyAudio.FRAME_MILLIS, TimeUnit.MILLISECONDS)
+    }
+
+    fun soundboardBlocked(): Boolean = PartyRepository.party.value?.let { PartyRepository.self(it)?.soundboardMuted } == true
+
     fun onPushToTalk(state: Boolean) {
         pttHeld = state
     }
 
+    fun onPushToMute(state: Boolean) {
+        ptmHeld = state
+    }
+
     fun onSettingsChanged(restartAudio: Boolean = false) {
-        RtcVoice.setInputGain(PartyVoiceSettings.inputGain())
+        if (EchoReference.enabled != PolyPlusConfig.voiceEchoCancellation) {
+            EchoReference.setEnabled(PolyPlusConfig.voiceEchoCancellation)
+            if (active == VoiceTransport.Rtc) stopTransport()
+            PartyPresence.forceSend()
+        }
         if (active == VoiceTransport.P2p) P2PSessionManager.setVoiceRelay(PolyPlusConfig.voiceHideIp)
-        if (!restartAudio || !inVoice) return
+        if (!restartAudio) return
+        LocalMonitor.restart()
+        if (!inVoice) {
+            if (micTest) {
+                stopCapture()
+                startCapture()
+            }
+            return
+        }
         if (!micBlocked) {
             stopCapture()
             startCapture()
@@ -176,27 +256,42 @@ object PartyVoice {
             PartyMesh.start(party.id)
         }
         if (active == VoiceTransport.Rtc) {
-            PolyPlusClient.SCOPE.launch { RtcVoice.applyDevices(PartyVoiceSettings.inputDevice(), PartyVoiceSettings.outputDevice()) }
+            PolyPlusClient.SCOPE.launch { RtcVoice.applyOutputDevice(PartyVoiceSettings.outputDevice()) }
         }
     }
 
     fun onCaptureFailed() {
-        if (!inVoice || micBlocked) return
+        val testing = micTest
+        if (testing) {
+            LOGGER.warn("The microphone gave nothing during the mic test")
+            micTest = false
+            micTestFailed = true
+            LocalMonitor.setHearSelf(false)
+        }
+        if (!inVoice) {
+            if (!testing) return
+            stopCapture()
+            publish()
+            return
+        }
+        if (micBlocked) {
+            publish()
+            return
+        }
         LOGGER.warn("The microphone gave nothing; party voice is listen-only until you retry")
         micBlocked = true
         talking = false
         RtcVoice.setTransmit(false)
-        capture?.stop()
-        capture = null
+        stopCapture()
         publish()
     }
 
     fun onRtcJoined() {
-        RtcVoice.setInputGain(PartyVoiceSettings.inputGain())
-        PolyPlusClient.SCOPE.launch { RtcVoice.applyDevices(PartyVoiceSettings.inputDevice(), PartyVoiceSettings.outputDevice()) }
+        PolyPlusClient.SCOPE.launch { RtcVoice.applyOutputDevice(PartyVoiceSettings.outputDevice()) }
     }
 
     fun rtcCapable(): Boolean {
+        if (PolyPlusConfig.voiceEchoCancellation && EchoReference.tapFailed) return false
         if (rtcSessionFailed || P2PSessionManager.activeBridge?.rtcEnabled != true) return false
         if (System.currentTimeMillis() - rtcFailedAt <= RTC_RETRY_MS) return false
         if (!EosRtcSupport.isLinux) return true
@@ -240,10 +335,14 @@ object PartyVoice {
 
     private fun startCapture() {
         if (capture != null) return
+        EchoReference.setEnabled(PolyPlusConfig.voiceEchoCancellation)
         silentSince = 0L
         micHeard = false
         micSilent = false
-        val mic = PartyAudio.openCapture(PartyVoiceSettings.inputDevice(), PartyVoiceSettings::inputGain, ::onFrame)
+        val token = synchronized(suppressorLock) { ++captureToken }
+        val mic = PartyAudio.openCapture(PartyVoiceSettings.inputDevice(), PartyVoiceSettings::inputGain) { frame, level ->
+            synchronized(suppressorLock) { if (token == captureToken) onFrame(frame, level) }
+        }
         if (mic != null) {
             capture = mic
         } else {
@@ -254,6 +353,35 @@ object PartyVoice {
     private fun stopCapture() {
         capture?.stop()
         capture = null
+        synchronized(suppressorLock) {
+            captureToken++
+            suppressor?.close()
+            suppressor = null
+            levelPeak = 0f
+            levelFrames = 0
+            _inputLevel.value = 0f
+        }
+    }
+
+    private fun denoise(frame: ShortArray): Float? {
+        val clean = PolyPlusConfig.voiceNoiseSuppression
+        val current = synchronized(suppressorLock) {
+            if (!clean && !PolyPlusConfig.voiceAutoSensitivity) {
+                suppressor?.close()
+                suppressor = null
+                return null
+            }
+            suppressor ?: NoiseSuppressor.open()?.also { suppressor = it }
+        } ?: return null
+        return if (clean) current.process(frame, PartyVoiceSettings.noiseStrength() / 100f) else current.analyze(frame)
+    }
+
+    private fun reportLevel(level: Float) {
+        levelPeak = max(levelPeak, level)
+        if (++levelFrames < LEVEL_EVERY_FRAMES) return
+        _inputLevel.value = levelPeak
+        levelPeak = 0f
+        levelFrames = 0
     }
 
     private fun onFrame(frame: ShortArray, level: Float) {
@@ -271,16 +399,36 @@ object PartyVoice {
                 setMicSilent(true)
             }
         }
-        if (level >= PartyVoiceSettings.activityThreshold()) lastLoud = now
-        val gate = if (PartyVoiceSettings.pushToTalk()) pttHeld else now - lastLoud < VAD_HANGOVER_MS
-        val allowed = inVoice && !muted && !deafened && !micBlocked && !selfHardMuted
+        EchoReference.process(frame)
+        val speech = denoise(frame)
+        val voiceLevel = PartyAudio.rms(frame)
+        reportLevel(voiceLevel)
+        if (micTest) LocalMonitor.pushLoopback(frame)
+        if (!inVoice) return
+        val voiced = if (speech != null && PartyVoiceSettings.autoSensitivity()) {
+            speech >= SPEECH_PROBABILITY && voiceLevel >= AUTO_FLOOR
+        } else {
+            voiceLevel >= PartyVoiceSettings.activityThreshold()
+        }
+        if (voiced) lastLoud = now
+        val recent = now - lastLoud < VAD_HANGOVER_MS
+        val gate = when (PartyVoiceSettings.inputMode()) {
+            VoiceInputMode.PUSH_TO_TALK -> pttHeld
+            VoiceInputMode.PUSH_TO_MUTE -> recent && !ptmHeld
+            VoiceInputMode.VOICE_ACTIVITY -> recent
+        }
+        val allowed = !muted && !deafened && !micBlocked && !selfHardMuted
         val talk = allowed && gate
         talking = talk
         when (active) {
-            VoiceTransport.P2p -> PartyMesh.onCapture(frame, talk)
-            VoiceTransport.Rtc -> RtcVoice.setTransmit(talk)
+            VoiceTransport.P2p -> PartyMesh.onCapture(if (talk) frame else silence, talk)
+            VoiceTransport.Rtc -> {
+                RtcVoice.setTransmit(talk)
+                if (talk) RtcVoice.send(frame)
+            }
             else -> Unit
         }
+        SoundboardStream.pump(active, canSendSounds())
     }
 
     private fun setMicSilent(silent: Boolean) {
@@ -318,6 +466,7 @@ object PartyVoice {
     }
 
     fun tick() {
+        migrateSensitivity()
         val party = PartyRepository.party.value
         if (party == null) {
             autoJoinedParty = null
@@ -341,6 +490,13 @@ object PartyVoice {
         publish()
     }
 
+    private fun migrateSensitivity() {
+        if (PolyPlusConfig.voiceSensitivityMigrated) return
+        PolyPlusConfig.voiceSensitivityMigrated = true
+        if (PolyPlusConfig.voiceNoticeAccepted) PolyPlusConfig.voiceAutoSensitivity = false
+        PolyPlusConfig.save()
+    }
+
     private fun mixPeers(party: Party) {
         val myKey = PartyPresence.local.location.key
         val others = PartyRepository.others(party)
@@ -357,6 +513,27 @@ object PartyVoice {
             mix[puid] = PeerMix(gain, proximity?.pan ?: 0f, silenced)
         }
         val byPuid = others.mapNotNull { member -> member.eosProductUserId?.let { it to member.player } }.toMap()
+        val othersGain = PartyVoiceSettings.soundboardOthers() / 100f
+        val soundMix = HashMap<String, PeerMix>()
+        for (member in others) {
+            val puid = member.eosProductUserId ?: continue
+            val proximity = gains[member.player]
+            val gain = (proximity?.gain ?: 1f) * PartyVoiceSettings.soundVolumeOf(member.player) * othersGain
+            val silenced = member.soundboardMuted || PartyVoiceSettings.isSoundMuted(member.player)
+            soundMix[puid] = PeerMix(gain, proximity?.pan ?: 0f, silenced)
+        }
+        SoundboardStream.mix = soundMix
+        SoundboardStream.deafened = deafened
+        SoundboardStream.outputGain = outputGain
+        SoundboardStream.retain(byPuid.keys)
+        val linked = when (active) {
+            VoiceTransport.P2p -> PartyMesh.connected()
+            VoiceTransport.Rtc -> RtcVoice.participants().filterTo(HashSet()) { it in byPuid }
+            else -> emptySet()
+        }
+        VoiceLinks.tick(active, linked)
+        if (active == VoiceTransport.Rtc) EchoReference.checkTap(linked.isNotEmpty())
+        VoiceAnnouncer.update(talkers.associate { it.player to PlayerNamesRepository.nameOr(it.player) })
         val speaking = when (active) {
             VoiceTransport.Rtc -> {
                 RtcVoice.setDeafened(deafened)
@@ -404,6 +581,9 @@ object PartyVoice {
             talking = talkingNow,
             speaking = speaking,
             noticeOpen = noticeOpen,
+            micTest = micTest,
+            micTestFailed = micTestFailed,
+            soundsReady = canSendSounds(),
         )
         if (next != _ui.value) _ui.value = next
     }

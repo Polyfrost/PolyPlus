@@ -11,16 +11,21 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessColor
 import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
+import org.polyfrost.polyplus.client.gui.gamesocial.SOUNDBOARD_ICON
+import org.polyfrost.polyplus.client.gui.gamesocial.SoundboardSettings
+import org.polyfrost.polyplus.client.gui.gamesocial.VoiceOptions
 import org.polyfrost.oneconfig.api.ui.v1.components.PlayerHead
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +63,9 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.polyplus.client.party.PartyVoiceSettings
+import org.polyfrost.polyplus.client.party.LinkQuality
+import org.polyfrost.polyplus.client.party.VoiceLink
+import org.polyfrost.polyplus.client.party.VoiceLinks
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -78,6 +86,10 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcons
 internal val PartyPopoverWidth = 260.dp
 private val MenuWidth = 280.dp
 private val PickerWidth = 300.dp
+private val PanelMenuWidth = 340.dp
+private val PanelMenuHeight = 380.dp
+
+private enum class PartyMenuPage { Main, Microphone, Speaker, Voice, Soundboard }
 private val PartyCardWidth = 300.dp
 private val PopoverGap = 14.dp
 private const val PERCENT = 100f
@@ -104,6 +116,7 @@ internal class PartyCell(
     val detail: String,
     val speaking: Boolean,
     val muted: Boolean,
+    val link: VoiceLink? = null,
 )
 
 internal fun locationLabel(state: MemberState?, online: Boolean): String {
@@ -134,6 +147,7 @@ private fun voiceLabel(member: PartyMember?, state: MemberState?): String? {
 internal fun partyCells(party: Party): List<PartyCell> {
     val voice by PartyVoice.ui.collectAsState()
     val names by PlayerNamesRepository.names.collectAsState()
+    val links by VoiceLinks.links.collectAsState()
     val self = PartyRepository.self(party)
     val selfState = PartyPresence.local.let {
         it.copy(voice = it.voice.copy(inVoice = voice.inVoice, muted = voice.muted, deafened = voice.deafened, micBlocked = voice.micBlocked))
@@ -152,6 +166,8 @@ internal fun partyCells(party: Party): List<PartyCell> {
     )
     val others = PartyRepository.others(party).map { member ->
         val state = member.state
+        val link = member.eosProductUserId?.let { links[it] }.takeIf { voice.inVoice && state?.voice?.inVoice == true }
+        val base = if (!member.online) "Offline" else voiceLabel(member, state) ?: locationLabel(state, true)
         PartyCell(
             id = member.player,
             name = names[member.player] ?: PlayerNamesRepository.nameOr(member.player),
@@ -159,9 +175,10 @@ internal fun partyCells(party: Party): List<PartyCell> {
             leader = PartyRepository.samePlayer(member.player, party.leader),
             member = member,
             state = state,
-            detail = if (!member.online) "Offline" else voiceLabel(member, state) ?: locationLabel(state, true),
+            detail = if (link != null && link.quality != LinkQuality.Good) "$base · ${linkLabel(link)}" else base,
             speaking = member.player in voice.speaking,
             muted = state?.voice?.let { it.inVoice && (it.muted || it.deafened || it.micBlocked) } == true || member.voiceHardMuted,
+            link = link,
         )
     }
     return listOf(local) + others
@@ -213,9 +230,29 @@ internal fun memberMuteItem(cell: PartyCell): MenuAction? {
     )
 }
 
+internal fun linkLabel(link: VoiceLink): String = when (link.quality) {
+    LinkQuality.Good -> "Good connection"
+    LinkQuality.Fair -> "Unstable connection"
+    LinkQuality.Poor -> "Bad connection"
+}
+
+internal fun memberSoundMuteItem(cell: PartyCell): MenuAction? {
+    if (cell.self) return null
+    val muted = PartyVoiceSettings.isSoundMuted(cell.id)
+    return MenuAction(
+        if (muted) "Unmute their sounds" else "Mute their sounds",
+        { PartyVoiceSettings.toggleSoundMute(cell.id) },
+        icon = if (muted) SOUNDS_ON_ICON else SOUNDS_OFF_ICON,
+    )
+}
+
+private const val SOUNDS_ON_ICON = SOCIAL_ASSETS + "volume-max.svg"
+private const val SOUNDS_OFF_ICON = SOCIAL_ASSETS + "volume-x.svg"
+
 internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Unit = {}): List<MenuAction> {
     if (!PartyRepository.isLeader(party) || cell.self) return emptyList()
     val hardMuted = cell.member?.voiceHardMuted == true
+    val soundsMuted = cell.member?.soundboardMuted == true
     return listOf(
         MenuAction(
             "Make leader",
@@ -227,6 +264,10 @@ internal fun memberLeaderItems(party: Party, cell: PartyCell, onClose: () -> Uni
         MenuAction(
             if (hardMuted) "Let them talk" else "Mute their voice for everyone",
             { PartyRepository.setHardMuted(cell.id, !hardMuted) },
+        ),
+        MenuAction(
+            if (soundsMuted) "Let them play sounds" else "Mute their sounds for everyone",
+            { PartyRepository.setSoundboardMuted(cell.id, !soundsMuted) },
         ),
         MenuAction(
             "Remove from party",
@@ -254,7 +295,7 @@ internal fun memberSocialItems(cell: PartyCell): List<MenuAction> {
 }
 
 internal fun memberMenuItems(host: SocialHost, party: Party, cell: PartyCell): List<MenuAction> =
-    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell)) + memberLeaderItems(party, cell) + memberSocialItems(cell)
+    listOfNotNull(memberJoinItem(host, cell), memberMuteItem(cell), memberSoundMuteItem(cell)) + memberLeaderItems(party, cell) + memberSocialItems(cell)
 
 internal fun partyInviteItem(
     friendId: String,
@@ -272,6 +313,7 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
     val theme = OneConfigTheme.current
     val join = memberJoinItem(host, cell, onClose)
     val mute = memberMuteItem(cell)
+    val soundMute = memberSoundMuteItem(cell)
     val joinIcon = join?.icon
     val muteIcon = mute?.icon
     val leaderItems = memberLeaderItems(party, cell, onClose)
@@ -282,12 +324,24 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
                 Text(if (cell.leader) "${cell.name} · Leader" else cell.name, style = OneConfigTheme.current.typography.body.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 Text(locationLabel(cell.state, cell.self || cell.member?.online == true), color = theme.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
                 voiceLabel(cell.member, cell.state)?.let { Text(it, color = theme.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false) }
+                cell.link?.let { link ->
+                    val tint = when (link.quality) {
+                        LinkQuality.Good -> theme.mutedText
+                        LinkQuality.Fair -> theme.warning
+                        LinkQuality.Poor -> theme.error
+                    }
+                    Text("${linkLabel(link)} · ${link.rttMillis} ms · ${link.lossPercent}% lost", color = tint, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+                }
             }
         }
         join?.let { OptionalIconTextButton(it.label, joinIcon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Primary, true) }
         mute?.let {
             MemberVolume(cell.id)
             OptionalIconTextButton(it.label, muteIcon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Secondary, true)
+        }
+        soundMute?.let {
+            MemberSoundVolume(cell.id)
+            OptionalIconTextButton(it.label, it.icon, it.onClick, Modifier.fillMaxWidth(), ControlStyle.Secondary, true)
         }
         if (leaderItems.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -297,6 +351,12 @@ internal fun MemberPopoverContent(host: SocialHost, party: Party, cell: PartyCel
             }
         }
     }
+}
+
+@Composable
+private fun MemberSoundVolume(player: String) {
+    val volume = PartyVoiceSettings.soundVolumes[player.lowercase()] ?: 1f
+    VolumeRow(volume * PERCENT, label = "Sounds") { percent -> PartyVoiceSettings.setSoundVolume(player, percent / PERCENT) }
 }
 
 @Composable
@@ -393,13 +453,24 @@ private fun PartyMenuHeading(text: String) {
 
 @Composable
 internal fun PartyMenu(party: Party, onVoice: (() -> Unit)? = null, onClose: () -> Unit) {
-    var devices by remember { mutableStateOf<Boolean?>(null) }
+    var page by remember { mutableStateOf(PartyMenuPage.Main) }
     val leader = PartyRepository.isLeader(party)
-    Column(Modifier.width(MenuWidth).popup().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val picking = devices
-        if (picking != null) {
-            DevicePicker(input = picking) { devices = null }
-            return@Column
+    val wide = page == PartyMenuPage.Voice || page == PartyMenuPage.Soundboard
+    Column(Modifier.width(if (wide) PanelMenuWidth else MenuWidth).popup().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (page) {
+            PartyMenuPage.Main -> Unit
+            PartyMenuPage.Microphone, PartyMenuPage.Speaker -> {
+                DevicePicker(input = page == PartyMenuPage.Microphone) { page = PartyMenuPage.Main }
+                return@Column
+            }
+            PartyMenuPage.Voice -> {
+                VoiceMenuPage { page = PartyMenuPage.Main }
+                return@Column
+            }
+            PartyMenuPage.Soundboard -> {
+                PartyMenuPanel("Soundboard", { page = PartyMenuPage.Main }) { SoundboardSettings(null) }
+                return@Column
+            }
         }
         PartyMenuHeading("Voice")
         VoiceModeChips(party)
@@ -421,10 +492,12 @@ internal fun PartyMenu(party: Party, onVoice: (() -> Unit)? = null, onClose: () 
                     size = MenuItemSize.Regular,
                 )
             } else {
-                MenuItem("Microphone: ${PartyAudio.deviceLabel(PartyVoiceSettings.inputDevice()).ifBlank { "Default" }}", { devices = true }, icon = PartyIcons.MIC, size = MenuItemSize.Regular)
+                MenuItem("Microphone: ${PartyAudio.deviceLabel(PartyVoiceSettings.inputDevice()).ifBlank { "Default" }}", { page = PartyMenuPage.Microphone }, icon = PartyIcons.MIC, size = MenuItemSize.Regular)
                 DeviceVolume(input = true)
-                MenuItem("Speaker: ${PartyAudio.deviceLabel(PartyVoiceSettings.outputDevice()).ifBlank { "Default" }}", { devices = false }, icon = PartyIcons.HEADPHONES, size = MenuItemSize.Regular)
+                MenuItem("Speaker: ${PartyAudio.deviceLabel(PartyVoiceSettings.outputDevice()).ifBlank { "Default" }}", { page = PartyMenuPage.Speaker }, icon = PartyIcons.HEADPHONES, size = MenuItemSize.Regular)
                 DeviceVolume(input = false)
+                MenuItem("Voice settings", { page = PartyMenuPage.Voice }, icon = PartyIcons.SETTINGS, size = MenuItemSize.Regular)
+                MenuItem("Soundboard", { page = PartyMenuPage.Soundboard }, icon = SOUNDBOARD_ICON, size = MenuItemSize.Regular)
             }
             MenuItem(
                 "Leave party",
@@ -450,6 +523,20 @@ internal fun PartyMenu(party: Party, onVoice: (() -> Unit)? = null, onClose: () 
             }
         }
     }
+}
+
+@Composable
+private fun VoiceMenuPage(onBack: () -> Unit) {
+    val voice by PartyVoice.ui.collectAsState()
+    DisposableEffect(Unit) { onDispose { PartyVoice.setMicTest(false) } }
+    PartyMenuPanel("Voice settings", onBack) { VoiceOptions(voice, null) }
+}
+
+@Composable
+private fun PartyMenuPanel(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    PartyMenuHeading(title)
+    ScrollFade(Modifier, 12.dp, maxHeight = PanelMenuHeight, ink = OneConfigTheme.current.pageBackground, content = content)
+    TextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth(), size = ControlSize.Large)
 }
 
 @Composable

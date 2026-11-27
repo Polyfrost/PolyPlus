@@ -137,7 +137,7 @@ repositories {
     strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
     strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
     strictMaven("https://maven.bawnorton.com/releases", "Bawnorton", "com.github.bawnorton.mixinsquared")
-    strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat")
+    strictMaven("https://maven.maxhenkel.de/repository/public", "MaxHenkel", "de.maxhenkel.voicechat", "de.maxhenkel.rnnoise4j")
     strictMaven("https://maven.taumc.org/releases", "TauMC", "org.embeddedt.celeritas")
 }
 
@@ -209,6 +209,10 @@ if (optionalProperty("deps.iris") == null) {
 val javaVersion = when {
     isOrnithe || stonecutter.current.parsed >= "26.1" -> 25
     else -> 21
+}
+
+sourceSets.main {
+    java.exclude(if (isOrnithe) "**/client/party/LwjglRenderTap.java" else "**/client/party/FfmRenderTap.java")
 }
 
 configure<KotlinJvmExtension> {
@@ -435,6 +439,8 @@ dependencies {
 
     implementation(include("gg.sona:eos:2.2.0")!!)
     implementation(include("io.github.jaredmdobson:concentus:1.0.2")!!)
+    implementation(include("de.maxhenkel.rnnoise4j:rnnoise4j:2.1.3") { isTransitive = false })
+    implementation(include("fr.delthas:javamp3:1.0.1") { isTransitive = false })
 
     implementation(include("com.moulberry:mixinconstraints:1.1.0")!!)
 

@@ -32,6 +32,8 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyVoice
 import org.polyfrost.oneconfig.api.ui.v1.components.Divider
 
+internal const val SOUNDBOARD_ICON = "assets/polyplus/mainmenu/music-note.svg"
+
 @Composable
 internal fun VoiceStrip(window: SocialWindowState, modifier: Modifier = Modifier) {
     val voice by PartyVoice.ui.collectAsState()
@@ -50,6 +52,7 @@ internal fun VoiceStrip(window: SocialWindowState, modifier: Modifier = Modifier
                 Text(stripDetail(party), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
             }
             VoiceButtons(party, leave = false)
+            IconButton(icon = SOUNDBOARD_ICON, contentDescription = "Soundboard", onClick = window::showSoundboard, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
             IconButton(icon = PartyIcons.SETTINGS, contentDescription = "Voice and devices", onClick = window::showVoice, modifier = Modifier.size(34.dp), tint = OneConfigTheme.current.textColor, tooltipPlacement = TooltipPlacement.BelowStart)
             LeaveVoiceButton()
         }

@@ -375,6 +375,14 @@ object PartyRepository {
             .onFailure { report("hard mute", "Couldn't change their voice", it) }
     }
 
+    fun setSoundboardMuted(player: String, muted: Boolean) = PolyPlusClient.SCOPE.launch {
+        PartyApi.setSoundboardMuted(player, muted)
+            .onSuccess {
+                updateParty { it?.copy(members = it.members.map { member -> if (samePlayer(member.player, player)) member.copy(soundboardMuted = muted) else member }) }
+            }
+            .onFailure { report("soundboard mute", "Couldn't change their soundboard", it) }
+    }
+
     fun setVoiceMode(mode: PartyVoiceMode) = PolyPlusClient.SCOPE.launch {
         val since = partyVersion
         PartyApi.updateSettings(voiceMode = mode)

@@ -24,7 +24,10 @@ import org.polyfrost.polyplus.client.gui.PolyPlusOneConfigIntegration
 import org.polyfrost.polyplus.client.network.eos.EosRtcSupport
 import org.polyfrost.polyplus.client.network.websocket.PolyConnection
 import org.polyfrost.polyplus.client.party.PartyVoice
+import org.polyfrost.polyplus.client.party.VoiceAnnouncer
 import org.polyfrost.polyplus.client.party.VoiceInputMode
+import org.polyfrost.polyplus.client.party.soundboard.Soundboard
+import org.polyfrost.polyplus.client.party.soundboard.SoundboardKeybind
 import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.privacy.PrivacyEnforcement
 import org.polyfrost.polyplus.client.social.SocialOverlay
@@ -338,8 +341,8 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
     @JvmStatic
     @Dropdown(
         title = "Input Mode",
-        description = "Send your voice when you speak, or only while you hold a key.",
-        options = ["Voice activity", "Push to talk"],
+        description = "Send your voice when you speak, only while you hold a key, or whenever you speak except while you hold a key.",
+        options = ["Voice activity", "Push to talk", "Push to mute"],
         category = "Multiplayer",
         subcategory = "Voice",
     )
@@ -355,6 +358,26 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         PartyVoice.onPushToTalk(state)
         true
     }
+
+    @Keybind(
+        title = "Push to Mute",
+        description = "Hold to mute yourself when Input Mode is Push to mute.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voicePushToMuteKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        PartyVoice.onPushToMute(state)
+        true
+    }
+
+    @JvmStatic
+    @Switch(
+        title = "Automatic Sensitivity",
+        description = "Let noise suppression tell your voice apart from other sounds instead of using a fixed threshold.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceAutoSensitivity = true
 
     @JvmStatic
     @Slider(
@@ -430,6 +453,118 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         subcategory = "Voice",
     )
     var voiceHideIp = true
+
+    @JvmStatic
+    @Switch(
+        title = "Noise Suppression",
+        description = "Filter out fans, typing and other background noise before your party hears you.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceNoiseSuppression = true
+
+    @JvmStatic
+    @Slider(
+        title = "Noise Suppression Strength",
+        description = "How much background noise to remove, in percent. Lower it if your voice sounds robotic.",
+        min = 0f,
+        max = 100f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceNoiseStrength = 100f
+
+    @JvmStatic
+    @Switch(
+        title = "Echo Cancellation",
+        description = "Stop your party from hearing themselves through your speakers.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceEchoCancellation = false
+
+    @JvmStatic
+    @Switch(
+        title = "Read Out Voice Joins",
+        description = "Say out loud when someone joins or leaves party voice.",
+        category = "Multiplayer",
+        subcategory = "Voice",
+    )
+    var voiceAnnounceJoins = false
+
+    @JvmStatic
+    @Slider(
+        title = "Soundboard Volume",
+        description = "How loud your soundboard sounds are for your party, in percent.",
+        min = 0f,
+        max = 200f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var voiceSoundboardVolume = 100f
+
+    @JvmStatic
+    @Slider(
+        title = "Hear My Sounds",
+        description = "How loud you hear your own soundboard sounds, in percent. Set it to 0 to stay silent on your end.",
+        min = 0f,
+        max = 100f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var voiceSoundboardMonitor = 60f
+
+    @JvmStatic
+    @Slider(
+        title = "Other People's Sounds",
+        description = "How loud your party's soundboard sounds are for you, in percent.",
+        min = 0f,
+        max = 200f,
+        step = 5f,
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var voiceSoundboardOthers = 100f
+
+    @Keybind(
+        title = "Soundboard",
+        description = "Hold to open the soundboard wheel, then let go to play the sound you picked.",
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var soundboardWheelKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        SoundboardKeybind.onKeybindState(state)
+        true
+    }
+
+    @Keybind(
+        title = "Stop Sounds",
+        description = "Stop every soundboard sound you're playing.",
+        category = "Multiplayer",
+        subcategory = "Soundboard",
+    )
+    var stopSoundsKeybind = OneConfigKeybind(null, null, KeyModifiers.NONE, 0L) { state ->
+        if (state) Soundboard.stopAll()
+        true
+    }
+
+    @JvmStatic @Include
+    var voiceSoundVolumes = ""
+
+    @JvmStatic @Include
+    var voiceSoundFavorites = ""
+
+    @JvmStatic @Include
+    var voiceSensitivityMigrated = false
+
+    @JvmStatic @Include
+    var voiceSoundMemberVolumes = ""
+
+    @JvmStatic @Include
+    var voiceSoundMemberMutes = ""
 
     @JvmStatic @Include
     var voiceInputDevice = ""
@@ -571,8 +706,11 @@ object PolyPlusConfig : Config("${PolyPlusConstants.ID}.json", "${PolyPlusConsta
         }
 
         hideIf("voiceLinuxRtc") { !EosRtcSupport.isLinux }
+        hideIf("voiceAnnounceJoins") { !VoiceAnnouncer.SUPPORTED }
 
         addCallback("voiceJavaSound") { PartyVoice.onSettingsChanged(restartAudio = true) }
+
+        addCallback("voiceEchoCancellation") { PartyVoice.onSettingsChanged() }
 
         for (option in listOf("voiceInputVolume", "voiceOutputVolume", "voiceProximityRange", "voiceHideIp", "voiceInputMode")) {
             addCallback(option) { PartyVoice.onSettingsChanged() }

@@ -126,11 +126,14 @@ internal class SocialWindowLayout(canvasWidth: Dp, canvasHeight: Dp) {
 
 internal enum class WindowView { Party, Voice, World }
 
+internal enum class VoiceTab { Settings, Soundboard }
+
 internal class SocialWindowState(val screen: Screen, openWorld: Boolean) {
     val composer = FocusRequester()
     val hostFlow = HostFlowState(hostingCurrent = true, preselected = false, inline = true)
     var blockedOpen by mutableStateOf(false)
     var view by mutableStateOf(if (openWorld) WindowView.World else null)
+    var voiceTab by mutableStateOf(VoiceTab.Settings)
     var singlePane by mutableStateOf(false)
     var lanOpen by mutableStateOf(SocialHosting.lanOpen)
     var page: SocialPageState? = null
@@ -170,6 +173,16 @@ internal class SocialWindowState(val screen: Screen, openWorld: Boolean) {
     }
 
     fun showVoice() {
+        voiceTab = VoiceTab.Settings
+        openVoiceView()
+    }
+
+    fun showSoundboard() {
+        voiceTab = VoiceTab.Soundboard
+        openVoiceView()
+    }
+
+    private fun openVoiceView() {
         if (view == WindowView.Voice) return
         behindVoice = view
         view = WindowView.Voice
