@@ -160,7 +160,7 @@ object CosmeticSync {
                 is ClientboundPacket.PlayerParticleColorChanged -> handleParticleColorChanged(packet)
                 is ClientboundPacket.PlayerPresence -> {
                     LOGGER.info("PolyPlus presence: {} is now {}", packet.player, if (packet.online) "online" else "offline")
-                    CosmeticCatalog.setPolyPlusUser(UUID.fromString(packet.player), packet.online)
+                    CosmeticCatalog.setPolyPlusUser(UUID.fromString(packet.player), packet.badge ?: packet.online)
                 }
                 is ClientboundPacket.OwnershipUpdated -> handleOwnershipUpdated(packet)
                 is ClientboundPacket.Error -> handleError(packet)
@@ -345,7 +345,7 @@ object CosmeticSync {
         if (packet.users.isNotEmpty()) {
             LOGGER.info("PolyPlus presence snapshot: {} online user(s): {}", packet.users.size, packet.users)
         }
-        for (uuidString in packet.users) {
+        for (uuidString in packet.badges ?: packet.users) {
             CosmeticCatalog.setPolyPlusUser(UUID.fromString(uuidString), true)
         }
     }
