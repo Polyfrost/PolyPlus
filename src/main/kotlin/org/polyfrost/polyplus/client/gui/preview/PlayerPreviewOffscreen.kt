@@ -85,6 +85,7 @@ object PlayerPreviewOffscreen {
     @JvmStatic
     fun renderAll(main: RenderTarget) {
         disposeReleased()
+        NameplatePreviewOffscreen.renderAll(main)
         if (entries.isEmpty()) return
         if (java.lang.Boolean.getBoolean("pp.preview.off")) return
         val composeScreen = isOneConfigComposeScreen(ClientPlatform.currentScreen())
