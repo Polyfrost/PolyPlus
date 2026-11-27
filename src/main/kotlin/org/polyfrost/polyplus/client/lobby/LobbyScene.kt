@@ -122,6 +122,7 @@ import org.polyfrost.polyplus.client.gui.screens.ShellScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyLayout
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.party.PartyScene
+import org.polyfrost.polyplus.client.pets.PetAssets
 import org.polyfrost.polyplus.client.pets.PetManager
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.compat.PictureModeCompat
@@ -431,6 +432,10 @@ object LobbyScene {
 
     fun revealStarted(): Boolean = live?.started == true
 
+    fun emoteAvatar(uuid: UUID): LobbyAvatar? = live?.avatars?.firstOrNull { it.uuid == uuid && emoteReady(it) }
+
+    private fun emoteReady(avatar: LobbyAvatar): Boolean = avatar.arrival == LobbyAvatar.Arrival.LANDED && !avatar.vanished
+
     fun startupReveal(seconds: Double) {
         overlayDelay = seconds
     }
@@ -471,6 +476,10 @@ object LobbyScene {
 
     fun wornTextures(): Set<Identifier> = live?.avatars.orEmpty().flatMapTo(HashSet()) { avatar ->
         (avatar as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equipped().map { it.cosmetic.texture }
+    }
+
+    fun wornCosmetics(): List<AttachedCosmetic> = live?.avatars.orEmpty().flatMap { avatar ->
+        (avatar as PlayerCosmeticsAccess).`polyplus$cosmeticEquipment`().equipped().map { it.cosmetic }
     }
 
     fun tick(): Long {
@@ -540,7 +549,8 @@ object LobbyScene {
         scene.startNanos = minOf(scene.startNanos, Util.getNanos() - (OPENING_SECONDS * 1_000_000_000.0).toLong())
         LOBBY_LOGGER.debug("Intro skipped")
         for (avatar in scene.avatars) {
-            (avatar as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+            val controller = (avatar as PlayerEmotesAccess).`polyplus$emoteController`()
+            if (controller.networkedEmoteId == null) controller.stop()
             avatar.pose = Pose.STANDING
             avatar.arriveNow()
         }
@@ -1367,7 +1377,7 @@ object LobbyScene {
 
     private fun subscribe(avatars: List<LobbyAvatar>) {
         if (driven == null || !PrivacyConsent.allowsOnlineServices()) return
-        val ids = avatars.filterNot { it.isLocal }.map { it.uuid.toString() }
+        val ids = avatars.map { it.uuid.toString() }
         if (ids.isNotEmpty()) CosmeticSync.subscribeFriends(ids)
     }
 
@@ -1406,7 +1416,9 @@ object LobbyScene {
     private fun recast(mc: Minecraft, scene: Live, cast: LobbyCast) {
         for (friend in cast.party + cast.background) {
             val avatar = scene.avatars.firstOrNull { it.uuid == friend.uuid } ?: continue
-            if (avatar.project(friend.whereabouts)) (avatar as PlayerEmotesAccess).`polyplus$emoteController`().stop()
+            if (!avatar.project(friend.whereabouts)) continue
+            val controller = (avatar as PlayerEmotesAccess).`polyplus$emoteController`()
+            if (controller.networkedEmoteId == null) controller.stop()
         }
         val party = cast.party.mapTo(HashSet()) { it.uuid }
         val background = cast.background.mapTo(HashSet()) { it.uuid }
@@ -2365,6 +2377,9 @@ object LobbyScene {
             syncTime(scene)
             LobbyCompat.setGameTime(scene.level, if (scene.started) waveTicks().toLong() else 0L)
             ambient(scene)
+            for (avatar in scene.avatars) {
+                if (emoteReady(avatar)) CosmeticSync.syncEmote(avatar)
+            }
             syncLocalCosmetics(scene)
             syncFriends(mc, scene)
             for (avatar in scene.avatars) {
@@ -2429,7 +2444,9 @@ object LobbyScene {
     }
 
     private fun syncLocalPet(avatar: LobbyAvatar) {
-        val pet = CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]?.takeIf { CosmeticAssetCache.getPetDefinition(it) != null }
+        val preview = LobbyWardrobe.preview
+        val shown = if (preview != null) preview.pet?.id else CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
+        val pet = shown?.takeIf { PetAssets.has(it) }
         if (pet != null) {
             PetManager.ensurePet(avatar.uuid, pet)
         } else if (PetManager.currentPetCosmeticId(avatar.uuid) != null) {

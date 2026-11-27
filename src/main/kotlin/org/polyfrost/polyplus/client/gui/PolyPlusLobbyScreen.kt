@@ -17,6 +17,7 @@ import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
 import org.polyfrost.oneconfig.api.ui.v1.keybind.TextInputFocus
 import org.polyfrost.oneconfig.internal.OneConfigConfig
+import org.polyfrost.polyplus.client.emotes.EmoteWheelKeybind
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyShell
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyPage
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyRoot
@@ -64,11 +65,21 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
     private var keyNavigated = false
 
     override fun handleMouseClicked(button: Int): Boolean {
+        if (WheelOverlay.isOpenOverLobby) {
+            WheelOverlay.consumeButton(button, true)
+            return true
+        }
+        if (emoteWheelReady() && EmoteWheelKeybind.claimsButton(button)) return true
         keyNavigated = false
         return StartupOverlay.active || lobby.skipIntro()
     }
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
+        if (WheelOverlay.isOpenOverLobby) {
+            if (key == InputConstants.KEY_ESCAPE) WheelOverlay.consumeEscape()
+            return key !in wheelKeys
+        }
+        if (emoteWheelReady() && EmoteWheelKeybind.claimsKey(key, modifiers)) return true
         if (key in navigationKeys) keyNavigated = true
         LobbyAntics.key(key, lobby.calm())
         if (lobby.setup && StartupAccessibility.handleKey(key, modifiers)) return true
@@ -133,9 +144,13 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
     @Composable
     override fun Content() {
         ProvidePopupSounds(false) { LobbyRoot(lobby, this) }
+        WheelOverlay.LobbyLayer()
     }
 
     internal fun showPage(page: LobbyPage) = lobby.show(page)
+
+    internal fun emoteWheelReady(): Boolean =
+        LobbyScene.showing() && !LobbyScene.introPlaying() && !StartupOverlay.active && !lobby.page.frosted && lobby.calm()
 
     private fun opensOneConfig(key: Int, modifiers: Int): Boolean {
         val bind = OneConfigConfig.oneConfigKeybind
@@ -147,6 +162,15 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
         const val MODIFIER_MASK = 0xF
         val navigationKeys = intArrayOf(
             InputConstants.KEY_TAB, InputConstants.KEY_UP, InputConstants.KEY_DOWN, InputConstants.KEY_LEFT, InputConstants.KEY_RIGHT,
+        )
+
+        val wheelKeys = navigationKeys + intArrayOf(
+            InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER, InputConstants.KEY_SPACE,
+            InputConstants.KEY_0, InputConstants.KEY_1, InputConstants.KEY_2, InputConstants.KEY_3, InputConstants.KEY_4,
+            InputConstants.KEY_5, InputConstants.KEY_6, InputConstants.KEY_7, InputConstants.KEY_8, InputConstants.KEY_9,
+            InputConstants.KEY_NUMPAD0, InputConstants.KEY_NUMPAD1, InputConstants.KEY_NUMPAD2, InputConstants.KEY_NUMPAD3,
+            InputConstants.KEY_NUMPAD4, InputConstants.KEY_NUMPAD5, InputConstants.KEY_NUMPAD6, InputConstants.KEY_NUMPAD7,
+            InputConstants.KEY_NUMPAD8, InputConstants.KEY_NUMPAD9,
         )
     }
 }

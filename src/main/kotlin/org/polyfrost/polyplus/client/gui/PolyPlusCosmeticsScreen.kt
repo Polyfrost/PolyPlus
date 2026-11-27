@@ -17,6 +17,7 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticLoadProgress
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
 import org.polyfrost.polyplus.client.gui.wardrobe.CartEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticsLoadingScreen
 import org.polyfrost.polyplus.client.gui.lobbyshell.rememberOnlineConsent
@@ -25,6 +26,7 @@ import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeShell
 import org.polyfrost.polyplus.client.gui.wardrobe.cartName
 import org.polyfrost.polyplus.client.gui.wardrobe.checkoutFailureMessage
 import org.polyfrost.polyplus.client.gui.wardrobe.checkoutSuccessMessage
+import org.polyfrost.polyplus.client.gui.wardrobe.coloursSaving
 import org.polyfrost.polyplus.client.gui.wardrobe.cosmeticCartKey
 import org.polyfrost.polyplus.client.gui.wardrobe.equip
 import org.polyfrost.polyplus.client.gui.wardrobe.rememberCosmeticItems
@@ -32,6 +34,7 @@ import org.polyfrost.polyplus.client.gui.wardrobe.selectAuraColor
 import org.polyfrost.polyplus.client.gui.wardrobe.selectedVariantId
 import org.polyfrost.polyplus.client.gui.wardrobe.toCartEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.unequip
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticGroupKey
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 @Composable
@@ -66,7 +69,7 @@ internal fun PolyPlusCosmeticsScreen() {
     val cart = remember { mutableStateListOf<CartEntry>() }
     val allItems = rememberCosmeticItems(refreshKey)
     val ownedIds = remember(refreshKey) { CosmeticCatalog.ownedIds() }
-    val variantPicks = remember { mutableStateMapOf<Int, Int>() }
+    val variantPicks = remember { mutableStateMapOf<CosmeticGroupKey, Int>() }
     var auraColor by remember { mutableStateOf(CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())) }
     LaunchedEffect(refreshKey) {
         auraColor = CosmeticCatalog.getParticleColor(ClientPlatform.localPlayerUuid())
@@ -122,20 +125,23 @@ internal fun PolyPlusCosmeticsScreen() {
         },
         onPreviewAuraColor = { color ->
             auraColor = color
-            CosmeticCatalog.setParticleColor(ClientPlatform.localPlayerUuid(), color)
+            CosmeticCatalog.previewParticleColor(ClientPlatform.localPlayerUuid(), color)
         },
         onSelectAuraColor = { color ->
-            auraColor = color
-            selectAuraColor(color) { status = it }
+            if (selectAuraColor(color) { status = it }) auraColor = color
         },
-        onSelectVariant = { groupId, variantId ->
-            variantPicks[groupId] = variantId
-            val item = allItems.firstOrNull { it.groupId == groupId && it.variants.any { variant -> variant.id == variantId } }
-            if (item != null && item.equipped && item.equippedVariantId != variantId) {
-                status = "Equipping ${item.name}..."
-                equip(item, variantId) {
-                    refreshKey++
-                    status = it
+        onSelectVariant = { key, variantId ->
+            val item = allItems.firstOrNull { it.key == key && it.variants.any { variant -> variant.id == variantId } }
+            if (item != null && coloursSaving(item)) {
+                status = ColourSaves.STILL_SAVING
+            } else {
+                variantPicks[key] = variantId
+                if (item != null && item.equipped && item.equippedVariantId != variantId) {
+                    status = "Equipping ${item.name}..."
+                    equip(item, variantId) {
+                        refreshKey++
+                        status = it
+                    }
                 }
             }
         },

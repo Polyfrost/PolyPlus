@@ -8,6 +8,7 @@ import org.polyfrost.polyplus.libs.ktor.client.plugins.ClientRequestException
 import org.polyfrost.polyplus.libs.ktor.http.HttpMethod
 import org.polyfrost.polyplus.libs.ktor.http.HttpStatusCode
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -21,6 +22,14 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
+import org.polyfrost.polyplus.client.cosmetics.outfitLoadout
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
+import org.polyfrost.polyplus.client.cosmetics.colors.CosmeticColors
+import org.polyfrost.polyplus.client.cosmetics.colors.holdUntilSettled
+import org.polyfrost.polyplus.client.cosmetics.colors.outfitResultChangesLook
+import org.polyfrost.polyplus.client.cosmetics.colors.outfitWritesColour
+import org.polyfrost.polyplus.client.gui.wardrobe.applyOutfitAura
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
 import java.util.UUID
@@ -117,16 +126,29 @@ object OutfitLibrary {
 
     suspend fun apply(id: Int): Result<OutfitInfo> {
         if (!OutfitApi.allowed()) return unavailable()
-        return requestLock.withLock {
-            busy = true
-            applying = true
+        return CosmeticService.equipQueue.handOff(requestLock, { applyQueued(id) }) { applied ->
             try {
-                applyLocked(id)
+                applied.fold({ finishApply(id, it) }, { Result.failure(it) })
             } finally {
-                applying = false
-                busy = false
+                applyDone()
             }
         }
+    }
+
+    private suspend fun applyQueued(id: Int): Result<Applied> {
+        busy = true
+        applying = true
+        try {
+            return applyColours(id)
+        } catch (e: Throwable) {
+            applyDone()
+            throw e
+        }
+    }
+
+    private fun applyDone() {
+        applying = false
+        busy = false
     }
 
     suspend fun rename(id: Int, name: String): Result<OutfitInfo> {
@@ -173,6 +195,12 @@ object OutfitLibrary {
             if (outfit.mojangCapeId == capeId) return@launch
             patch(outfit.id, buildJsonObject { put("mojang_cape_id", capeId) })
         }
+    }
+
+    internal fun onEquipped(changes: Map<BodySlot, Int?>) {
+        val outfit = activeOutfit() ?: return
+        val equipped = outfitEquipment(outfit.equipped, changes)
+        if (equipped != outfit.equipped) replace(outfit.copy(equipped = equipped))
     }
 
     internal fun onParticleColorChanged(color: Int?) {
@@ -262,8 +290,30 @@ object OutfitLibrary {
         }
     }
 
-    private suspend fun applyLocked(id: Int): Result<OutfitInfo> {
+    private class Applied(
+        val response: ApplyOutfitResponse,
+        val outfit: OutfitInfo,
+        val keepLook: Boolean,
+        val changesSkin: Boolean,
+    )
+
+    private suspend fun applyColours(id: Int): Result<Applied> {
+        val target = outfits.firstOrNull { it.id == id }
+        val wornAura = CosmeticCatalog.localEquipped().equipped[BodySlot.Aura]
+        val nextAura = if (target?.blank == true) wornAura else target?.equipped?.get(BodySlot.Aura)
+        val writesColour = outfitWritesColour(target?.blank, target?.particleColor)
+        val hold = ColourSaves.reserveOutfit(nextAura, writesColour)
+            ?: return Result.failure(OutfitException(ColourSaves.STILL_SAVING))
+        val auras = listOfNotNull(wornAura, nextAura, target?.equipped?.get(BodySlot.Aura)).distinct()
+        return holdUntilSettled(hold::release) { settling -> applyHolding(id, auras, writesColour, settling) }
+    }
+
+    private suspend fun applyHolding(id: Int, auras: List<Int>, writesColour: Boolean, settling: (Job) -> Unit): Result<Applied> {
         val owner = ClientPlatform.localPlayerUuid()
+        val colorBefore = CosmeticCatalog.confirmedParticleColor(owner)
+        val choice = ColourSaves.particleChoices.seen()
+        val aurasBefore = auras.associateWith(CosmeticColors::saved)
+        if (writesColour) CosmeticColors.lookChanged(auras)
         val response = OutfitApi.send<ApplyOutfitResponse>(HttpMethod.Post, "/outfits/$id/apply")
             .onFailure {
                 LOGGER.error("Failed to apply outfit {}", id, it)
@@ -271,41 +321,74 @@ object OutfitLibrary {
             }
             .getOrElse { return Result.failure(it) }
         val outfit = response.outfit.toInfo()
+        val keepLook = response.adopted || outfit.blank
+        val fresh = !ColourSaves.particleChoices.since(choice)
+        val changesLook = fresh && outfitResultChangesLook(keepLook, outfit.particleColor, colorBefore)
+        val aura = if (keepLook) {
+            CosmeticCatalog.localEquipped().equipped[BodySlot.Aura]
+        } else {
+            outfit.equipped[BodySlot.Aura]
+        }
+        if (writesColour || changesLook) CosmeticColors.lookChanged(auras + listOfNotNull(aura))
+        if (aura != null && changesLook) {
+            settling(applyOutfitAura(aura, outfit.particleColor, aurasBefore[aura]))
+        }
+        val color = outfit.particleColor
+        ClientPlatform.runOnMain {
+            if (ColourSaves.particleChoices.since(choice)) return@runOnMain
+            ColourSaves.particleChoices.made()
+            if (color != null) {
+                CosmeticCatalog.setParticleColor(owner, color)
+            } else {
+                CosmeticCatalog.clearParticleColor(owner)
+            }
+        }
         replace(outfit)
         activeOutfitId = outfit.id
         response.skin?.let { skin -> SkinLibrary.remember(skin.toInfo()) }
+        val expected = if (keepLook) {
+            CosmeticCatalog.serverEquipment()
+        } else {
+            val pieces = outfit.equipped.filterKeys { it != BodySlot.Unknown }
+            val kept = outfitLoadout(pieces, CosmeticCatalog.ownedCosmeticIds()) { cosmeticId, slot ->
+                CosmeticCatalog.getCosmeticDefinition(cosmeticId)?.allowsSlot(slot) ?: false
+            }
+            kept.takeIf { it == pieces }
+        }
+        CosmeticService.confirmLocalActive(expected).onFailure { LOGGER.warn("Failed to resync cosmetics after applying outfit {}", id, it) }
+        val changesSkin = !keepLook && response.skin != null
+        if (changesSkin) CosmeticService.skinChanges.begin()
+        return Result.success(Applied(response, outfit, keepLook, changesSkin))
+    }
 
+    private suspend fun finishApply(id: Int, applied: Applied): Result<OutfitInfo> {
+        val response = applied.response
+        val outfit = applied.outfit
+        val keepLook = applied.keepLook
+        val owner = ClientPlatform.localPlayerUuid()
         val problems = mutableListOf<String>()
         if (response.adopted) {
             adoptCurrentLook(outfit).onFailure {
                 problems += "your current skin and cape weren't saved to it (${it.message})"
             }
         }
-        val keepLook = response.adopted || outfit.blank
-        response.skin?.toInfo()?.takeIf { !keepLook }?.let { skin ->
-            val current = MojangSkinService.activeSkin().getOrNull()
-            if (current == null || current.textureHash != skin.hash || current.model != skin.model) {
-                MojangSkinService.setSkin(skin.url, skin.model, owner)
-                    .onSuccess { SkinLibrary.recordInBackground(force = true) }
-                    .onFailure {
-                        problems += "your Minecraft skin wasn't changed (${MojangSkinService.failureMessage(it)})"
-                    }
+        try {
+            response.skin?.toInfo()?.takeIf { !keepLook }?.let { skin ->
+                val current = MojangSkinService.activeSkin().getOrNull()
+                if (current == null || current.textureHash != skin.hash || current.model != skin.model) {
+                    MojangSkinService.setSkin(skin.url, skin.model, owner)
+                        .onSuccess { SkinLibrary.recordInBackground(force = true) }
+                        .onFailure {
+                            problems += "your Minecraft skin wasn't changed (${MojangSkinService.failureMessage(it)})"
+                        }
+                }
             }
+        } finally {
+            if (applied.changesSkin) CosmeticService.skinChanges.end()
         }
         if (!keepLook) {
             applyMojangCape(outfit.mojangCapeId).onFailure {
                 problems += "your Minecraft cape wasn't changed (${MojangCapeService.failureMessage(it)})"
-            }
-        }
-
-        CosmeticService.syncLocalActive().onFailure { LOGGER.warn("Failed to resync cosmetics after applying outfit {}", id, it) }
-        val uuid = ClientPlatform.localPlayerUuid()
-        val color = outfit.particleColor
-        ClientPlatform.runOnMain {
-            if (color != null) {
-                CosmeticCatalog.setParticleColor(uuid, color)
-            } else {
-                CosmeticCatalog.clearParticleColor(uuid)
             }
         }
 

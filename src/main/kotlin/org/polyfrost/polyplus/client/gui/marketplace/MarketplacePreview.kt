@@ -37,15 +37,19 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
+import org.polyfrost.polyplus.client.gui.preview.PreviewTryOn
 import org.polyfrost.polyplus.client.gui.wardrobe.BACK_VIEW_TYPES
 import org.polyfrost.polyplus.client.gui.wardrobe.BACK_YAW_DEG
 import org.polyfrost.polyplus.client.gui.wardrobe.FRONT_YAW_DEG
 import org.polyfrost.polyplus.client.gui.wardrobe.OwnershipBadge
 import org.polyfrost.polyplus.client.gui.wardrobe.ResetRotationButton
+import org.polyfrost.polyplus.client.gui.wardrobe.TryInfo
+import org.polyfrost.polyplus.client.gui.wardrobe.TryOnBar
 import org.polyfrost.polyplus.client.gui.wardrobe.isPreviewAssetLoaded
 import org.polyfrost.polyplus.client.gui.wardrobe.outfitPreviewSource
+import org.polyfrost.polyplus.client.gui.wardrobe.rememberLocalSkinSlim
+import org.polyfrost.polyplus.client.gui.wardrobe.rememberPreviewBonuses
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.utils.ClientPlatform
 import kotlin.math.abs
 
 private const val TURN_MILLIS = 300
@@ -59,7 +63,7 @@ private const val WIDTH_ROOM = 0.96f
 private const val BODY_KEEP = 0.62f
 private const val EDGE_FADE = 0.07f
 
-private class Look(val source: PlayerPreviewSource, val reach: SideReach)
+private class Look(val source: PlayerPreviewSource, val reach: SideReach, val ids: Collection<Int>)
 
 private val EDGE_FADE_BRUSH = Brush.horizontalGradient(
     0f to Color.Transparent,
@@ -71,8 +75,8 @@ private val EDGE_FADE_BRUSH = Brush.horizontalGradient(
 @Composable
 private fun rememberLook(wanted: Map<BodySlot, Int>, yawDeg: Float): Look {
     var worn by remember { mutableStateOf(emptyMap<BodySlot, Int>()) }
-    LaunchedEffect(wanted) {
-        val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+    val slim = rememberLocalSkinSlim()
+    LaunchedEffect(wanted, slim) {
         val resolved = wanted.mapValues { CosmeticCatalog.resolveVariantForSkin(it.value, slim) }
         worn = resolved
         resolved.forEach { (slot, id) ->
@@ -83,16 +87,18 @@ private fun rememberLook(wanted: Map<BodySlot, Int>, yawDeg: Float): Look {
     val textures = MojangCapeService.textureVersion
     return remember(worn, installs, textures, yawDeg) {
         val reach = typicalReach(worn.values.mapNotNull(CosmeticAssetCache::getAttachedCosmetic), yawDeg)
-        Look(outfitPreviewSource(worn, MojangCapeService.localCapeTexture()), reach)
+        Look(outfitPreviewSource(worn, MojangCapeService.localCapeTexture()), reach, worn.values)
     }
 }
 
 @Composable
-internal fun TryOnPreview(state: MarketplaceState, modifier: Modifier) {
+internal fun TryOnPreview(state: MarketplaceState, tryInfo: TryInfo, tryOn: PreviewTryOn, modifier: Modifier) {
     val targetYaw = if (state.facing in BACK_VIEW_TYPES) BACK_YAW_DEG else FRONT_YAW_DEG
     val rotation = remember { PreviewRotation(targetYaw) }
     val wanted = state.look + state.fitting.mapValues { it.value.variantId }
     val look = rememberLook(wanted, targetYaw)
+    val bonuses = rememberPreviewBonuses(look.ids)
+    LaunchedEffect(tryOn, bonuses) { tryOn.bonuses = bonuses }
     LaunchedEffect(targetYaw) {
         if (rotation.userRotated) return@LaunchedEffect
         val start = rotation.yaw
@@ -131,6 +137,7 @@ internal fun TryOnPreview(state: MarketplaceState, modifier: Modifier) {
                 live = true,
                 rotation = rotation,
                 fadeEdges = false,
+                tryOn = tryOn,
             )
         }
         state.selectedItem?.let { info ->
@@ -141,5 +148,6 @@ internal fun TryOnPreview(state: MarketplaceState, modifier: Modifier) {
             rotation.yaw = targetYaw
             rotation.pitch = 0f
         }
+        TryOnBar(tryInfo, tryOn, Modifier.align(Alignment.BottomCenter).padding(12.dp))
     }
 }

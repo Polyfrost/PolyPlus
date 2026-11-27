@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,11 +55,16 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticSwatches
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.SwatchArt
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
+import org.polyfrost.polyplus.client.cosmetics.sets.BonusPreview
+import org.polyfrost.polyplus.client.cosmetics.sets.DiscoveredBonuses
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
-import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.network.http.responses.BonusRef
+import org.polyfrost.polyplus.client.network.http.responses.DiscoveredBonus
+import kotlinx.coroutines.delay
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
 
 private val PREVIEW_HEIGHT = 330.dp
@@ -82,6 +88,7 @@ internal fun PreviewPanel(
     auraColor: Int? = null,
     onPreviewAuraColor: (Int) -> Unit = {},
     onSelectAuraColor: (Int?) -> Unit = {},
+    onStatus: (String) -> Unit = {},
 ) {
     var panelHeight by remember { mutableIntStateOf(0) }
     var headerHeight by remember { mutableIntStateOf(0) }
@@ -95,6 +102,12 @@ internal fun PreviewPanel(
     ) {
         val hasHeadCosmetic = selectionPreview?.hasHeadCosmetic
             ?: CosmeticCatalog.localEquipped().equipped.containsKey(BodySlot.Hat)
+        val tryInfo = rememberTryInfo(selected?.let { it.variant(selectedVariantId)?.pieces ?: listOfNotNull(selectedVariantId) })
+        val tryOn = rememberTryOn(selected?.key to selectedVariantId)
+        val bonuses = rememberPreviewBonuses(selectionPreview?.ids ?: CosmeticCatalog.localEquipped().equipped.values)
+        LaunchedEffect(tryOn, bonuses) { tryOn.bonuses = bonuses }
+        val discovered by DiscoveredBonuses.bonuses.collectAsState()
+        val bonusLine = remember(bonuses, discovered) { bonusLine(bonuses, discovered) }
         PlayerPreview(
             Modifier.align(Alignment.Center).offset { IntOffset(0, previewShift) }.fillMaxWidth().height(PREVIEW_HEIGHT),
             source = selectionPreview?.source ?: PlayerPreviewSource.LocalLive,
@@ -104,6 +117,7 @@ internal fun PreviewPanel(
             initialYaw = FRONT_YAW_DEG,
             live = true,
             rotation = rotation,
+            tryOn = tryOn,
         )
         ResetRotationButton(rotation, onResetRotation)
         Column(
@@ -119,13 +133,24 @@ internal fun PreviewPanel(
             if (status != null) {
                 Text(status, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
             }
+            if (bonusLine != null) {
+                Text(bonusLine, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+            }
         }
-        val variants = if (selected != null && selected.hasVariants) selected.variants else emptyList()
-        if (variants.isNotEmpty() || showAuraColor) {
+        val custom = rememberCustomColours(selected?.let { customPieces(it, selectedVariantId) }, selected?.owned == true)
+        val variants = when {
+            selected == null -> emptyList()
+            selected.hasVariants -> selected.variants
+            custom != null -> listOfNotNull(selected.variant(selectedVariantId)?.copy(name = "Default"))
+            else -> emptyList()
+        }
+        val auraPill = showAuraColor && legacyAura(selected, selectedVariantId)
+        if (variants.isNotEmpty() || custom != null || auraPill || tryInfo.actions.isNotEmpty()) {
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                TryOnBar(tryInfo, tryOn)
                 if (variants.isNotEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxWidth()
@@ -133,11 +158,12 @@ internal fun PreviewPanel(
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text("Variants", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
-                        VariantChips(variants, selectedVariantId, onSelectVariant)
+                        Text(if (custom != null) "Colors" else "Variants", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.small)
+                        VariantChips(variants, selectedVariantId, onSelectVariant, custom = custom, onStatus = onStatus, choosesColours = true)
                     }
                 }
-                if (showAuraColor) {
+                if (custom != null) CustomColoursPanel(custom, onStatus)
+                if (auraPill) {
                     PreviewPill(
                         auraColor = auraColor,
                         onPreviewAuraColor = onPreviewAuraColor,
@@ -150,12 +176,78 @@ internal fun PreviewPanel(
     }
 }
 
-internal class SelectionPreview(val source: PlayerPreviewSource, val hasHeadCosmetic: Boolean)
+@Composable
+private fun legacyAura(item: CosmeticUiItem?, variantId: Int?): Boolean {
+    CosmeticAssetCache.installs
+    val id = item?.let { it.variant(variantId)?.pieces?.firstOrNull() ?: variantId } ?: return false
+    return CosmeticAssetCache.getAttachedCosmetic(id)?.let { it.scene.asset == null } ?: true
+}
+
+internal class SelectionPreview(val source: PlayerPreviewSource, val hasHeadCosmetic: Boolean, val ids: Collection<Int>)
+
+@Composable
+internal fun rememberPreviewBonuses(ids: Collection<Int>): List<BonusRef> {
+    val key = remember(ids) { ids.distinct().sorted() }
+    var bonuses by remember(key) { mutableStateOf(BonusPreview.cached(key).orEmpty()) }
+    LaunchedEffect(key, BonusPreview.revision) {
+        if (key.isEmpty()) return@LaunchedEffect
+        var first = true
+        while (true) {
+            val cached = BonusPreview.cached(key)
+            if (cached != null) {
+                bonuses = cached
+            } else {
+                if (first) delay(BONUS_PREVIEW_DELAY_MS)
+                val fetched = fetchBonusPreview(key)
+                if (fetched == null) {
+                    bonuses = emptyList()
+                    return@LaunchedEffect
+                }
+                bonuses = fetched
+            }
+            first = false
+            delay(BonusPreview.remainingMs(key).coerceAtLeast(BONUS_PREVIEW_RETRY_MS))
+        }
+    }
+    return bonuses
+}
+
+private suspend fun fetchBonusPreview(key: List<Int>): List<BonusRef>? {
+    var backoff = BONUS_PREVIEW_RETRY_MS
+    while (true) {
+        val result = BonusPreview.preview(key)
+        result.getOrNull()?.let { return it }
+        if (result.exceptionOrNull()?.let(BonusPreview::shouldRetry) == false) return null
+        delay(backoff)
+        backoff = (backoff * 2).coerceAtMost(BONUS_PREVIEW_MAX_RETRY_MS)
+    }
+}
+
+private fun bonusLine(bonuses: List<BonusRef>, discovered: List<DiscoveredBonus>): String? {
+    if (bonuses.isEmpty()) return null
+    val names = bonuses.mapNotNull { ref -> discovered.firstOrNull { it.bonusId == ref.id }?.name }
+    val hidden = bonuses.size - names.size
+    return when {
+        names.isEmpty() && hidden == 1 -> "This outfit has a hidden bonus"
+        names.isEmpty() -> "This outfit has $hidden hidden bonuses"
+        hidden > 0 -> "Outfit bonuses: ${names.joinToString(", ")} and a hidden one"
+        names.size == 1 -> "Outfit bonus: ${names[0]}"
+        else -> "Outfit bonuses: ${names.joinToString(" and ")}"
+    }
+}
+
+private const val BONUS_PREVIEW_DELAY_MS = 400L
+private const val BONUS_PREVIEW_RETRY_MS = 5_000L
+private const val BONUS_PREVIEW_MAX_RETRY_MS = 60_000L
 
 @Composable
 internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, mojang: MojangCape?, previewRequest: Int = 0): SelectionPreview? {
-    val slot = owned?.type?.defaultSlot()
-    val selectedKey = owned?.let { it.type to it.groupId }
+    val slot = owned?.let { item ->
+        item.type.defaultSlot()
+            ?: (item.variant(variantId)?.pieces?.firstOrNull() ?: variantId)
+                ?.let { CosmeticCatalog.getCosmeticDefinition(it)?.preferredSlot() }
+    }
+    val selectedKey = owned?.let { it.type to it.key }
     val equippedNow = owned?.equipped == true
     var wasEquipped by remember(selectedKey) { mutableStateOf(equippedNow) }
     var droppedVariant by remember(selectedKey, previewRequest) { mutableStateOf<Int?>(null) }
@@ -180,15 +272,13 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
             },
         )
     }
-    LaunchedEffect(pieceIds, previewsOwned) {
+    val slim = rememberLocalSkinSlim()
+    LaunchedEffect(pieceIds, previewsOwned, slim) {
         if (!previewsOwned || slot == null) return@LaunchedEffect
         val pieces = pieceIds.associate { pieceId ->
             CosmeticCatalog.getCosmeticDefinition(pieceId)
-                ?.let { CosmeticService.equipTarget(it).getOrNull() }
-                ?: run {
-                    val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
-                    slot to CosmeticCatalog.resolveVariantForSkin(pieceId, slim)
-                }
+                ?.let { CosmeticService.equipTarget(it, slim).getOrNull() }
+                ?: (slot to CosmeticCatalog.resolveVariantForSkin(pieceId, slim))
         }
         previewPieces = pieces
         for ((pieceSlot, id) in pieces) {
@@ -212,7 +302,7 @@ internal fun rememberSelectionPreview(owned: CosmeticUiItem?, variantId: Int?, m
         outfitPreviewSource(look, mojangTexture ?: localMojang)
     }
     if (!previewsOwned && mojang == null) return null
-    return SelectionPreview(source, BodySlot.Hat in look)
+    return SelectionPreview(source, BodySlot.Hat in look, look.values)
 }
 
 @Composable
@@ -231,6 +321,7 @@ private fun PreviewPill(
     modifier: Modifier = Modifier,
 ) {
     var customOpen by remember { mutableStateOf(false) }
+    val saving = ColourSaves.auraPending()
 
     Box(modifier) {
         Row(
@@ -245,6 +336,7 @@ private fun PreviewPill(
                 customOpen = customOpen,
                 onToggleCustom = { customOpen = !customOpen },
                 onCommit = onSelectAuraColor,
+                enabled = !saving,
             )
         }
         if (customOpen) {
@@ -254,6 +346,7 @@ private fun PreviewPill(
                 onCommit = onSelectAuraColor,
                 onDismiss = { customOpen = false },
                 gap = 8.dp,
+                enabled = !saving,
             )
         }
     }
@@ -279,24 +372,54 @@ internal fun VariantChips(
     selectedVariantId: Int?,
     onSelect: (Int) -> Unit,
     ownedVariantIds: Set<Int> = emptySet(),
+    custom: CustomColours? = null,
+    onStatus: (String) -> Unit = {},
+    choosesColours: Boolean = false,
 ) {
     val scroll = rememberScrollState()
+    val saving = coloursSaving(variants) || custom?.saving == true
     ScrollContainer(scroll, Modifier.fillMaxWidth().heightIn(max = MAX_CHIP_HEIGHT), scrollbar = false) {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             for (variant in variants) {
+                val current = variant.id == selectedVariantId
                 VariantChip(
                     variant = variant,
-                    selected = variant.id == selectedVariantId,
+                    selected = current && custom?.selected != true,
                     dimmed = variant.id in ownedVariantIds && variant.id != selectedVariantId,
-                    onClick = { onSelect(variant.id) },
+                    enabled = !saving,
+                    onClick = {
+                        if (current && custom != null && custom.selected) {
+                            custom.useDesigned { result ->
+                                result.onFailure {
+                                    onStatus(colourFailureMessage(it, "Couldn't switch back to the default colors. Try again in a moment."))
+                                }
+                            }
+                        } else {
+                            onSelect(variant.id)
+                            if (!current && choosesColours) {
+                                useDesignedColours(variant.pieces) { result ->
+                                    result.onFailure {
+                                        onStatus(colourFailureMessage(it, "Couldn't switch to the designed colors. Try again in a moment."))
+                                    }
+                                }
+                            }
+                        }
+                    },
                 )
             }
+            if (custom != null) CustomColoursChip(custom)
         }
     }
 }
 
+internal fun customPieces(item: CosmeticUiItem, variantId: Int?): List<Int>? {
+    val pieces = item.variant(variantId)?.pieces ?: variantId?.let(::listOf) ?: return null
+    val owned = CosmeticCatalog.ownedCosmeticIds()
+    return pieces.takeIf { it.isNotEmpty() && it.all(owned::contains) }
+}
+
 @Composable
-private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: Boolean, onClick: () -> Unit) {
+private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
     val swatchVersion = CosmeticSwatches.version
     val art = remember(variant.artId, swatchVersion) { CosmeticSwatches.get(variant.artId) }
@@ -306,6 +429,7 @@ private fun VariantChip(variant: CosmeticVariantUi, selected: Boolean, dimmed: B
         selected = selected,
         onClick = onClick,
         modifier = Modifier.widthIn(max = MAX_CHIP_WIDTH).graphicsLayer { alpha = dimAlpha },
+        enabled = enabled,
         size = ControlSize.Compact,
         sound = null,
         leading = {

@@ -146,6 +146,8 @@ object LobbyPipelines {
     @JvmStatic
     fun hologram(original: RenderPipeline): RenderPipeline = if (LobbyHologram.drawing && entityFormat(original) && usable(hologram)) hologram else original
 
+    fun hologramUsable(): Boolean = usable(hologram)
+
     //? if < 1.21.10 {
     /*private val perFaceEntity by lazy {
         RenderPipeline.builder(RenderPipelinesAccessor.`polyplus$entitySnippet`())
@@ -263,6 +265,8 @@ object LobbyPipelines {
 
     fun compiled(): Boolean = listOf(solid, cutoutMipped, cutout, translucent, tripwire).all(::usable)
 
+    fun hologramUsable(): Boolean = usable(hologram)
+
     @JvmStatic
     fun hologramState() {
         if (!LobbyHologram.drawing) return
@@ -316,6 +320,8 @@ object LobbyPipelines {
     private val failed = mutableSetOf<String>()
 
     fun compiled(): Boolean = solid != null && cutoutMipped != null && cutout != null && translucent != null && tripwire != null
+
+    fun hologramUsable(): Boolean = hologram != null
 
     fun register() {
         // VulkanMod can't compile these shaders, and the GL link check aborts the JVM without a GL context

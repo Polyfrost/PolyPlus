@@ -37,6 +37,12 @@ data class OutfitInfo(
     val blank: Boolean = false,
 )
 
+internal fun outfitEquipment(equipped: Map<BodySlot, Int>, changes: Map<BodySlot, Int?>): Map<BodySlot, Int> {
+    val next = LinkedHashMap(equipped)
+    for ((slot, id) in changes) if (id == null) next.remove(slot) else next[slot] = id
+    return next
+}
+
 sealed interface LibraryState {
     data object Idle : LibraryState
     data object Loading : LibraryState

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.polyfrost.oneconfig.api.ui.v1.OneConfigUI
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
+import org.polyfrost.polyplus.client.cosmetics.sets.DiscoveredBonuses
 import org.polyfrost.polyplus.client.gui.lobbyshell.CustomizeKit
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelPageColumn
 import org.polyfrost.polyplus.client.gui.lobbyshell.PanelSection
@@ -79,13 +82,25 @@ private fun LibraryFrame(content: @Composable () -> Unit) {
 @Composable
 private fun LibraryGrid(section: WardrobeSection, selection: WardrobeSelection?, store: WardrobeStoreData, actions: DrawerActions) {
     var adding by remember(section) { mutableStateOf(false) }
+    val discovered by DiscoveredBonuses.bonuses.collectAsState()
+    LaunchedEffect(section) { if (section == WardrobeSection.Outfits) DiscoveredBonuses.ensureLoaded() }
     if (adding) {
         EscapeCloses { adding = false }
         AddSkinPanel(onClose = { adding = false }, onStatus = actions.onStatus, modifier = Modifier.fillMaxWidth(), framed = false)
         return
     }
     WardrobeGrid(
-        entries = buildWardrobeEntries(section, emptyList(), emptySet(), store, MojangCapeState.Idle, "", WardrobeSort.Popular, true),
+        entries = buildWardrobeEntries(
+            section,
+            emptyList(),
+            emptySet(),
+            store,
+            MojangCapeState.Idle,
+            "",
+            WardrobeSort.Popular,
+            true,
+            discovered = discovered,
+        ),
         state = rememberLazyGridState(),
         ownedIds = emptySet(),
         cartKeys = emptySet(),

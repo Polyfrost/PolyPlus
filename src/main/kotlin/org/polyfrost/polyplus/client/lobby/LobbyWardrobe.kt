@@ -50,7 +50,7 @@ object LobbyWardrobe {
     private const val HEAD_SWAY = 5f
     private const val BODY_HEIGHT = 1.9
     private const val BODY_SPAN = 1.0
-    private const val PIXELS_PER_BLOCK = 16.0
+    private const val NECK_HEIGHT = 1.5
     private const val CAST_FADE_START = 0.12
     private const val CAST_FADE_SPAN = 0.4
     private const val ANIMATED_SWEEP = 0.7
@@ -159,18 +159,14 @@ object LobbyWardrobe {
         var bottom = 0.0
         val points = ArrayList<Pair<Double, Double>>()
         for (cosmetic in worn) {
-            val scale = cosmetic.scale / PIXELS_PER_BLOCK
-            val reach = if (cosmetic.animation != null) ANIMATED_SWEEP else 1.0
-            for (bone in cosmetic.model.geometry.bones.values) {
-                for (cube in bone.cubes) {
-                    for (x in listOf(cube.origin.x, cube.origin.x + cube.size.x)) {
-                        for (z in listOf(cube.origin.z, cube.origin.z + cube.size.z)) {
-                            points += x * scale * reach to z * scale * reach
-                        }
-                    }
-                    top = max(top, (cube.origin.y + cube.size.y) * scale)
-                    bottom = minOf(bottom, cube.origin.y * scale)
-                }
+            val reach = if (cosmetic.scene.hasAnimation) ANIMATED_SWEEP else 1.0
+            val positions = cosmetic.scene.restPositions(0f)
+            for (i in positions.indices step 3) {
+                points += positions[i] * reach to positions[i + 2] * reach
+                // a render layer's Y points down from the neck
+                val height = NECK_HEIGHT - positions[i + 1]
+                top = max(top, height)
+                bottom = minOf(bottom, height)
             }
         }
         extent = Extent(points, top, bottom)

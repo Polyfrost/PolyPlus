@@ -20,6 +20,7 @@ import org.polyfrost.polyplus.client.party.PartyRepository
 import org.polyfrost.polyplus.client.party.PartyScene
 import org.polyfrost.polyplus.client.social.FriendsRepository
 import org.polyfrost.polyplus.client.social.PlayerNamesRepository
+import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.polyfrost.polyplus.privacy.PrivacyConsent
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -71,9 +72,9 @@ object LobbyFriends {
             .filter { friend -> friend.online && members.none { PartyRepository.samePlayer(it.player, friend.player) } }
             .map { it.player }
         val everyone = party + others
+        CosmeticSync.subscribeFriends(everyone + ClientPlatform.localPlayerUuid().toString())
         if (everyone.isEmpty()) return EMPTY
         PlayerNamesRepository.resolve(everyone)
-        CosmeticSync.subscribeFriends(everyone)
         val names = PlayerNamesRepository.names.value
         val whereabouts = figures.associate { it.player to it.whereabouts }
         return LobbyCast(known(party, names, whereabouts), known(others, names, emptyMap()))

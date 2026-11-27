@@ -55,13 +55,8 @@ import net.minecraft.client.renderer.ProjectionMatrixBuffer
 import net.minecraft.client.renderer.state.level.CameraRenderState
 //?}
 
-//? if >= 1.21.11 {
-import net.minecraft.client.renderer.rendertype.RenderTypes
-//?}
-
 //? if >= 1.21.10 {
 import net.minecraft.client.model.HumanoidModel
-import net.minecraft.client.renderer.SubmitNodeCollector
 import net.minecraft.client.renderer.entity.state.AvatarRenderState
 import net.minecraft.core.ClientAsset
 import net.minecraft.world.entity.HumanoidArm
@@ -70,21 +65,20 @@ import net.minecraft.world.entity.player.PlayerSkin
 //?}
 
 //? if >= 1.21.8 {
-import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.resources.Identifier
 import org.polyfrost.polyplus.client.PolyPlusSentry
-import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
-import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
-import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
-import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
-import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.pets.PetAsset
+import org.polyfrost.polyplus.client.pets.PetAssets
+import org.polyfrost.polyplus.client.pets.PetPreview
 import java.util.UUID
 //?}
 
 //? if >= 1.21.4 {
 import com.mojang.blaze3d.ProjectionType
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState
 import org.polyfrost.polyplus.client.cosmetics.access.AvatarEmoteRenderAccess
+import org.polyfrost.polyplus.client.cosmetics.signals.PlayerSignalsRenderAccess
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController
 //?}
 
@@ -130,13 +124,9 @@ import com.mojang.blaze3d.textures.GpuTexture
 /*import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer
 *///?}
 
-//? if >= 1.21.8 && < 1.21.11 {
-/*import net.minecraft.client.renderer.RenderType
-*///?}
-
 //? if = 1.21.8 {
-/*import net.minecraft.client.renderer.MultiBufferSource
-import net.minecraft.client.renderer.entity.state.PlayerRenderState as AvatarRenderState
+/*import net.minecraft.client.renderer.entity.state.PlayerRenderState as AvatarRenderState
+import net.minecraft.world.entity.HumanoidArm
 import net.minecraft.world.entity.player.PlayerModelPart as SkinLayer
 *///?}
 
@@ -154,6 +144,7 @@ import org.polyfrost.polyplus.mixin.client.cosmetics.EntityRenderDispatcherAcces
 
 //? if < 1.21.8 {
 /*import net.minecraft.world.entity.HumanoidArm
+import org.polyfrost.polyplus.client.pets.PetPreview
 import org.polyfrost.polyplus.mixin.client.access.MinecraftAccessor
 *///?}
 
@@ -223,7 +214,9 @@ object PlayerPreviewRenderer {
     private val tintByEntityId = ConcurrentHashMap<Int, PreviewTint>()
 
     @JvmStatic
-    fun previewEquipment(entityId: Int): CosmeticEquipment? = equipmentByEntityId[entityId]
+    fun previewEquipment(entityId: Int): CosmeticEquipment? = if (equipmentByEntityId.isEmpty()) null else equipmentByEntityId[entityId]
+
+    fun heldCosmetics() = equipmentByEntityId.values.flatMap { equipment -> equipment.equipped().map { it.cosmetic } }
 
     @Volatile
     private var renderingPreview = false
@@ -278,6 +271,18 @@ object PlayerPreviewRenderer {
 
     fun release(key: Any) {
         if (retainCounts.computeIfPresent(key) { _, n -> (n - 1).takeIf { it > 0 } } == null) latestByKey.remove(key)
+        dropHoldersIfIdle()
+    }
+
+    @JvmStatic
+    fun dropHoldersIfIdle() {
+        if (retainCounts.isNotEmpty() || PlayerPreviewOffscreen.hasEntries()) return
+        equipmentByEntityId.clear()
+        tintByEntityId.clear()
+        //? if >= 1.21.8 {
+        cachedLocalEquipment = null
+        cachedLocalKey = null
+        //?}
     }
 
     private inline fun publish(key: Any, bitmap: () -> ImageBitmap) {
@@ -305,6 +310,7 @@ object PlayerPreviewRenderer {
         ClientPlatform.runOnMain {
             runCatching { renderAndReadback(source, yawDeg, pitchDeg, w, h, modelScale, verticalAnchor, key) }
                 .onFailure { LOG.error("[preview] capture failed", it) }
+            dropHoldersIfIdle()
         }
         return latestByKey[key]
         //?} else {
@@ -313,6 +319,7 @@ object PlayerPreviewRenderer {
         ClientPlatform.runOnMain {
             runCatching { renderLegacy(source, yawDeg, w, h, modelScale, verticalAnchor, key) }
                 .onFailure { LEGACY_LOG.error("[preview] legacy capture failed", it) }
+            dropHoldersIfIdle()
         }
         return latestByKey[key]
         *///?}
@@ -615,18 +622,18 @@ object PlayerPreviewRenderer {
         //? if >= 26.3 {
         val submitStorage = SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
+        previewPet(source)?.let { PetPreview.submit(it, pose, submitStorage, state.lightCoords, yawDeg, state.mainArm == HumanoidArm.LEFT, state.walkAnimationPos, state.walkAnimationSpeed) }
         renderFeatures(mc, submitStorage)
         //?} elif >= 26.2 {
         /*val features = mc.gameRenderer.featureRenderDispatcher()
         val submitStorage = SubmitNodeStorage()
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, submitStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, submitStorage, state.lightCoords, yawDeg) }
+        previewPet(source)?.let { PetPreview.submit(it, pose, submitStorage, state.lightCoords, yawDeg, state.mainArm == HumanoidArm.LEFT, state.walkAnimationPos, state.walkAnimationSpeed) }
         features.renderAllFeatures(submitStorage)
         *///?} else {
         /*val features = mc.gameRenderer.featureRenderDispatcher
         mc.entityRenderDispatcher.submit(state, camera, 0.0, 0.0, 0.0, pose, features.submitNodeStorage)
-        previewPet(source)?.let { submitPreviewPet(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg) }
+        previewPet(source)?.let { PetPreview.submit(it, pose, features.submitNodeStorage, state.lightCoords, yawDeg, state.mainArm == HumanoidArm.LEFT, state.walkAnimationPos, state.walkAnimationSpeed) }
         features.renderAllFeatures()
         mc.renderBuffers().bufferSource().endBatch()
         *///?}
@@ -648,6 +655,8 @@ object PlayerPreviewRenderer {
         if (mc.entityRenderDispatcher.getRenderer(player) == null) return
         val state = mc.entityRenderDispatcher.extractEntity(player, 1.0f) as? AvatarRenderState ?: return
         state.lightCoords = 0xF000F0
+        state.nameTag = null
+        state.scoreText = null
         state.ageInTicks = previewTicks()
         // the dummy's skin customisation data is never synced, which hides every outer layer; match directState
         state.showHat = true
@@ -668,6 +677,7 @@ object PlayerPreviewRenderer {
         state.boundingBoxWidth /= state.scale
         state.boundingBoxHeight = bbH
         state.scale = 1f
+        applyTryOn(state)
 
         val pose = previewPose(w, h, modelScale, verticalAnchor, bbH)
         setupUiLighting(mc)
@@ -724,6 +734,7 @@ object PlayerPreviewRenderer {
         state.boundingBoxWidth = PLAYER_BB_WIDTH
         state.boundingBoxHeight = PLAYER_BB_HEIGHT
         state.scale = 1f
+        applyTryOn(state)
         val bbH = PLAYER_BB_HEIGHT
 
         val pose = previewPose(w, h, modelScale, verticalAnchor, bbH)
@@ -736,7 +747,7 @@ object PlayerPreviewRenderer {
         mc.entityRenderDispatcher.setRenderShadow(false)
         try {
             mc.entityRenderDispatcher.render(state, 0.0, 0.0, 0.0, pose, bufferSource, 0xF000F0)
-            renderPreviewPetLegacy(previewPet(source), pose, bufferSource, yawDeg)
+            previewPet(source)?.let { PetPreview.render(it, pose, bufferSource, yawDeg, state.mainArm == HumanoidArm.LEFT, state.walkAnimationPos, state.walkAnimationSpeed) }
             bufferSource.endBatch()
         } finally {
             mc.entityRenderDispatcher.setRenderShadow(true)
@@ -744,112 +755,23 @@ object PlayerPreviewRenderer {
         *///?}
     }
 
-    private fun previewPet(source: PlayerPreviewSource): PetDefinition? = when (source) {
+    private fun previewPet(source: PlayerPreviewSource): PetAsset? = when (source) {
         is PlayerPreviewSource.Override -> source.pet
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
-                ?.let { CosmeticAssetCache.getPetDefinition(it) }
+                ?.let { PetAssets.get(it) }
     }
-
-    private val previewPetModelCache =
-        ConcurrentHashMap<Int, BedrockStandaloneModel>()
-
-    private fun idlePetPose(definition: PetDefinition): Map<String, BoneTransform> {
-        val animationName = definition.stateMap["idle"] ?: definition.stateMap.values.firstOrNull()
-        val animation = animationName?.let { definition.animations[it] } ?: return emptyMap()
-        val timeTicks = BedrockAnimationPlayback.resolveTimeTicks(
-            animation,
-            (System.nanoTime() / 50_000_000L).toFloat(),
-        )
-        return AnimationSampler.sample(animation, timeTicks, null, mutableMapOf())
-    }
-
-    private const val PREVIEW_PET_SIDE_OFFSET = -0.65
-
-    private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
-
-    private fun previewTextureFrame(definition: PetDefinition): Pair<Float, Float> {
-        val frameCount = definition.textureFrameCount
-        if (frameCount <= 1) return 1f to 0f
-        val ticks = System.nanoTime() / 50_000_000L
-        val frame = (ticks / PREVIEW_TICKS_PER_TEXTURE_FRAME) % frameCount
-        return (1f / frameCount) to (frame.toFloat() / frameCount)
-    }
-
-    //? if >= 1.21.10 {
-    private fun submitPreviewPet(
-        definition: PetDefinition,
-        poseStack: PoseStack,
-        submitNodeCollector: SubmitNodeCollector,
-        lightCoords: Int,
-        yawDeg: Float,
-    ) {
-        val model = previewPetModelCache.getOrPut(definition.id) {
-            BedrockStandaloneModel.build(definition.geometry)
-        }
-        val pose = idlePetPose(definition)
-        model.resetPose()
-        if (pose.isNotEmpty()) model.applyPose(pose, 1f)
-
-        //? if >= 26.1 {
-        val renderType = RenderTypes.entityCutout(definition.texture)
-        //?} elif >= 1.21.11 {
-        /*val renderType = RenderTypes.entityCutoutNoCull(definition.texture)
-        *///?} else {
-        /*val renderType = RenderType.entityCutoutNoCull(definition.texture)
-        *///?}
-
-        poseStack.pushPose()
-        poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
-        poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.rotateBy(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
-        val (vScale, vOffset) = previewTextureFrame(definition)
-        submitNodeCollector.submitCustomGeometry(poseStack, renderType) { basePose, buffer ->
-            val localStack = PoseStack()
-            localStack.last().set(basePose)
-            for (root in model.roots) {
-                root.render(localStack, buffer, lightCoords, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
-            }
-        }
-        poseStack.popPose()
-    }
-    //?} else {
-    /*private fun renderPreviewPetLegacy(
-        definition: PetDefinition?,
-        poseStack: PoseStack,
-        bufferSource: MultiBufferSource,
-        yawDeg: Float,
-    ) {
-        if (definition == null) return
-        val model = previewPetModelCache.getOrPut(definition.id) {
-            BedrockStandaloneModel.build(definition.geometry)
-        }
-        val pose = idlePetPose(definition)
-        model.resetPose()
-        if (pose.isNotEmpty()) model.applyPose(pose, 1f)
-
-        val buffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(definition.texture))
-        poseStack.pushPose()
-        poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0.0, 0.0)
-        poseStack.scale(-definition.scale, -definition.scale, definition.scale)
-        poseStack.rotateBy(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
-        val (vScale, vOffset) = previewTextureFrame(definition)
-        for (root in model.roots) {
-            root.render(poseStack, buffer, 0xF000F0, OverlayTexture.NO_OVERLAY, vScale = vScale, vOffset = vOffset)
-        }
-        poseStack.popPose()
-    }
-    *///?}
 
     private val loadAttempted = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
 
     private var cachedLocalEquipment: CosmeticEquipment? = null
-    private var cachedLocalKey: List<String>? = null
+    private var cachedLocalKey: List<Any>? = null
 
     private fun localEquipment(): CosmeticEquipment {
-        val ids = CosmeticCatalog.localEquipped().ids()
-        val resolved = ids.map { id -> CosmeticAssetCache.getAttachedCosmetic(id) }
-        val key = ids.mapIndexed { i, id -> if (resolved[i] != null) "$id" else "$id:pending" }
+        val worn = CosmeticCatalog.localEquipped().equipped.entries.toList()
+        val ids = worn.map { it.value }
+        val resolved = worn.map { (slot, id) -> CosmeticAssetCache.getAttachedCosmetic(id)?.copy(slot = slot) }
+        val key = worn.mapIndexed { i, (slot, id) -> Triple(slot, id, resolved[i]) }
         cachedLocalEquipment?.let { if (cachedLocalKey == key) return it }
 
         val equipment = CosmeticEquipment()
@@ -976,16 +898,20 @@ object PlayerPreviewRenderer {
                 CosmeticAssetCache.getCapeResource(it)
             } ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
-            CosmeticCatalog.localEquipped().cape?.let {
+            if (localEngineCape()) null
+            else CosmeticCatalog.localEquipped().cape?.let {
                 CosmeticAssetCache.getCapeResource(it)
             } ?: MojangCapeService.localCapeTexture()?.takeIf { mojangCapeChosen() }
     }
 
     private fun hidesCape(source: PlayerPreviewSource): Boolean = when (source) {
-        is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null
-        PlayerPreviewSource.LocalLive ->
+        is PlayerPreviewSource.Override -> source.capeCosmeticId == null && source.mojangCape == null ||
+            source.capeCosmeticId?.let(CosmeticAssetCache::isEngineCape) == true
+        PlayerPreviewSource.LocalLive -> localEngineCape() ||
             CosmeticCatalog.localEquipped().cape == null && MojangCapeService.localCapeHidden() && mojangCapeChosen()
     }
+
+    private fun localEngineCape(): Boolean = CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::isEngineCape) == true
 
     private fun mojangCapeChosen(): Boolean = MojangCapeService.overridesLocalCape(ClientPlatform.localPlayerUuid())
 
@@ -997,6 +923,22 @@ object PlayerPreviewRenderer {
         PlayerSkin(skin.texture(), skin.textureUrl(), cape, skin.elytraTexture(), skin.model(), skin.secure())
     *///?}
 
+    //? if >= 1.21.4 {
+    private fun applyTryOn(state: HumanoidRenderState) {
+        PreviewTryOn.yaw = state.bodyRot
+        (state as? PlayerSignalsRenderAccess)?.`polyplus$setSignals`(PreviewTryOn.previewSignals())
+        val tryOn = PreviewTryOn.current ?: return
+        if (tryOn.crouching()) state.isCrouching = true
+        val legs = tryOn.walkSpeed()
+        if (legs > 0f) {
+            state.walkAnimationSpeed = legs
+            state.walkAnimationPos = previewTicks() * legs * WALK_CYCLE_PER_TICK
+        }
+    }
+
+    private const val WALK_CYCLE_PER_TICK = 0.6f
+    //?}
+
     //? if < 1.21.8 {
     /*private val LEGACY_LOG = LoggerFactory.getLogger("polyplus/preview")
     private const val LEGACY_MAX_DIM = 512
@@ -1004,6 +946,9 @@ object PlayerPreviewRenderer {
     private var legacyTarget: TextureTarget? = null
     //? if < 1.21.4 {
     /*private var legacyDummy: PreviewRemotePlayer? = null
+
+    @JvmStatic
+    fun isPreviewEntity(entity: Any?): Boolean = entity != null && entity === legacyDummy
     *///?}
 
     private fun ensureLegacyTarget(w: Int, h: Int): TextureTarget {
@@ -1211,12 +1156,13 @@ object PlayerPreviewRenderer {
         Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
 
     private var cachedLegacyEquipment: CosmeticEquipment? = null
-    private var cachedLegacyKey: List<String>? = null
+    private var cachedLegacyKey: List<Any>? = null
 
     private fun legacyLocalEquipment(): CosmeticEquipment {
-        val ids = CosmeticCatalog.localEquipped().ids()
-        val resolved = ids.map { id -> CosmeticAssetCache.getAttachedCosmetic(id) }
-        val key = ids.mapIndexed { i, id -> if (resolved[i] != null) "$id" else "$id:pending" }
+        val worn = CosmeticCatalog.localEquipped().equipped.entries.toList()
+        val ids = worn.map { it.value }
+        val resolved = worn.map { (slot, id) -> CosmeticAssetCache.getAttachedCosmetic(id)?.copy(slot = slot) }
+        val key = worn.mapIndexed { i, (slot, id) -> Triple(slot, id, resolved[i]) }
         cachedLegacyEquipment?.let { if (cachedLegacyKey == key) return it }
 
         val equipment = CosmeticEquipment()
@@ -1300,6 +1246,7 @@ object PlayerPreviewRenderer {
         val state = legacyState(skin, yawDeg)
         if (hidesCape(source)) state.showCape = false
         applyLegacySkinOptions(mc, state, source)
+        applyTryOn(state)
         val renderer = legacyPlayerRenderer(mc, skin) ?: return false
         //?}
         //? if < 1.21.4 {
@@ -1321,6 +1268,7 @@ object PlayerPreviewRenderer {
         player.xo = 0.0; player.yo = 0.0; player.zo = 0.0
         player.xCloak = 0.0; player.yCloak = 0.0; player.zCloak = 0.0
         player.xCloakO = 0.0; player.yCloakO = 0.0; player.zCloakO = 0.0
+        PreviewTryOn.yaw = yawDeg
         *///?}
 
         //? if < 1.21.5 {
@@ -1382,6 +1330,7 @@ object PlayerPreviewRenderer {
             dispatcher.overrideCameraOrientation(Quaternionf().rotateY(Math.PI.toFloat()))
             dispatcher.getRenderer(player)?.render(player, 0f, 1f, pose, bufferSource, 0xF000F0)
             *///?}
+            PetPreview.renderEquipped(source, pose, bufferSource, yawDeg)
             //? if < 1.21.5
             //fbo.bindWrite(true)
             bufferSource.endBatch()
@@ -1472,12 +1421,9 @@ import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
 import org.joml.Quaternionf
-import org.polyfrost.polyplus.client.bedrock.model.BedrockStandaloneModel
-import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
-import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
-import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
-import org.polyfrost.polyplus.client.cosmetics.PetDefinition
-import org.polyfrost.polyplus.client.render.VertexConsumer
+import org.polyfrost.polyplus.client.pets.PetAsset
+import org.polyfrost.polyplus.client.pets.PetAssets
+import org.polyfrost.polyplus.client.pets.PetPreview
 import org.polyfrost.polyplus.client.utils.Easing
 import org.polyfrost.polyplus.client.utils.rotateBy
 import org.polyfrost.polyplus.client.utils.runSuspendCatching
@@ -1489,6 +1435,8 @@ import org.polyfrost.polyplus.client.cosmetics.LocalSkinOverride
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.render.CosmeticRenderer
+import org.polyfrost.polyplus.client.cosmetics.render.CosmeticWearers
+import org.polyfrost.polyplus.client.cosmetics.sets.BonusEffects
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
 import org.polyfrost.polyplus.client.render.PoseStack
@@ -1525,6 +1473,15 @@ object PlayerPreviewRenderer {
 
     fun release(key: Any) {
         if (retainCounts.computeIfPresent(key) { _, n -> (n - 1).takeIf { it > 0 } } == null) latestByKey.remove(key)
+        dropHoldersIfIdle()
+    }
+
+    @JvmStatic
+    fun dropHoldersIfIdle() {
+        if (retainCounts.isNotEmpty() || PlayerPreviewOffscreen.hasEntries()) return
+        drawnEquipment = null
+        cachedLocalEquipment = null
+        cachedLocalKey = null
     }
 
     fun capture(
@@ -1548,6 +1505,7 @@ object PlayerPreviewRenderer {
                 latestByKey[key] = bmp
                 if (!retainCounts.containsKey(key)) latestByKey.remove(key, bmp)
             }.onFailure { LOG.error("[preview] capture failed", it) }
+            dropHoldersIfIdle()
         }
         return latestByKey[key]
     }
@@ -1660,7 +1618,8 @@ object PlayerPreviewRenderer {
         GlStateManager.popMatrix()
         GlStateManager.enableRescaleNormal()
         GlStateManager.disableCull()
-        previewPet(source)?.let { drawPreviewPet(it, yawDeg) }
+        PreviewTryOn.yaw = yawDeg
+        previewPet(source)?.let { PetPreview.draw(it, yawDeg) }
         GlStateManager.rotatef(yawDeg, 0f, 1f, 0f)
         GlStateManager.scalef(0.9375f, 0.9375f, 0.9375f)
         GlStateManager.translatef(0f, -1.5078125f, 0f)
@@ -1701,7 +1660,7 @@ object PlayerPreviewRenderer {
         GlStateManager.disableBlend()
 
         val equipment = equipmentFor(source)
-        if (equipment.equipped().isNotEmpty()) {
+        if (equipment.equipped().isNotEmpty() || BonusEffects.active(null, true)) {
             val renderContext = PlayerRenderContext(
                 ageInTicks = mc.player?.ticks?.toFloat() ?: 0f,
                 walkAnimationSpeed = 0f,
@@ -1710,6 +1669,7 @@ object PlayerPreviewRenderer {
                 isInWater = false,
                 swimAmount = 0f,
                 isInvisible = false,
+                signals = PreviewTryOn.previewSignals(),
             )
             CosmeticRenderer.render(
                 PoseStack(),
@@ -1720,6 +1680,7 @@ object PlayerPreviewRenderer {
                 particleColor(source),
                 false,
                 emptySet(),
+                CosmeticWearers.previewWearer(),
             )
         }
 
@@ -1730,55 +1691,11 @@ object PlayerPreviewRenderer {
         GlStateManager.disableColorMaterial()
     }
 
-    private fun previewPet(source: PlayerPreviewSource): PetDefinition? = when (source) {
+    private fun previewPet(source: PlayerPreviewSource): PetAsset? = when (source) {
         is PlayerPreviewSource.Override -> source.pet
         PlayerPreviewSource.LocalLive ->
             CosmeticCatalog.localEquipped().equipped[BodySlot.Pet]
-                ?.let { CosmeticAssetCache.getPetDefinition(it) }
-    }
-
-    private val previewPetModelCache = ConcurrentHashMap<Int, BedrockStandaloneModel>()
-
-    private fun idlePetPose(definition: PetDefinition): Map<String, BoneTransform> {
-        val animationName = definition.stateMap["idle"] ?: definition.stateMap.values.firstOrNull()
-        val animation = animationName?.let { definition.animations[it] } ?: return emptyMap()
-        val timeTicks = BedrockAnimationPlayback.resolveTimeTicks(
-            animation,
-            (System.nanoTime() / 50_000_000L).toFloat(),
-        )
-        return AnimationSampler.sample(animation, timeTicks, null, mutableMapOf())
-    }
-
-    private const val PREVIEW_PET_SIDE_OFFSET = -0.65f
-
-    private const val PREVIEW_TICKS_PER_TEXTURE_FRAME = 4
-
-    private fun previewTextureFrame(definition: PetDefinition): Pair<Float, Float> {
-        val frameCount = definition.textureFrameCount
-        if (frameCount <= 1) return 1f to 0f
-        val ticks = System.nanoTime() / 50_000_000L
-        val frame = (ticks / PREVIEW_TICKS_PER_TEXTURE_FRAME) % frameCount
-        return (1f / frameCount) to (frame.toFloat() / frameCount)
-    }
-
-    private fun drawPreviewPet(definition: PetDefinition, yawDeg: Float) {
-        val model = previewPetModelCache.getOrPut(definition.id) {
-            BedrockStandaloneModel.build(definition.geometry)
-        }
-        val pose = idlePetPose(definition)
-        model.resetPose()
-        if (pose.isNotEmpty()) model.applyPose(pose, 1f)
-
-        val poseStack = PoseStack()
-        poseStack.translate(PREVIEW_PET_SIDE_OFFSET, 0f, 0f)
-        poseStack.scale(-definition.scale, definition.scale, -definition.scale)
-        poseStack.rotateBy(Quaternionf().rotateY(Math.toRadians((180f + yawDeg).toDouble()).toFloat()))
-        val (vScale, vOffset) = previewTextureFrame(definition)
-        VertexConsumer.draw(definition.texture, false) { buffer ->
-            for (root in model.roots) {
-                root.render(poseStack, buffer, FULL_BRIGHT, 0, vScale = vScale, vOffset = vOffset)
-            }
-        }
+                ?.let { PetAssets.get(it) }
     }
 
     private fun capeFor(mc: Minecraft, source: PlayerPreviewSource): Identifier? = when (source) {
@@ -1786,7 +1703,8 @@ object PlayerPreviewRenderer {
             if (source.equipment.get(BodySlot.Backpack) != null) null
             else source.capeCosmeticId?.let(CosmeticAssetCache::getCapeResource) ?: source.mojangCape
         PlayerPreviewSource.LocalLive ->
-            CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
+            if (CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::isEngineCape) == true) null
+            else CosmeticCatalog.localEquipped().cape?.let(CosmeticAssetCache::getCapeResource)
                 ?: if (!MojangCapeService.overridesLocalCape(ClientPlatform.localPlayerUuid())) playerCape(mc)
                 else MojangCapeService.localCapeTexture()
                     ?: if (MojangCapeService.localCapeHidden()) null else playerCape(mc)
@@ -1794,19 +1712,24 @@ object PlayerPreviewRenderer {
 
     private fun playerCape(mc: Minecraft): Identifier? = mc.player?.capeTextureLocation ?: optifineCape(mc) ?: accountCape(mc)
 
+    private var drawnEquipment: CosmeticEquipment? = null
+
+    fun heldCosmetics() = drawnEquipment?.equipped()?.map { it.cosmetic }.orEmpty()
+
     private fun equipmentFor(source: PlayerPreviewSource): CosmeticEquipment = when (source) {
         is PlayerPreviewSource.Override -> source.equipment
         PlayerPreviewSource.LocalLive -> localEquipment()
-    }
+    }.also { drawnEquipment = it }
 
     private val loadAttempted = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
     private var cachedLocalEquipment: CosmeticEquipment? = null
-    private var cachedLocalKey: List<String>? = null
+    private var cachedLocalKey: List<Any>? = null
 
     private fun localEquipment(): CosmeticEquipment {
-        val ids = CosmeticCatalog.localEquipped().ids()
-        val resolved = ids.map { id -> CosmeticAssetCache.getAttachedCosmetic(id) }
-        val key = ids.mapIndexed { i, id -> if (resolved[i] != null) "$id" else "$id:pending" }
+        val worn = CosmeticCatalog.localEquipped().equipped.entries.toList()
+        val ids = worn.map { it.value }
+        val resolved = worn.map { (slot, id) -> CosmeticAssetCache.getAttachedCosmetic(id)?.copy(slot = slot) }
+        val key = worn.mapIndexed { i, (slot, id) -> Triple(slot, id, resolved[i]) }
         cachedLocalEquipment?.let { if (cachedLocalKey == key) return it }
 
         val equipment = CosmeticEquipment()

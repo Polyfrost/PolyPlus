@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +40,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.Text
 import org.polyfrost.oneconfig.api.ui.v1.components.TextButton
 import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
 import org.polyfrost.polyplus.client.gui.SocialDangerText
 import org.polyfrost.polyplus.client.gui.SocialSuccessText
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
@@ -168,6 +170,8 @@ internal fun StoreDetailPanel(
     rotation: PreviewRotation? = null,
     onResetRotation: () -> Unit = {},
 ) {
+    val tryInfo = rememberTryInfo(variant?.pieces)
+    val tryOn = rememberTryOn(variant?.id)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
             modifier = Modifier.fillMaxWidth().height(330.dp)
@@ -192,9 +196,11 @@ internal fun StoreDetailPanel(
                     previewKey = "store-detail-${variant.id}",
                     live = true,
                     rotation = rotation,
+                    tryOn = tryOn,
                 )
                 OwnershipBadge(variant.id in ownedIds, info.createdAt, Modifier.padding(12.dp))
                 ResetRotationButton(rotation, onResetRotation)
+                TryOnBar(tryInfo, tryOn, Modifier.align(Alignment.BottomCenter).padding(12.dp))
             }
         }
 
@@ -221,6 +227,8 @@ internal fun StoreDetailPanel(
                                     ownedVariantIds = ownedIds,
                                 )
                             }
+                            StoreColours(variant, variant.id in ownedIds)
+                            TryOnLines(tryInfo)
                             if (info.tags.all.isNotEmpty()) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     for (tag in info.tags.all.take(4)) {
@@ -261,6 +269,45 @@ internal fun StoreDetailPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun StoreColours(variant: CosmeticVariantUi, owned: Boolean) {
+    val colours = rememberCustomColours(variant.pieces, owned = true) ?: return
+    val theme = OneConfigTheme.current
+    val message = ColourSaves.noteFor(colours.ids)
+    if (!colours.editing) {
+        message?.let { Text(it, color = theme.textColorSecondary, style = theme.typography.small) }
+        TextButton(
+            if (colours.saving) "Saving..." else "Try your own colors",
+            onClick = {
+                ColourSaves.note(colours.ids, null)
+                colours.open()
+            },
+            size = ControlSize.Compact,
+            sound = null,
+            enabled = !colours.saving,
+        )
+        return
+    }
+    val ready = colours.ready
+    LaunchedEffect(ready) { colours.refreshDraft() }
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .themedSurface(SurfaceKind.Field, OneConfigTheme.shape(12.dp), glass = false)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Your colors", color = theme.textColorSecondary, style = theme.typography.small)
+        SlotList(colours)
+        if (!owned) Text("Buy it to keep your colors.", color = theme.textColorSecondary, style = theme.typography.small)
+        message?.let { Text(it, color = theme.textColorSecondary, style = theme.typography.small) }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (owned) SaveColoursButton(colours, ready) {}
+            TextButton(text = "Close", onClick = { colours.close() }, size = ControlSize.Compact, sound = null)
+            TextButton(text = "Start over", onClick = { colours.resetDraft() }, size = ControlSize.Compact, sound = null, enabled = !colours.saving)
         }
     }
 }

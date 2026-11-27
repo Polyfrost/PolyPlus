@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,8 +36,10 @@ import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
+import org.polyfrost.polyplus.client.cosmetics.sets.DiscoveredBonuses
 import org.polyfrost.polyplus.client.gui.preview.PreviewRotation
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticGroupKey
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 
@@ -46,14 +49,14 @@ internal fun WardrobeShell(
     ownedIds: Set<Int>,
     cart: List<CartEntry>,
     status: String?,
-    variantPicks: Map<Int, Int>,
+    variantPicks: Map<CosmeticGroupKey, Int>,
     auraColor: Int?,
     historyReloadKey: Int,
     onStatus: (String) -> Unit,
     onRefresh: () -> Unit,
     onPreviewAuraColor: (Int) -> Unit,
     onSelectAuraColor: (Int?) -> Unit,
-    onSelectVariant: (Int, Int) -> Unit,
+    onSelectVariant: (CosmeticGroupKey, Int) -> Unit,
     onEquip: (CosmeticUiItem) -> Unit,
     onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
     onBuyNow: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
@@ -99,7 +102,10 @@ internal fun WardrobeShell(
     LaunchedEffect(section) {
         if (!polyPlusAvailable) return@LaunchedEffect
         when (section) {
-            WardrobeSection.Outfits -> OutfitLibrary.refreshIfNeeded(reload = true)
+            WardrobeSection.Outfits -> {
+                OutfitLibrary.refreshIfNeeded(reload = true)
+                DiscoveredBonuses.ensureLoaded()
+            }
             WardrobeSection.Skins -> {
                 SkinLibrary.refreshIfNeeded()
                 OutfitLibrary.refreshIfNeeded()
@@ -109,8 +115,9 @@ internal fun WardrobeShell(
     }
     val outfitKey = listOf(OutfitLibrary.outfits, OutfitLibrary.activeOutfitId, OutfitLibrary.state, OutfitLibrary.limit)
     val skinKey = listOf(SkinLibrary.skins, SkinLibrary.state, SkinLibrary.wornSkinId(), SkinLibrary.limit)
-    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, store.featuredLoading, store.failedTypes, store.featuredFailed, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey) {
-        buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning)
+    val discovered by DiscoveredBonuses.bonuses.collectAsState()
+    val entries = remember(section, items, ownedIds, store.byType, store.popular, store.newest, store.bundles, store.loading, store.featuredLoading, store.failedTypes, store.featuredFailed, mojangState, query, sort, emoteKeybindWarning, outfitKey, skinKey, discovered) {
+        buildWardrobeEntries(section, items, ownedIds, store, mojangState, query, sort, polyPlusAvailable, emoteKeybindWarning, discovered)
     }
     val coverByVariant = remember(store.byType, store.popular, store.newest) { store.coversByVariant() }
     val anchors = remember(entries) {
@@ -127,7 +134,7 @@ internal fun WardrobeShell(
         if (target != null) gridState.scrollToItem(target.first, target.second) else gridState.scrollToItem(0)
     }
 
-    val selectedOwned = (selection as? WardrobeSelection.Owned)?.let { sel -> items.firstOrNull { it.groupId == sel.groupId && it.type == sel.type } }
+    val selectedOwned = (selection as? WardrobeSelection.Owned)?.let { sel -> items.firstOrNull { it.key == sel.key && it.type == sel.type } }
     val selectedShop = (selection as? WardrobeSelection.Shop)?.let { sel -> store.all.firstOrNull { it.id == sel.infoId } }
     val selectedMojang = (selection as? WardrobeSelection.Mojang)?.let { sel ->
         (mojangState as? MojangCapeState.Loaded)?.capes?.firstOrNull { it.id == sel.capeId }
@@ -238,7 +245,7 @@ internal fun WardrobeShell(
                         if (wheelMode && item.type == CosmeticType.Emote) {
                             addToWheel(item)
                         } else {
-                            selection = WardrobeSelection.Owned(item.groupId, item.type)
+                            selection = WardrobeSelection.Owned(item.key, item.type)
                             showCart = false
                             onEquip(item)
                         }
@@ -247,13 +254,13 @@ internal fun WardrobeShell(
                         if (wheelMode && item.type == CosmeticType.Emote) {
                             addToWheel(item)
                         } else {
-                            selection = WardrobeSelection.Owned(item.groupId, item.type)
+                            selection = WardrobeSelection.Owned(item.key, item.type)
                             previewRequest++
                             showCart = false
                         }
                     },
                     onPreviewOwned = { item ->
-                        selection = WardrobeSelection.Owned(item.groupId, item.type)
+                        selection = WardrobeSelection.Owned(item.key, item.type)
                         previewRequest++
                         showCart = false
                     },
@@ -261,7 +268,7 @@ internal fun WardrobeShell(
                     onShop = { info ->
                         val ownedItem = items.firstOrNull { item -> item.owned && info.variantList.any { v -> item.variants.any { it.id == v.id } } }
                             ?.takeIf { info.fullyOwned(ownedIds) }
-                        selection = if (ownedItem != null) WardrobeSelection.Owned(ownedItem.groupId, ownedItem.type) else WardrobeSelection.Shop(info.id)
+                        selection = if (ownedItem != null) WardrobeSelection.Owned(ownedItem.key, ownedItem.type) else WardrobeSelection.Shop(info.id)
                         showCart = false
                     },
                     onPickStoreVariant = { infoId, variantId -> storeVariantPicks[infoId] = variantId },
@@ -386,7 +393,7 @@ internal fun WardrobeShell(
                             heading = previewHeading,
                             status = status,
                             selectedVariantId = selectedOwned?.let { selectedVariantId(it, variantPicks) },
-                            onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.groupId, variantId) } },
+                            onSelectVariant = { variantId -> selectedOwned?.let { onSelectVariant(it.key, variantId) } },
                             rotation = previewRotation,
                             onResetRotation = resetRotation,
                             selectionPreview = selectionPreview,
@@ -394,6 +401,7 @@ internal fun WardrobeShell(
                             auraColor = auraColor,
                             onPreviewAuraColor = onPreviewAuraColor,
                             onSelectAuraColor = onSelectAuraColor,
+                            onStatus = onStatus,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

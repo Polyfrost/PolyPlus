@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
@@ -69,28 +70,37 @@ internal fun AuraSwatchRow(
     customOpen: Boolean,
     onToggleCustom: () -> Unit,
     onCommit: (Int?) -> Unit,
+    enabled: Boolean = true,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+    val disabledAlpha = OneConfigTheme.current.disabledAlpha
+    Row(
+        modifier = Modifier.graphicsLayer { alpha = if (enabled) 1f else disabledAlpha },
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         AuraDot(
             color = Color(DEFAULT_AURA_ARGB),
             isSelected = selectedColor == null,
-            label = "Default aura colour",
+            label = "Default aura color",
             onClick = { onCommit(null) },
+            enabled = enabled,
         )
         for (color in AURA_PRESETS) {
             AuraDot(
                 color = Color(color),
                 isSelected = selectedColor == color,
-                label = "Aura colour ${auraHex(color)}",
+                label = "Aura color ${auraHex(color)}",
                 onClick = { onCommit(color) },
+                enabled = enabled,
             )
         }
         val isCustom = selectedColor != null && selectedColor !in AURA_PRESETS
         AuraDot(
             color = if (isCustom) Color(selectedColor!!) else OneConfigTheme.current.componentBackground,
             isSelected = isCustom || customOpen,
-            label = "Custom aura colour",
+            label = "Custom aura color",
             onClick = onToggleCustom,
+            enabled = enabled,
         ) {
             if (!isCustom) {
                 Text("+", color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.current.typography.body.copy(fontSize = 11.sp))
@@ -105,13 +115,14 @@ private fun AuraDot(
     isSelected: Boolean,
     label: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     content: @Composable () -> Unit = {},
 ) {
     val shape = OneConfigTheme.shape(6.dp)
     Box(
         modifier = Modifier.size(18.dp)
             .clip(shape)
-            .oneConfigClickable(label, onClick, selected = isSelected, shape = shape, indication = false, sound = null),
+            .oneConfigClickable(label, onClick, enabled = enabled, selected = isSelected, shape = shape, indication = false, sound = null),
         contentAlignment = Alignment.Center,
     ) {
         Checkerboard(Modifier.fillMaxSize())
@@ -143,6 +154,8 @@ private val AURA_COLORS: List<Int> = listOf(
 )
 
 private const val DEFAULT_AURA_ARGB: Int = -1
+
+private const val OPAQUE: Int = 0xFF shl 24
 
 private val AURA_PRESETS: List<Int> = AURA_COLORS.filter { it != DEFAULT_AURA_ARGB }
 
@@ -225,14 +238,18 @@ internal fun AuraColorPopup(
     onCommit: (Int?) -> Unit,
     onDismiss: () -> Unit,
     gap: Dp = 4.dp,
+    title: String = "Aura Color",
+    withAlpha: Boolean = true,
+    placement: Placement = Placement.BelowEnd,
+    enabled: Boolean = true,
 ) {
     EscapeCloses(onDismiss)
     Popup(
-        popupPositionProvider = rememberAnchoredPosition(Placement.BelowEnd, gap),
+        popupPositionProvider = rememberAnchoredPosition(placement, gap),
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        AuraCustomPopover(selectedColor, onPreview, onCommit)
+        AuraCustomPopover(selectedColor, onPreview, onCommit, title = title, withAlpha = withAlpha, enabled = enabled)
     }
 }
 
@@ -242,14 +259,21 @@ private fun AuraCustomPopover(
     onPreview: (Int) -> Unit,
     onCommit: (Int?) -> Unit,
     modifier: Modifier = Modifier,
+    title: String = "Aura Color",
+    withAlpha: Boolean = true,
+    enabled: Boolean = true,
 ) {
-    val state = remember { AuraPickerState(selectedColor ?: 0xFFFFFFFF.toInt()) }
+    val active by rememberUpdatedState(enabled)
+    val shown = (selectedColor ?: 0xFFFFFFFF.toInt()).let { if (withAlpha) it else it or OPAQUE }
+    val state = remember { AuraPickerState(shown) }
     var hexText by remember { mutableStateOf(argbHex(state.currentArgb())) }
     var hexPending by remember { mutableStateOf(false) }
-    LaunchedEffect(selectedColor) {
-        if (selectedColor != null && selectedColor != state.lastEmitted) {
-            state.applyFrom(selectedColor)
-            hexText = argbHex(selectedColor)
+    LaunchedEffect(shown) {
+        if (shown != state.lastEmitted) {
+            state.applyFrom(shown)
+            state.lastEmitted = shown
+            hexText = argbHex(shown)
+            hexPending = false
         }
     }
 
@@ -283,6 +307,7 @@ private fun AuraCustomPopover(
     val paneShape = OneConfigTheme.shape(16.dp)
     val barShape = OneConfigTheme.shape(6.dp)
     val handleShape = OneConfigTheme.shape(5.dp)
+    val controlAlpha = if (enabled) 1f else theme.disabledAlpha
 
     Column(
         modifier = modifier.width(190.dp)
@@ -293,11 +318,12 @@ private fun AuraCustomPopover(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Aura Color", color = theme.textColorSecondary, style = theme.typography.body.copy(fontSize = 12.sp))
+        Text(title, color = theme.textColorSecondary, style = theme.typography.body.copy(fontSize = 12.sp))
 
         var paneSize by remember { mutableStateOf(Size.Zero) }
         Box(
             modifier = Modifier.fillMaxWidth().height(120.dp)
+                .graphicsLayer { this.alpha = controlAlpha }
                 .clip(barShape)
                 .onSizeChanged { paneSize = Size(it.width.toFloat(), it.height.toFloat()) }
                 .drawWithCache {
@@ -312,6 +338,7 @@ private fun AuraCustomPopover(
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
+                        if (!active) return@awaitEachGesture
                         fun update(x: Float, y: Float) {
                             state.saturation = (x / paneSize.width).coerceIn(0f, 1f)
                             state.brightness = 1f - (y / paneSize.height).coerceIn(0f, 1f)
@@ -345,6 +372,7 @@ private fun AuraCustomPopover(
 
         Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
+                .graphicsLayer { this.alpha = controlAlpha }
                 .clip(barShape)
                 .drawWithCache {
                     val gradient = Brush.horizontalGradient(
@@ -355,6 +383,7 @@ private fun AuraCustomPopover(
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
+                        if (!active) return@awaitEachGesture
                         fun update(x: Float) {
                             state.hue = ((x / size.width) * 360f).coerceIn(0f, 360f)
                             emitPreview()
@@ -385,12 +414,14 @@ private fun AuraCustomPopover(
             )
         }
 
-        Box(
+        if (withAlpha) Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
+                .graphicsLayer { this.alpha = controlAlpha }
                 .clip(barShape)
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
+                        if (!active) return@awaitEachGesture
                         fun update(x: Float) {
                             state.alpha = (x / size.width).coerceIn(0f, 1f)
                             emitPreview()
@@ -429,7 +460,11 @@ private fun AuraCustomPopover(
             )
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.graphicsLayer { this.alpha = controlAlpha },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Box(modifier = Modifier.size(28.dp).clip(handleShape)) {
                 Checkerboard(Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(current.copy(alpha = alpha)))
@@ -449,6 +484,7 @@ private fun AuraCustomPopover(
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { commitHex() }),
+                enabled = enabled,
                 singleLine = true,
                 textStyle = TextStyle(
                     color = theme.textColor,

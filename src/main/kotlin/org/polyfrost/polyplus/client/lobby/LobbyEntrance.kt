@@ -18,10 +18,9 @@ import net.minecraft.world.phys.AABB
 /*import net.minecraft.util.math.Box as AABB
 *///?}
 import net.minecraft.world.phys.Vec3
-import org.polyfrost.polyplus.client.bedrock.BedrockConstants
-import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimationParser
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.emotes.Emote
+import org.polyfrost.polyplus.client.emotes.EmoteBundles
 import java.util.Random
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -306,8 +305,10 @@ object LobbyEntrance {
     const val RUN_SPEED = 0.27
     private const val MAX_FALL = 24.0
 
-    private val ANIMATIONS by lazy {
-        LobbyEntrance::class.java.getResourceAsStream("/assets/polyplus/lobby/entrance.animation.json")?.use(BedrockAnimationParser::parseStream)?.animations.orEmpty()
+    private val EMOTES by lazy {
+        val json = LobbyEntrance::class.java.getResourceAsStream("/assets/polyplus/lobby/entrance.animation.json")
+            ?.use { it.readBytes().toString(Charsets.UTF_8) } ?: return@lazy emptyMap()
+        EmoteBundles.fromAnimations(json) { Identifier.fromNamespaceAndPath("polyplus", "lobby/${it.substringAfterLast('.')}") }
     }
 
     private const val FIRST_TICK = 24L
@@ -339,14 +340,14 @@ object LobbyEntrance {
     private val waveEmote by lazy { emote("wave") }
     private val fallEmote by lazy { emote("fall") }
 
-    private fun emote(name: String): Emote? = ANIMATIONS["animation.lobby.$name"]?.let {
-        Emote(Identifier.fromNamespaceAndPath("polyplus", "lobby/$name"), it)
-    }
+    private fun emote(name: String): Emote? = EMOTES["animation.lobby.$name"]
 
     fun wave(avatar: LobbyAvatar) {
         val emote = waveEmote ?: return
-        (avatar as PlayerEmotesAccess).`polyplus$emoteController`().play(emote)
-        avatar.gaze.wave((emote.animation.lengthTicks / BedrockConstants.TICKS_PER_SECOND).toDouble())
+        val controller = (avatar as PlayerEmotesAccess).`polyplus$emoteController`()
+        if (controller.networkedEmoteId != null) return
+        controller.play(emote)
+        avatar.gaze.wave(emote.lengthSeconds.toDouble())
     }
 
     fun fallPose(): Emote? = fallEmote

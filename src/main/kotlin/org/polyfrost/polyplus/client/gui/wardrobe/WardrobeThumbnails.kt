@@ -40,8 +40,9 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreview
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.rememberCoverImage
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
-import org.polyfrost.polyplus.client.utils.ClientPlatform
+import org.polyfrost.polyplus.client.pets.PetAssets
 
 @Composable
 internal fun CosmeticThumbnail(
@@ -78,8 +79,8 @@ private fun needsLivePreview(type: CosmeticType, source: PlayerPreviewSource): B
     if (type == CosmeticType.Aura) return true
     val override = source as? PlayerPreviewSource.Override ?: return false
     if (override.capeCosmeticId?.let(CosmeticAssetCache::isCapeAnimated) == true) return true
-    if (override.pet?.let { it.animations.isNotEmpty() || it.controller != null } == true) return true
-    return override.equipment.equipped().any { it.cosmetic.animation != null || it.cosmetic.textureFrameCount > 1 }
+    if (override.pet?.isAnimated == true) return true
+    return override.equipment.equipped().any { it.cosmetic.scene.isAnimated }
 }
 
 private data class PreviewFraming(val yawDeg: Float, val modelScale: Float, val verticalAnchor: Float)
@@ -108,8 +109,8 @@ internal fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType):
     var previewId by remember(cosmeticId) { mutableIntStateOf(cosmeticId) }
     val loaded = CosmeticAssetCache.installs.let { isPreviewAssetLoaded(previewId, isCape, isPet) }
     // a trim can evict a preview's assets while the screen is closed, so it reloads them when shown again
-    LaunchedEffect(cosmeticId, loaded) {
-        val slim = ClientPlatform.runOnMainSync { ClientPlatform.localSkinSlim() }
+    val slim = rememberLocalSkinSlim()
+    LaunchedEffect(cosmeticId, loaded, slim) {
         val id = CosmeticCatalog.resolveVariantForSkin(cosmeticId, slim)
         previewId = id
         if (!isPreviewAssetLoaded(id, isCape, isPet)) CosmeticAssetCache.ensureCosmeticLoaded(id)
@@ -119,7 +120,9 @@ internal fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType):
 
     val source = remember(previewId, loadTick, isCape, isPet) {
         when {
-            isCape -> PlayerPreviewSource.Override(CosmeticEquipment(), capeCosmeticId = previewId)
+            isCape -> CosmeticAssetCache.getAttachedCosmetic(previewId)?.takeIf { it.slot == BodySlot.Cape }
+                ?.let { attached -> PlayerPreviewSource.Override(CosmeticEquipment().apply { equip(attached) }) }
+                ?: PlayerPreviewSource.Override(CosmeticEquipment(), capeCosmeticId = previewId)
             isPet -> {
                 val attached = CosmeticAssetCache.getAttachedCosmetic(previewId)
                 if (attached != null) {
@@ -127,7 +130,7 @@ internal fun rememberCosmeticPreviewSource(cosmeticId: Int, type: CosmeticType):
                     equipment.equip(attached)
                     PlayerPreviewSource.Override(equipment)
                 } else {
-                    val pet = CosmeticAssetCache.getPetDefinition(previewId) ?: return@remember null
+                    val pet = PetAssets.get(previewId) ?: return@remember null
                     PlayerPreviewSource.Override(CosmeticEquipment(), pet = pet)
                 }
             }
@@ -164,8 +167,8 @@ internal fun BoxScope.OwnershipBadge(owned: Boolean, createdAt: String, modifier
 }
 
 internal fun isPreviewAssetLoaded(id: Int, isCape: Boolean, isPet: Boolean): Boolean = when {
-    isCape -> CosmeticAssetCache.isCapeLoaded(id)
-    isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
+    isCape -> CosmeticAssetCache.isCapeLoaded(id) || CosmeticAssetCache.isEngineCape(id)
+    isPet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || PetAssets.has(id)
     else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
 }
 

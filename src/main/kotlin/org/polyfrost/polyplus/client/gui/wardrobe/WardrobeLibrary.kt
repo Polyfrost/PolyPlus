@@ -61,7 +61,6 @@ import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticEquipment
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
-import org.polyfrost.polyplus.client.cosmetics.PetDefinition
 import org.polyfrost.polyplus.client.cosmetics.outfits.LibraryState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitException
@@ -74,6 +73,8 @@ import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.gui.preview.PreviewSkin
 import org.polyfrost.polyplus.client.gui.preview.PreviewTint
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
+import org.polyfrost.polyplus.client.pets.PetAsset
+import org.polyfrost.polyplus.client.pets.PetAssets
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 
 
@@ -125,7 +126,7 @@ internal fun OutfitThumbnail(outfit: OutfitInfo, modifier: Modifier) {
 
 private fun isOutfitAssetLoaded(slot: BodySlot, id: Int): Boolean = when (slot) {
     BodySlot.Cape -> CosmeticAssetCache.isCapeLoaded(id)
-    BodySlot.Pet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || CosmeticAssetCache.getPetDefinition(id) != null
+    BodySlot.Pet -> CosmeticAssetCache.getAttachedCosmetic(id) != null || PetAssets.has(id)
     else -> CosmeticAssetCache.getAttachedCosmetic(id) != null
 }
 
@@ -145,7 +146,7 @@ internal fun rememberOutfitPreview(outfit: OutfitInfo?): SelectionPreview? {
         outfit?.let { outfitPreviewSource(it.equipped, outfitMojangCape(it), outfitSkin(it), PreviewTint(it.particleColor)) }
     }
     if (outfit == null || source == null) return null
-    return SelectionPreview(source, BodySlot.Hat in outfit.equipped)
+    return SelectionPreview(source, BodySlot.Hat in outfit.equipped, outfit.equipped.values)
 }
 
 @Composable
@@ -160,7 +161,7 @@ internal fun rememberSkinPreview(skin: PlayerSkinInfo?): SelectionPreview? {
         outfitPreviewSource(base, MojangCapeService.localCapeTexture(), preview)
     }
     if (skin == null) return null
-    return SelectionPreview(source, BodySlot.Hat in base)
+    return SelectionPreview(source, BodySlot.Hat in base, base.values)
 }
 
 private fun outfitMojangCape(outfit: OutfitInfo): Identifier? {
@@ -183,14 +184,14 @@ internal fun outfitPreviewSource(
     tint: PreviewTint? = null,
 ): PlayerPreviewSource {
     val equipment = CosmeticEquipment()
-    var pet: PetDefinition? = null
+    var pet: PetAsset? = null
     for ((slot, id) in equipped) {
-        if (slot == BodySlot.Cape) continue
+        if (slot == BodySlot.Cape && !CosmeticAssetCache.isEngineCape(id)) continue
         val attached = CosmeticAssetCache.getAttachedCosmetic(id)
         if (attached != null) {
-            equipment.equip(attached)
+            equipment.equip(attached.copy(slot = slot))
         } else if (slot == BodySlot.Pet) {
-            pet = CosmeticAssetCache.getPetDefinition(id)
+            pet = PetAssets.get(id)
         }
     }
     val capeId = equipped[BodySlot.Cape]
