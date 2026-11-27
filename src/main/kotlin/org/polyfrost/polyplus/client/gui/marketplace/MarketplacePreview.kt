@@ -104,10 +104,11 @@ internal fun TryOnPreview(state: MarketplaceState, modifier: Modifier) {
     BoxWithConstraints(
         modifier.themedSurface(SurfaceKind.Card, OneConfigTheme.shape(16.dp), glass = false),
     ) {
-        val modelScale = (maxWidth.value * WIDTH_ROOM / (maxHeight.value * look.reach.span)).coerceIn(MIN_MODEL_SCALE, MAX_MODEL_SCALE)
+        val reach = if (rotation.userRotated) look.reach.centered() else look.reach
+        val modelScale = (maxWidth.value * WIDTH_ROOM / (maxHeight.value * reach.span)).coerceIn(MIN_MODEL_SCALE, MAX_MODEL_SCALE)
         val blockSize = maxHeight.value * modelScale
         val limit = (maxWidth.value / 2f - blockSize * BODY_KEEP).coerceAtLeast(0f)
-        val shift = ((look.reach.left - look.reach.right) / 2f * blockSize).coerceIn(-limit, limit)
+        val shift = ((reach.left - reach.right) / 2f * blockSize).coerceIn(-limit, limit)
         val frame = DpSize(maxWidth + (abs(shift) * 2f).dp, maxHeight)
         Box(
             Modifier
