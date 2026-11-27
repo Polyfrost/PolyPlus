@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
@@ -867,6 +868,11 @@ internal class LobbyFeed {
         depart.floatValue = LobbyScene.departProgress
         val labels = LobbyScene.labels
         tags.value = labels
+        place(labels)
+        Snapshot.sendApplyNotifications()
+    }
+
+    private fun place(labels: List<LobbyScene.Label>) {
         if (labels === placed && root == placedRoot) return
         placed = labels
         placedRoot = root
