@@ -432,6 +432,8 @@ object PolyPlusSentry {
     // SkyHanni joke crash feature requiring player opt-in
     private const val SKYHANNI_CRASH_CLASS = "at.hannibal2.skyhanni.features.misc.CrashOn"
 
+    private val HOTWIRE_INTENTIONAL_THROW = Regex("""Hotwire harness: .*thrown? on purpose.*""")
+
     private val WATCHDOG_ERROR = Regex("""java\.lang\.Error: Watchdog\b""")
 
     private val DEBUG_CRASH_TRACE = Regex(
@@ -448,6 +450,7 @@ object PolyPlusSentry {
         if (body == null) return false
         return body.contains(SKYHANNI_CRASH_CLASS) ||
             body.contains(CRASHPATCH_TRIGGER) ||
+            HOTWIRE_INTENTIONAL_THROW.containsMatchIn(body) ||
             DEBUG_CRASH_TRACE.containsMatchIn(body) ||
             OUT_OF_MEMORY.containsMatchIn(body)
     }

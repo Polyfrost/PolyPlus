@@ -106,6 +106,28 @@ class IgnoredCrashReportTest {
             	at at.hannibal2.skyhanni.features.misc.CrashOnTick.onTick(CrashOnTick.kt:24)
         """.trimIndent()
 
+        val HOTWIRE_REPORT_1 = """
+        ---- Minecraft Crash Report ----
+        // Why did you do that?
+
+        Time: 2026-11-22 14:07:50
+        Description: Render Frame
+
+        java.lang.IllegalStateException: Hotwire harness: a throw on purpose at PASS
+            at dev.isxander.zoomify.fabric.ZoomifyBootstrap.harness(Unknown Source)
+        """.trimIndent()
+
+        val HOTWIRE_REPORT_2 = """
+        ---- Minecraft Crash Report ----
+        // Hi. I'm Minecraft, and I'm a crashaholic.
+
+        Time: 2026-10-08 18:37:51
+        Description: Render Frame
+
+        java.lang.IllegalStateException: Hotwire harness: a frame thrown on purpose
+            at squeek.appleskin.AppleSkin.harness(Unknown Source)
+        """.trimIndent()
+
         val GENUINE_REPORT = """
             ---- Minecraft Crash Report ----
 
@@ -137,6 +159,8 @@ class IgnoredCrashReportTest {
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(CRASHPATCH_REPORT), CRASHPATCH_REPORT))
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(DEBUG_CRASH_REPORT), DEBUG_CRASH_REPORT))
         assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(SKYHANNI_REPORT), SKYHANNI_REPORT))
+        assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(HOTWIRE_REPORT_1), HOTWIRE_REPORT_1))
+        assertTrue(PolyPlusSentry.isIgnoredCrashReport(summary(HOTWIRE_REPORT_2), HOTWIRE_REPORT_2))
     }
 
     @Test
