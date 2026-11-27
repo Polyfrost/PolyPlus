@@ -10,8 +10,7 @@ import org.polyfrost.polyplus.client.bedrock.animation.BoneAnimation
 import org.polyfrost.polyplus.client.bedrock.animation.EasingMode
 import org.polyfrost.polyplus.client.bedrock.animation.MolangVectorInterpolator
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
-import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
-import org.polyfrost.polyplus.client.bedrock.molang.MolangStatement
+import org.polyfrost.polyplus.client.bedrock.molang.executeAll
 import org.polyfrost.polyplus.client.render.PlayerRenderContext
 import kotlin.math.pow
 
@@ -48,7 +47,7 @@ object AnimationSampler {
             animTimeSeconds = 0f,
             variables = molangVariables,
         )
-        executeStatements(animation.initialize, context)
+        animation.initialize.executeAll(context)
     }
 
     private fun buildContext(
@@ -67,13 +66,8 @@ object AnimationSampler {
             variables = molangVariables,
         )
 
-        executeStatements(animation.preAnimation, context)
+        animation.preAnimation.executeAll(context)
         return context
-    }
-
-    private fun executeStatements(statements: List<MolangStatement>, context: MolangContext) {
-        if (statements.isNotEmpty())
-            MolangEvaluator.execute(statements, context)
     }
 
     private fun sampleBone(

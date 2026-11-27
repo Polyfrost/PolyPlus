@@ -4,7 +4,7 @@ import org.joml.Vector3f
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
 import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimation
 import org.polyfrost.polyplus.client.bedrock.molang.MolangContext
-import org.polyfrost.polyplus.client.bedrock.molang.MolangEvaluator
+import org.polyfrost.polyplus.client.bedrock.molang.executeAll
 import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
 import org.polyfrost.polyplus.client.bedrock.playback.BedrockAnimationPlayback
 import org.polyfrost.polyplus.client.bedrock.playback.BoneTransform
@@ -37,7 +37,7 @@ class BedrockAnimationControllerRunner(
         var result: Map<String, BoneTransform> = emptyMap()
         for (stateAnimation in state.animations) {
             val animation = animations[stateAnimation.animationName] ?: continue
-            val weight = MolangEvaluator.eval(stateAnimation.weight, context).toFloat().coerceIn(0f, 1f)
+            val weight = stateAnimation.weight.evaluate(context).toFloat().coerceIn(0f, 1f)
             if (weight <= 0f) continue
 
             val elapsedTicks = timeInStateSeconds * BedrockConstants.TICKS_PER_SECOND
@@ -66,9 +66,9 @@ class BedrockAnimationControllerRunner(
 
         for (transition in state.transitions) {
             val target = controller.states[transition.targetState] ?: continue
-            if (MolangEvaluator.eval(transition.condition, context) == 0.0) continue
+            if (transition.condition.evaluate(context) == 0.0) continue
 
-            MolangEvaluator.execute(state.onExit, context)
+            state.onExit.executeAll(context)
             currentState = transition.targetState
             timeInStateSeconds = 0f
 
@@ -77,7 +77,7 @@ class BedrockAnimationControllerRunner(
                 renderContext = renderContext,
                 variables = molangVariables,
             )
-            MolangEvaluator.execute(target.onEntry, entryContext)
+            target.onEntry.executeAll(entryContext)
             return
         }
     }
