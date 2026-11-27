@@ -24,6 +24,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuItem
 import org.polyfrost.oneconfig.api.ui.v1.components.RadialMenuState
 import org.polyfrost.compose.minecraft.hud.HudLayer
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeOptions
+import org.polyfrost.polyplus.client.lobby.LobbyScene
 import org.polyfrost.polyplus.client.ping.PingGraphics
 import org.polyfrost.polyplus.client.ping.PingInput
 import org.polyfrost.polyplus.client.utils.ClientPlatform
@@ -36,6 +37,9 @@ class WheelSession(
     val content: @Composable (WheelSession) -> Unit,
 ) {
     val state = RadialMenuState()
+
+    var input: RadialMenuInput = RadialMenuInput.Steered
+        internal set
 }
 
 private const val WHEEL_SURFACE_ALPHA = 0.78f
@@ -49,17 +53,31 @@ fun HudRadialMenu(
     subtitle: String?,
     below: (@Composable () -> Unit)? = null,
 ) {
+    val pointer = session.input == RadialMenuInput.Pointer
+    val onSelect: ((Int) -> Unit)? = if (pointer) {
+        { WheelOverlay.settle(session, true) }
+    } else {
+        null
+    }
+    val onDismiss: (() -> Unit)? = if (pointer) {
+        { WheelOverlay.settle(session, false) }
+    } else {
+        null
+    }
     RadialMenu(
         items = items,
         state = session.state,
+        onSelect = onSelect,
+        onDismiss = onDismiss,
         title = title,
         subtitle = subtitle,
-        input = RadialMenuInput.Steered,
+        input = session.input,
         glass = liquidGlassTheme && hudBackdropGlass,
         surfaceAlpha = WHEEL_SURFACE_ALPHA,
         hubAlpha = WHEEL_HUB_ALPHA,
         sounds = RadialMenuDefaults.silent,
         pixelRatio = hudPixelRatio,
+        onScroll = if (pointer) session.onScroll else null,
         below = below,
     )
 }
@@ -70,6 +88,8 @@ object WheelOverlay {
 
     private var session: WheelSession? = null
     private var shown by mutableStateOf<WheelSession?>(null)
+    private var lobbyHost: PolyPlusLobbyScreen? = null
+    private var lobbyShown by mutableStateOf<WheelSession?>(null)
     private var fadeEndsAt = 0L
     private var scrollAccum = 0.0
     private var started = false
@@ -78,21 +98,43 @@ object WheelOverlay {
 
     val isOpen: Boolean get() = session != null
 
+    val isOpenOverLobby: Boolean get() = session != null && lobbyHost != null
+
     fun open(next: WheelSession): Boolean {
         if (session != null || ClientPlatform.currentScreen() != null) return false
         if (Minecraft.getInstance().player == null) return false
         ensureStarted()
         scrollAccum = 0.0
+        next.input = RadialMenuInput.Steered
+        lobbyHost = null
         session = next
         shown = next
         return true
     }
 
+    fun openOverLobby(next: WheelSession): Boolean {
+        if (session != null) return false
+        val host = ClientPlatform.currentScreen() as? PolyPlusLobbyScreen ?: return false
+        if (!host.emoteWheelReady()) return false
+        ensureStarted()
+        scrollAccum = 0.0
+        next.input = RadialMenuInput.Pointer
+        lobbyHost = host
+        session = next
+        lobbyShown = next
+        return true
+    }
+
     fun cancel() = finish(false)
+
+    internal fun settle(target: WheelSession, pick: Boolean) {
+        if (session === target) finish(pick)
+    }
 
     @JvmStatic
     fun consumeLook(dx: Double, dy: Double): Boolean {
         val current = session ?: return PingInput.consumePendingLook(dx, dy)
+        if (lobbyHost != null) return false
         val scale = PULL_GAIN * sensitivityGain() / layer.density.coerceAtLeast(0.01f)
         current.state.steer((dx * scale).toFloat(), (dy * scale).toFloat())
         return true
@@ -164,16 +206,27 @@ object WheelOverlay {
 
     private fun update() {
         val current = session ?: return
-        if (Minecraft.getInstance().player == null || ClientPlatform.currentScreen() != null) {
+        val host = lobbyHost
+        val gone = if (host != null) {
+            ClientPlatform.currentScreen() !== host || !LobbyScene.showing()
+        } else {
+            Minecraft.getInstance().player == null || ClientPlatform.currentScreen() != null
+        }
+        if (gone) {
             cancel()
             return
         }
         if (!current.held()) finish(true)
     }
 
+    private fun expireLobby() {
+        if (session == null && lobbyShown != null && System.currentTimeMillis() >= fadeEndsAt) lobbyShown = null
+    }
+
     private fun finish(pick: Boolean) {
         val current = session ?: return
         session = null
+        lobbyHost = null
         fadeEndsAt = System.currentTimeMillis() + if (Motion.reduced) 0L else RadialMenuDefaults.fadeMillis.toLong()
         if (!pick) {
             current.state.dismiss()
@@ -186,12 +239,21 @@ object WheelOverlay {
     private fun ensureStarted() {
         if (started) return
         started = true
-        eventHandler<TickEvent.End> { update() }
+        eventHandler<TickEvent.End> {
+            update()
+            expireLobby()
+        }
     }
 
     @Composable
     private fun Content() {
         val current = shown ?: return
+        key(current) { current.content(current) }
+    }
+
+    @Composable
+    fun LobbyLayer() {
+        val current = lobbyShown ?: return
         key(current) { current.content(current) }
     }
 }
