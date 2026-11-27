@@ -2,11 +2,14 @@ package org.polyfrost.polyplus.client.gui.wardrobe
 
 import org.apache.logging.log4j.LogManager
 import org.polyfrost.polyplus.client.cosmetics.BillingService
+import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
+import org.polyfrost.polyplus.client.cosmetics.colors.ColorSaveException
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticGroupKey
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.polyplus.client.privacy.OnlineServicesDisabledException
@@ -94,10 +97,11 @@ internal fun checkoutFailureMessage(error: Throwable): String =
 
 internal fun wardrobeFailure(error: Throwable, action: String): String {
     LOGGER.warn("Couldn't {}: {}: {}", action, error.javaClass.simpleName, error.message?.replace(URL_QUERY, ""))
-    return if (error is OnlineServicesDisabledException) {
-        "Accept the Terms of Service and Privacy Policy under Privacy in the PolyPlus settings."
-    } else {
-        "Couldn't $action. Try again later."
+    return when (error) {
+        is OnlineServicesDisabledException -> "Accept the Terms of Service and Privacy Policy under Privacy in the PolyPlus settings."
+        is CosmeticService.SkinModelUnknown -> "Your skin is still loading. Try again in a moment."
+        is ColorSaveException -> error.message ?: "Couldn't $action. Try again later."
+        else -> "Couldn't $action. Try again later."
     }
 }
 
@@ -112,8 +116,10 @@ internal data class CosmeticUiItem(
     val equippedVariantId: Int?,
     val equippedCosmeticId: Int? = equippedVariantId,
     val memberIds: Set<Int> = emptySet(),
+    val grouped: Boolean = false,
 ) {
     val id: Int get() = groupId
+    val key: CosmeticGroupKey get() = CosmeticGroupKey(groupId, grouped)
     val hasVariants: Boolean get() = variants.size > 1
 
     fun variant(variantId: Int?): CosmeticVariantUi? = variantId?.let { id -> variants.firstOrNull { it.id == id } }
@@ -123,8 +129,8 @@ internal data class CosmeticUiItem(
 
 internal const val MOJANG_CAPE_COLLECTION = "Minecraft cape"
 
-internal fun selectedVariantId(item: CosmeticUiItem, picks: Map<Int, Int>): Int? =
-    picks[item.groupId]?.takeIf { id -> item.variants.any { it.id == id } } ?: item.equippedVariantId ?: item.variants.firstOrNull()?.id
+internal fun selectedVariantId(item: CosmeticUiItem, picks: Map<CosmeticGroupKey, Int>): Int? =
+    picks[item.key]?.takeIf { id -> item.variants.any { it.id == id } } ?: item.equippedVariantId ?: item.variants.firstOrNull()?.id
 
 internal enum class WardrobeSection(val label: String, val icon: String) {
     Featured("Featured", "star-filled"),
@@ -167,7 +173,7 @@ internal sealed interface WardrobeEntry {
     }
 
     data class Owned(val item: CosmeticUiItem) : WardrobeEntry {
-        override val key: String get() = "owned-${item.type.serializedName}-${item.groupId}"
+        override val key: String get() = "owned-${item.type.serializedName}-${item.key.tag}"
     }
 
     data class Shop(val info: CosmeticStoreInfo, val group: String) : WardrobeEntry {
@@ -197,7 +203,7 @@ internal sealed interface WardrobeEntry {
 }
 
 internal sealed interface WardrobeSelection {
-    data class Owned(val groupId: Int, val type: CosmeticType) : WardrobeSelection
+    data class Owned(val key: CosmeticGroupKey, val type: CosmeticType) : WardrobeSelection
     data class Shop(val infoId: Int) : WardrobeSelection
     data class Mojang(val capeId: String) : WardrobeSelection
     data class Bundle(val bundleId: Int) : WardrobeSelection

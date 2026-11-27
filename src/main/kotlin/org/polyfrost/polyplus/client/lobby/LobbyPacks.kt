@@ -80,6 +80,12 @@ object LobbyPacks {
     fun activeIds(): List<String> = selected().map { it.id }
 
     fun changed(): Boolean {
+        val unchanged = lastStack
+        if (unchanged != null && sameStack(unchanged)) {
+            if (!settled.getAndSet(false)) return false
+            revision++
+            return true
+        }
         val stack = activeIds()
         val previous = lastStack
         lastStack = stack
@@ -296,19 +302,36 @@ object LobbyPacks {
         .filter { !it.isRequired && !fromServer(it) }
         .map(::local)
 
+    private fun sameStack(previous: List<String>): Boolean {
+        val packs = Minecraft.getInstance().resourcePackRepository.selectedPacks
+        var index = 0
+        for (pack in packs) {
+            if (pack.isRequired || fromServer(pack)) continue
+            if (index >= previous.size || previous[index] != pack.id) return false
+            index++
+        }
+        return index == previous.size
+    }
+
     private fun installed(id: String): Local? = Minecraft.getInstance().resourcePackRepository.getPack(id)?.let(::local)
 
     private fun local(pack: Pack) = Local(pack.id, pack.compatibility.isCompatible)
 
     private fun fromServer(pack: Pack): Boolean = pack.packSource === PackSource.SERVER || pack.packSource === PackSource.WORLD
 
-    fun serverPackApplied(mc: Minecraft): Boolean = mc.resourcePackRepository.selectedPacks.any(::fromServer)
+    fun serverPackApplied(mc: Minecraft): Boolean {
+        val packs = mc.resourcePackRepository.selectedPacks
+        for (pack in packs) if (fromServer(pack)) return true
+        return false
+    }
 
     fun connectionOf(mc: Minecraft): Connection? = mc.connection?.getConnection()
     //?} else {
     /*private fun directory(): File = Minecraft.getInstance().resourcePacks.directory
 
     private fun selected(): List<Local> = Minecraft.getInstance().resourcePacks.selectedPacks.map(::local)
+
+    private fun sameStack(previous: List<String>): Boolean = activeIds() == previous
 
     private fun installed(id: String): Local? =
         Minecraft.getInstance().resourcePacks.availablePacks.firstOrNull { FILE_PREFIX + it.name == id }?.let(::local)

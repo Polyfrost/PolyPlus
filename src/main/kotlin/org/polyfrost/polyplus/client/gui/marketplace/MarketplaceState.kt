@@ -237,12 +237,14 @@ internal class MarketplaceState {
 
     fun pickVariant(infoId: Int, variantId: Int) {
         variantPicks[infoId] = variantId
-        selectedItem?.takeIf { it.id == infoId }?.let { fit(it, variantId) }
+        selectedItem?.takeIf { it.id == infoId }?.let { fit(it, variantId, refit = true) }
     }
 
-    private fun fit(info: CosmeticStoreInfo, variantId: Int) {
+    private fun fit(info: CosmeticStoreInfo, variantId: Int, refit: Boolean = false) {
         facing = info.type
-        info.type.defaultSlot()?.let { fitting[it] = MarketPiece(info, variantId) }
+        val slot = CosmeticCatalog.getCosmeticDefinition(variantId)?.preferredSlot() ?: info.type.defaultSlot() ?: return
+        if (refit) fitting.filterValues { it.info.id == info.id }.keys.forEach(fitting::remove)
+        fitting[slot] = MarketPiece(info, variantId)
     }
 
     fun inCart(variantId: Int): Boolean = cart.any { it.key == cosmeticCartKey(variantId) }

@@ -10,12 +10,11 @@ import net.minecraft.world.phys.Vec3
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.polyplus.client.bedrock.BedrockConstants
-import org.polyfrost.polyplus.client.bedrock.animation.BedrockAnimationParser
 import org.polyfrost.polyplus.client.cosmetics.access.PlayerEmotesAccess
 import org.polyfrost.polyplus.client.emotes.Emote
+import org.polyfrost.polyplus.client.emotes.EmoteBundles
 import org.polyfrost.polyplus.client.emotes.playback.EmoteController
 import org.polyfrost.polyplus.client.utils.Easing
-import java.io.ByteArrayInputStream
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.ceil
@@ -204,7 +203,7 @@ object LobbyGrab {
         val avatar = hold?.avatar ?: falling?.avatar ?: return
         val controller = controller(avatar)
         if (hold != null) controller.clock = hold.previousClock
-        if (ours(controller.playbackSnapshot()?.emote)) controller.stop()
+        if (ours(controller.playing)) controller.stop()
         avatar.pose = Pose.STANDING
         if (avatar.arrival != LobbyAvatar.Arrival.LANDED) return
         val rest = avatar.rest
@@ -262,7 +261,7 @@ object LobbyGrab {
         avatar.place(within(avatar.rest.pos, hold.anchor.add(right.x * hold.u, hold.v, right.z * hold.u)), avatar.yBodyRot)
         avatar.yHeadRot = head
         avatar.pose = Pose.STANDING
-        if (controller(avatar).playbackSnapshot()?.emote !== pose()) play(hold)
+        if (controller(avatar).playing !== pose()) play(hold)
     }
 
     private fun within(rest: Vec3, at: Vec3): Vec3 {
@@ -335,11 +334,11 @@ object LobbyGrab {
     private fun play(hold: Hold) {
         val controller = controller(hold.avatar)
         hold.starting = true
-        controller.play(pose())
+        pose()?.let(controller::play)
         hold.starting = false
     }
 
-    private fun pose(): Emote = if (Motion.reduced) still else dangling
+    private fun pose(): Emote? = if (Motion.reduced) still else dangling
 
     private fun ours(emote: Emote?): Boolean = emote != null && (emote.id == DANGLE_ID || emote === LobbyEntrance.fallPose())
 
@@ -350,7 +349,7 @@ object LobbyGrab {
         return ((BASE_TICKS + MAX_SWING + roll) * BedrockConstants.MS_PER_TICK).toLong()
     }
 
-    private fun emote(flail: Double): Emote {
+    private fun emote(flail: Double): Emote? {
         val start = BASE_TICKS / BedrockConstants.TICKS_PER_SECOND
         val end = (BASE_TICKS + 2.0 * MAX_SWING) / BedrockConstants.TICKS_PER_SECOND
         val arm = ARM_SWING * flail
@@ -374,7 +373,6 @@ object LobbyGrab {
               }
             }
         """.trimIndent()
-        val animation = ByteArrayInputStream(json.toByteArray()).use(BedrockAnimationParser::parseStream).animations.getValue("animation.lobby.dangle")
-        return Emote(DANGLE_ID, animation)
+        return EmoteBundles.fromAnimations(json) { DANGLE_ID }["animation.lobby.dangle"]
     }
 }

@@ -20,6 +20,7 @@ import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.platform.isOneConfigComposeScreen
 import org.polyfrost.compose.minecraft.render.OffscreenTarget
 import org.polyfrost.compose.minecraft.render.TextureRenderer
+import org.polyfrost.polyplus.client.cosmetics.render.CosmeticWearers
 import org.polyfrost.polyplus.client.utils.ClientPlatform
 import org.slf4j.LoggerFactory
 
@@ -34,6 +35,7 @@ object PlayerPreviewOffscreen {
         var maxTextureSize = MAX_DIM
         var cameraTiltDeg = 0f
         var lights: PreviewLights? = null
+        var tryOn: PreviewTryOn? = null
         var initialYaw = 0f
         var dragYaw = 0f
         var dragPitch = 0f
@@ -51,6 +53,7 @@ object PlayerPreviewOffscreen {
         internal var contentWidth = 0
         internal var contentHeight = 0
         internal var hasContent = false
+        internal var slot = 0
     }
 
     internal const val MAX_DIM = 1024
@@ -63,12 +66,22 @@ object PlayerPreviewOffscreen {
     private val entries = HashSet<Entry>()
     private val released = ArrayList<OffscreenTarget>()
 
-    fun register(): Entry = Entry().also(entries::add)
+    fun register(): Entry {
+        var slot = 1
+        while (entries.any { it.slot == slot }) slot++
+        return Entry().also {
+            it.slot = slot
+            entries += it
+        }
+    }
 
     fun unregister(entry: Entry) {
         entries.remove(entry)
         release(entry)
+        PlayerPreviewRenderer.dropHoldersIfIdle()
     }
+
+    fun hasEntries(): Boolean = entries.isNotEmpty()
 
     private fun release(entry: Entry) {
         entry.hasContent = false
@@ -118,6 +131,9 @@ object PlayerPreviewOffscreen {
                 continue
             }
             val target = offscreen.target ?: continue
+            PreviewTryOn.current = e.tryOn
+            CosmeticWearers.previewSlot = e.slot
+            e.tryOn?.beginFrame()
             runCatching {
                 //? if >= 1.21.8 {
                 val drawn = PlayerPreviewRenderer.renderInto(target, e.source, yaw, e.dragPitch, w, h, e.modelScale, e.verticalAnchor, e.cameraTiltDeg, e.lights)
@@ -133,6 +149,8 @@ object PlayerPreviewOffscreen {
                 e.contentHeight = h
                 e.hasContent = true
             }.onFailure { LOG.error("[preview] offscreen render failed", it) }
+            PreviewTryOn.current = null
+            CosmeticWearers.previewSlot = 0
         }
     }
 

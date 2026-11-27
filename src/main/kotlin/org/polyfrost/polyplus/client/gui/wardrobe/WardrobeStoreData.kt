@@ -7,14 +7,18 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import org.polyfrost.polyplus.client.cosmetics.BundleCatalog
+import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticStore
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeState
 import org.polyfrost.polyplus.client.cosmetics.outfits.LibraryState
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
+import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticDefinition
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
+import org.polyfrost.polyplus.client.network.http.responses.DiscoveredBonus
 
 internal class WardrobeStoreData {
     var byType by mutableStateOf<Map<CosmeticType, List<CosmeticStoreInfo>>>(emptyMap())
@@ -116,6 +120,7 @@ internal fun buildWardrobeEntries(
     sort: WardrobeSort,
     polyPlusAvailable: Boolean,
     emoteKeybindWarning: String? = null,
+    discovered: List<DiscoveredBonus> = emptyList(),
 ): List<WardrobeEntry> {
     val needle = query.trim()
     fun matches(name: String) = needle.isEmpty() || name.contains(needle, ignoreCase = true)
@@ -176,6 +181,14 @@ internal fun buildWardrobeEntries(
                         outfits.isEmpty() -> entries += WardrobeEntry.Note("outfits", "No outfits match your search.")
                         else -> outfits.mapTo(entries) { WardrobeEntry.Outfit(it, it.id == activeId) }
                     }
+                }
+            }
+            val found = discovered.filter { matches(it.name) }
+            if (found.isNotEmpty()) {
+                entries += WardrobeEntry.Divider("Discovered bonuses", anchor = false)
+                for (bonus in found) {
+                    entries += WardrobeEntry.Group("bonus-${bonus.bonusId}", bonus.name, "Wear these together to turn it on.")
+                    entries += WardrobeEntry.Note("bonus-${bonus.bonusId}", bonusItems(bonus))
                 }
             }
         }
@@ -286,4 +299,60 @@ internal fun buildWardrobeEntries(
         }
     }
     return entries
+}
+
+internal class BonusPiece(
+    val group: String,
+    val variant: String,
+    val side: BodySlot?,
+    val groupVariants: Set<String> = setOf(variant),
+    val groupSides: Set<BodySlot?> = setOf(side),
+)
+
+private fun bonusItems(bonus: DiscoveredBonus): String {
+    val pieces = bonus.cosmeticIds.distinct().mapNotNull { id ->
+        CosmeticCatalog.getCosmeticDefinition(id)?.let { definition ->
+            val members = CosmeticCatalog.groupContaining(id)?.variants.orEmpty().ifEmpty { listOf(definition) }
+            BonusPiece(
+                definition.groupName,
+                definition.variantName,
+                pieceSide(definition),
+                members.mapTo(HashSet()) { it.variantName },
+                members.mapTo(HashSet(), ::pieceSide),
+            )
+        }
+    }
+    return joinBonusNames(bonusPieceLabels(pieces))
+}
+
+private fun pieceSide(definition: CosmeticDefinition): BodySlot? {
+    val left = definition.allowsSlot(BodySlot.LeftHand)
+    val right = definition.allowsSlot(BodySlot.RightHand)
+    return when {
+        left == right -> null
+        left -> BodySlot.LeftHand
+        else -> BodySlot.RightHand
+    }
+}
+
+internal fun bonusPieceLabels(pieces: List<BonusPiece>): List<String> {
+    val byGroup = pieces.groupBy { it.group }
+    return pieces.map { piece ->
+        val same = byGroup.getValue(piece.group)
+        val sided = piece.side != null && (piece.groupSides.size > 1 || same.mapTo(HashSet()) { it.side }.size > 1)
+        val varied = piece.variant != piece.group &&
+            (piece.groupVariants.size > 1 || same.mapTo(HashSet()) { it.variant }.size > 1)
+        val name = when {
+            sided && piece.side == BodySlot.LeftHand -> "Left ${piece.group}"
+            sided -> "Right ${piece.group}"
+            else -> piece.group
+        }
+        if (varied) "$name (${piece.variant})" else name
+    }.distinct()
+}
+
+internal fun joinBonusNames(names: List<String>): String = when (names.size) {
+    0 -> "Its items aren't in the shop right now."
+    1 -> names[0]
+    else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
 }

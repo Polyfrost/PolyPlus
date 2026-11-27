@@ -50,11 +50,18 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.PageTitle
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticVariantUi
 import org.polyfrost.polyplus.client.gui.wardrobe.PriceLabel
+import org.polyfrost.polyplus.client.gui.wardrobe.StoreColours
+import org.polyfrost.polyplus.client.gui.wardrobe.coloursSaving
 import org.polyfrost.polyplus.client.gui.wardrobe.VariantSwatch
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeCartPane
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeGrid
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeEntry
 import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeSort
+import org.polyfrost.polyplus.client.gui.wardrobe.TryInfo
+import org.polyfrost.polyplus.client.gui.wardrobe.TryOnLines
+import org.polyfrost.polyplus.client.gui.wardrobe.WardrobeSelection
+import org.polyfrost.polyplus.client.gui.wardrobe.rememberTryInfo
+import org.polyfrost.polyplus.client.gui.wardrobe.rememberTryOn
 import org.polyfrost.polyplus.client.gui.wardrobe.uiVariants
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
@@ -205,22 +212,27 @@ internal fun PreviewColumn(state: MarketplaceState, onWardrobe: () -> Unit, modi
                 )
             }
         } else {
+            val variant = state.selectedItem?.let(state::variant)
+            val bundle = state.selectedBundle
+            val pieces = variant?.pieces ?: bundle?.let { state.fitting.values.map { piece -> piece.variantId } }
+            val tryInfo = rememberTryInfo(pieces)
+            val tryOn = rememberTryOn(variant?.id ?: bundle?.let { WardrobeSelection.Bundle(it.info.id) })
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TryOnPreview(state, Modifier.fillMaxWidth().weight(1f))
-                DetailCard(state, onWardrobe)
+                TryOnPreview(state, tryInfo, tryOn, Modifier.fillMaxWidth().weight(1f))
+                DetailCard(state, tryInfo, onWardrobe)
             }
         }
     }
 }
 
 @Composable
-private fun DetailCard(state: MarketplaceState, onWardrobe: () -> Unit) {
+private fun DetailCard(state: MarketplaceState, tryInfo: TryInfo, onWardrobe: () -> Unit) {
     val item = state.selectedItem
     val bundle = state.selectedBundle
     Column(Modifier.fillMaxWidth().panel(16.dp).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when {
-            item != null -> ItemDetail(state, item, onWardrobe)
-            bundle != null -> BundleDetail(state, bundle)
+            item != null -> ItemDetail(state, item, tryInfo, onWardrobe)
+            bundle != null -> BundleDetail(state, bundle, tryInfo)
             else -> Text("Select a cosmetic to try it on your look.", modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, textAlign = TextAlign.Center)
         }
         state.notice?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
@@ -239,7 +251,7 @@ private fun DetailHeading(name: String, detail: String, price: @Composable () ->
 }
 
 @Composable
-private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardrobe: () -> Unit) {
+private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, tryInfo: TryInfo, onWardrobe: () -> Unit) {
     val variant = state.variant(info)
     val variants = info.uiVariants()
     val owned = variant.id in state.ownedIds
@@ -248,7 +260,9 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(info) }
     }
     info.description?.takeIf { it.isNotBlank() }?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+    TryOnLines(tryInfo)
     if (variants.size > 1) VariantRow(variants, variant) { state.pickVariant(info.id, it) }
+    StoreColours(variant, owned)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (owned) {
             TextButton(text = "Open in Wardrobe", icon = "profiles", onClick = onWardrobe, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
@@ -270,22 +284,24 @@ private fun ItemDetail(state: MarketplaceState, info: CosmeticStoreInfo, onWardr
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VariantRow(variants: List<CosmeticVariantUi>, selected: CosmeticVariantUi, onPick: (Int) -> Unit) {
+    val saving = coloursSaving(variants)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            variants.forEach { VariantSwatch(it, it.id, it.id == selected.id, 16.dp, UiSound.Click) { onPick(it.id) } }
+            variants.forEach { VariantSwatch(it, it.id, it.id == selected.id, 16.dp, UiSound.Click, enabled = !saving) { onPick(it.id) } }
         }
-        Text(selected.name, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+        Text(if (saving) "Saving your colors..." else selected.name, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
     }
 }
 
 @Composable
-private fun BundleDetail(state: MarketplaceState, bundle: MarketBundle) {
+private fun BundleDetail(state: MarketplaceState, bundle: MarketBundle, tryInfo: TryInfo) {
     val owned = bundle.pieces.count { it.variantId in state.ownedIds }
     DetailHeading(bundle.info.name, bundle.label) {
         Row(verticalAlignment = Alignment.CenterVertically) { PriceLabel(bundle.info.basePrice, bundle.info.finalPrice, bundle.info.discounted) }
     }
     bundle.info.description?.takeIf { it.isNotBlank() }?.let { Text(it, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     Text(bundle.pieces.joinToString { it.info.name }, color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+    TryOnLines(tryInfo)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(text = "Buy now", icon = BAG_ICON, onClick = { state.buyBundle(bundle.info) }, modifier = Modifier, style = ControlStyle.Primary, size = ControlSize.Large)
         if (owned > 0) Text("You own $owned of ${bundle.pieces.size}", color = OneConfigTheme.current.mutedText, style = OneConfigTheme.current.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)

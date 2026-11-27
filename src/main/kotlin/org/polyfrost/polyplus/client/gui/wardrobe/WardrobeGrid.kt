@@ -102,6 +102,7 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.ConsentStep
 import org.polyfrost.polyplus.client.gui.ppShapeOf
 import org.polyfrost.polyplus.client.gui.preview.PlayerPreviewSource
 import org.polyfrost.polyplus.client.network.http.responses.BundleInfo
+import org.polyfrost.polyplus.client.network.http.responses.CosmeticGroupKey
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticStoreInfo
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
@@ -115,7 +116,7 @@ internal fun WardrobeGrid(
     ownedIds: Set<Int>,
     cartKeys: Set<String>,
     selection: WardrobeSelection?,
-    variantPicks: Map<Int, Int>,
+    variantPicks: Map<CosmeticGroupKey, Int>,
     storeVariantPicks: Map<Int, Int>,
     mojangBusy: Boolean,
     modifier: Modifier,
@@ -123,7 +124,7 @@ internal fun WardrobeGrid(
     onOwned: (CosmeticUiItem) -> Unit,
     onClickOwned: (CosmeticUiItem) -> Unit,
     onPreviewOwned: (CosmeticUiItem) -> Unit,
-    onSelectVariant: (Int, Int) -> Unit,
+    onSelectVariant: (CosmeticGroupKey, Int) -> Unit,
     onShop: (CosmeticStoreInfo) -> Unit,
     onPickStoreVariant: (Int, Int) -> Unit,
     onAddToCart: (CosmeticStoreInfo, CosmeticVariantUi) -> Unit,
@@ -170,20 +171,24 @@ internal fun WardrobeGrid(
                         val item = entry.item
                         val variantId = selectedVariantId(item, variantPicks)
                         val artId = item.artId(variantId)
+                        val saving = coloursSaving(item)
+                        val equipBlocked = saving && (!item.equipped || variantId != item.equippedVariantId)
                         WardrobeCard(
                             name = item.name,
                             detail = { CardDetailText(item.collection) },
-                            action = equipAction(item.equipped),
+                            action = if (equipBlocked) CardAction("Saving colors...", "profiles") else equipAction(item.equipped),
                             onAction = { onOwned(item) },
                             equipped = item.equipped,
-                            selected = selection == WardrobeSelection.Owned(item.groupId, item.type),
+                            selected = selection == WardrobeSelection.Owned(item.key, item.type),
                             onClick = { onClickOwned(item) },
+                            actionEnabled = !equipBlocked,
                             variants = item.variants,
                             selectedVariantId = variantId,
-                            onPickVariant = { onSelectVariant(item.groupId, it) },
+                            variantsEnabled = !saving,
+                            onPickVariant = { onSelectVariant(item.key, it) },
                             menu = listOf(
                                 MenuAction("Preview", { onPreviewOwned(item) }),
-                                MenuAction(if (item.equipped) "Unequip" else "Equip", { onOwned(item) }),
+                                MenuAction(if (item.equipped) "Unequip" else "Equip", { onOwned(item) }, enabled = !equipBlocked),
                             ),
                         ) { modifier ->
                             val (source, loadTick) = if (artId != null) {
@@ -194,7 +199,7 @@ internal fun WardrobeGrid(
                             CosmeticThumbnail(
                                 source,
                                 item.type,
-                                "card-${item.groupId}-$artId-$loadTick",
+                                "card-${item.key.tag}-$artId-$loadTick",
                                 modifier,
                                 checker = false,
                                 coverAssetId = coverFor(item),
@@ -234,6 +239,7 @@ internal fun WardrobeGrid(
                             onClick = { onShop(info) },
                             variants = variants,
                             selectedVariantId = variant.id,
+                            variantsEnabled = !coloursSaving(variants),
                             onPickVariant = { onPickStoreVariant(info.id, it) },
                             previewUrl = info.previewUrlFor(variant.id),
                             menu = listOf(
@@ -455,8 +461,10 @@ private fun WardrobeCard(
     onClick: () -> Unit,
     badge: CardBadge? = null,
     enabled: Boolean = true,
+    actionEnabled: Boolean = true,
     variants: List<CosmeticVariantUi> = emptyList(),
     selectedVariantId: Int? = null,
+    variantsEnabled: Boolean = true,
     onPickVariant: (Int) -> Unit = {},
     menu: List<MenuEntry> = emptyList(),
     previewUrl: String? = null,
@@ -517,6 +525,7 @@ private fun WardrobeCard(
                             variants = variants,
                             selectedVariantId = selectedVariantId,
                             onPick = onPickVariant,
+                            enabled = variantsEnabled,
                             modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
                         )
                     }
@@ -556,7 +565,7 @@ private fun WardrobeCard(
                     onClick = onAction,
                     modifier = Modifier.height(CardStripHeight),
                     style = if (equipped) ControlStyle.Primary else ControlStyle.Footer,
-                    enabled = enabled,
+                    enabled = enabled && actionEnabled,
                     fillWidth = true,
                     labelStyle = CardActionLabel,
                     glass = false,
@@ -578,14 +587,15 @@ private fun VariantSwatches(
     variants: List<CosmeticVariantUi>,
     selectedVariantId: Int?,
     onPick: (Int) -> Unit,
+    enabled: Boolean,
     modifier: Modifier,
 ) {
     val scroll = rememberScrollState()
     ScrollContainer(scroll, modifier, scrollbar = false) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
             variants.forEach { variant ->
-                TooltipBox(variant.name, Modifier, TooltipPlacement.AboveStart) {
-                    VariantSwatch(variant, variant.artId, variant.id == selectedVariantId, 14.dp, null) { onPick(variant.id) }
+                TooltipBox(if (enabled) variant.name else "Saving your colors...", Modifier, TooltipPlacement.AboveStart) {
+                    VariantSwatch(variant, variant.artId, variant.id == selectedVariantId, 14.dp, null, enabled) { onPick(variant.id) }
                 }
             }
         }
@@ -593,13 +603,13 @@ private fun VariantSwatches(
 }
 
 @Composable
-internal fun VariantSwatch(variant: CosmeticVariantUi, artId: Int, selected: Boolean, width: Dp, sound: UiSound?, onClick: () -> Unit) {
+internal fun VariantSwatch(variant: CosmeticVariantUi, artId: Int, selected: Boolean, width: Dp, sound: UiSound?, enabled: Boolean = true, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
     val swatchVersion = CosmeticSwatches.version
     val art = remember(artId, swatchVersion) { CosmeticSwatches.get(artId) }
     val shape = theme.shapes.small
     Box(
-        modifier = Modifier.selectableSwatch(selected, onClick, variant.name, circle = false, sound = sound)
+        modifier = Modifier.selectableSwatch(selected, onClick, variant.name, circle = false, enabled = enabled, sound = sound)
             .size(width = width, height = 22.dp)
             .clip(shape)
             .background(theme.chipBackground),

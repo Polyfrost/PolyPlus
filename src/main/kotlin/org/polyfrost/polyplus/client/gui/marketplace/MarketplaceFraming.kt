@@ -1,11 +1,5 @@
 package org.polyfrost.polyplus.client.gui.marketplace
 
-import org.joml.Matrix4f
-import org.joml.Quaternionf
-import org.joml.Vector3f
-import org.polyfrost.polyplus.client.bedrock.playback.AnimationSampler
-import org.polyfrost.polyplus.client.bedrock.render.BedrockBoneRenderer
-import org.polyfrost.polyplus.client.bedrock.render.BedrockQuad
 import org.polyfrost.polyplus.client.cosmetics.runtime.AttachedCosmetic
 import org.polyfrost.polyplus.client.network.http.responses.BodySlot
 import kotlin.math.cos
@@ -19,25 +13,9 @@ internal class SideReach(val left: Float, val right: Float) {
     val span: Float get() = left + right
 }
 
-private fun walkBone(bone: BedrockBoneRenderer, parent: Matrix4f, visit: (Vector3f) -> Unit) {
-    val matrix = Matrix4f(parent)
-        .translate(bone.x / BedrockQuad.PIXEL_SCALE, bone.y / BedrockQuad.PIXEL_SCALE, bone.z / BedrockQuad.PIXEL_SCALE)
-        .rotate(Quaternionf().rotationZYX(bone.zRot, bone.yRot, bone.xRot))
-        .scale(bone.xScale, bone.yScale, bone.zScale)
-    for (quad in bone.mesh.quads) {
-        for (vertex in listOf(quad.v0, quad.v1, quad.v2, quad.v3)) {
-            visit(matrix.transformPosition(Vector3f(vertex.x, vertex.y, vertex.z).div(BedrockQuad.PIXEL_SCALE)))
-        }
-    }
-    bone.children.forEach { walkBone(it, matrix, visit) }
-}
-
-private fun AttachedCosmetic.visitPose(step: Int, visit: (Vector3f) -> Unit) {
-    model.resetPose()
-    animation?.let { model.applyPose(AnimationSampler.sample(it, it.lengthTicks * step / FLAP_SAMPLES), 1f) }
-    val root = Matrix4f().scale(scale)
-    model.attachments.forEach { walkBone(it.rootBone, root, visit) }
-    model.resetPose()
+private fun AttachedCosmetic.visitPose(step: Int, visit: (x: Float, z: Float) -> Unit) {
+    val positions = scene.restPositions(scene.animationSeconds * step / FLAP_SAMPLES)
+    for (i in positions.indices step 3) visit(positions[i], positions[i + 2])
 }
 
 internal fun typicalReach(worn: List<AttachedCosmetic>, yawDeg: Float): SideReach {
@@ -49,8 +27,8 @@ internal fun typicalReach(worn: List<AttachedCosmetic>, yawDeg: Float): SideReac
         var left = BODY_REACH
         var right = BODY_REACH
         shown.forEach { cosmetic ->
-            cosmetic.visitPose(step) { point ->
-                val side = point.x * across + point.z * depth
+            cosmetic.visitPose(step) { x, z ->
+                val side = x * across + z * depth
                 left = max(left, side)
                 right = max(right, -side)
             }

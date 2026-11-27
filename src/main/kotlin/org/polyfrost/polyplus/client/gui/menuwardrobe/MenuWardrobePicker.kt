@@ -73,6 +73,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.selectableRow
 import org.polyfrost.oneconfig.api.ui.v1.components.themedSurface
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
 import org.polyfrost.polyplus.client.gui.ThemedIcon
 import org.polyfrost.polyplus.client.gui.lobbyshell.CustomizeKit
 import org.polyfrost.polyplus.client.gui.lobbyshell.LobbyIcon
@@ -81,6 +82,13 @@ import org.polyfrost.polyplus.client.gui.lobbyshell.Segmented
 import org.polyfrost.polyplus.client.gui.lobbyshell.panel
 import org.polyfrost.polyplus.client.gui.wardrobe.AuraColorPopup
 import org.polyfrost.polyplus.client.gui.wardrobe.AuraSwatchRow
+import org.polyfrost.polyplus.client.gui.wardrobe.coloursSaving
+import org.polyfrost.polyplus.client.gui.wardrobe.CustomColoursChip
+import org.polyfrost.polyplus.client.gui.wardrobe.CustomColoursPanel
+import org.polyfrost.polyplus.client.gui.wardrobe.colourFailureMessage
+import org.polyfrost.polyplus.client.gui.wardrobe.customPieces
+import org.polyfrost.polyplus.client.gui.wardrobe.rememberCustomColours
+import org.polyfrost.polyplus.client.gui.wardrobe.useDesignedColours
 import org.polyfrost.polyplus.client.gui.wardrobe.CosmeticUiItem
 import org.polyfrost.polyplus.client.gui.wardrobe.ForceCapesToggle
 import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
@@ -113,6 +121,7 @@ internal class PickerModel(
     val note: String?,
     val status: String? = null,
     val picksToWheel: Boolean = false,
+    val onStatus: (String) -> Unit = {},
 )
 
 private enum class PickerFilter(val label: String) {
@@ -437,36 +446,70 @@ private fun PickerFooter(model: PickerModel) {
     val variantItem = model.variantItem()
     val action = model.applyAction()
     val aura = model.aura
-    if (variantItem == null && aura == null && !model.forceToggle && action == null) return
+    val colourItem = (model.selected ?: model.target)?.item
+    val colourVariant = colourItem?.let(model.variantOf)
+    val custom = rememberCustomColours(colourItem?.let { customPieces(it, colourVariant) }, colourItem?.owned == true)
+    if (variantItem == null && custom == null && aura == null && !model.forceToggle && action == null) return
+    val targetItem = model.target?.item
+    val coloursBusy = (variantItem?.let(::coloursSaving) ?: false) || custom?.saving == true
+    val equipBusy = action == ApplyAction.Equip && targetItem != null && coloursSaving(targetItem)
     Column(
         Modifier.fillMaxWidth().padding(top = CustomizeKit.SectionGap),
         verticalArrangement = Arrangement.spacedBy(CustomizeKit.SectionGap),
     ) {
-        if (variantItem != null) {
+        if (variantItem != null || custom != null) {
             FlowRow(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                for (variant in variantItem.variants) {
-                    Chip(label = variant.name, selected = variant.id == model.variantOf(variantItem), onClick = { model.onPickVariant(variantItem, variant.id) })
+                if (variantItem != null) {
+                    for (variant in variantItem.variants) {
+                        val current = variant.id == model.variantOf(variantItem)
+                        Chip(
+                            label = variant.name,
+                            selected = current && custom?.selected != true,
+                            enabled = !coloursBusy,
+                            onClick = {
+                                if (current && custom != null && custom.selected) {
+                                    custom.useDesigned { result -> result.onFailure { model.onStatus(colourFailureMessage(it, "Couldn't switch back to the default colors. Try again in a moment.")) } }
+                                } else {
+                                    model.onPickVariant(variantItem, variant.id)
+                                    if (!current) {
+                                        useDesignedColours(variant.pieces) { result -> result.onFailure { model.onStatus(colourFailureMessage(it, "Couldn't switch to the designed colors. Try again in a moment.")) } }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                } else if (custom != null) {
+                    Chip(
+                        label = "Default",
+                        selected = !custom.selected,
+                        enabled = !coloursBusy,
+                        onClick = {
+                            custom.useDesigned { result -> result.onFailure { model.onStatus(colourFailureMessage(it, "Couldn't switch back to the default colors. Try again in a moment.")) } }
+                        },
+                    )
                 }
+                if (custom != null) CustomColoursChip(custom)
             }
         }
+        if (custom != null) CustomColoursPanel(custom, model.onStatus)
         if (aura != null) AuraControl(aura)
         if (model.forceToggle) ForceCapesToggle()
         val target = model.target
         if (action != null && target != null) {
             TextButton(
                 text = when (action) {
-                    ApplyAction.Equip -> "Equip ${target.name}"
+                    ApplyAction.Equip -> if (equipBusy) "Saving colors..." else "Equip ${target.name}"
                     ApplyAction.Unequip -> "Unequip ${target.name}"
                     ApplyAction.Equipped -> "Equipped"
                 },
                 onClick = model.onApply,
                 style = if (action == ApplyAction.Equip) ControlStyle.Primary else ControlStyle.Secondary,
                 size = ControlSize.Large,
-                enabled = action != ApplyAction.Equipped,
+                enabled = action != ApplyAction.Equipped && !equipBusy,
                 fillWidth = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -477,10 +520,11 @@ private fun PickerFooter(model: PickerModel) {
 @Composable
 private fun AuraControl(aura: AuraChoice) {
     var customOpen by remember { mutableStateOf(false) }
+    val saving = ColourSaves.auraPending()
     Box {
-        AuraSwatchRow(aura.color, customOpen, { customOpen = !customOpen }, aura.onCommit)
+        AuraSwatchRow(aura.color, customOpen, { customOpen = !customOpen }, aura.onCommit, enabled = !saving)
         if (customOpen) {
-            AuraColorPopup(aura.color, aura.onPreview, aura.onCommit, onDismiss = { customOpen = false })
+            AuraColorPopup(aura.color, aura.onPreview, aura.onCommit, onDismiss = { customOpen = false }, enabled = !saving)
         }
     }
 }

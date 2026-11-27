@@ -52,9 +52,10 @@ fun PlayerPreview(
     maxTextureSize: Int = PlayerPreviewOffscreen.MAX_DIM,
     cameraTiltDeg: Float = 0f,
     lights: PreviewLights? = null,
+    tryOn: PreviewTryOn? = null,
 ) {
     if (live) {
-        PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction, rotation, fadeEdges, maxTextureSize, cameraTiltDeg, lights)
+        PlayerPreviewLive(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey, bottomFadeFraction, rotation, fadeEdges, maxTextureSize, cameraTiltDeg, lights, tryOn)
         return
     }
     PlayerPreviewBitmap(modifier, source, autoSpin, allowDrag, modelScale, verticalAnchor, initialYaw, previewKey)
@@ -76,6 +77,7 @@ private fun PlayerPreviewLive(
     maxTextureSize: Int,
     cameraTiltDeg: Float,
     lights: PreviewLights?,
+    tryOn: PreviewTryOn?,
 ) {
     val entry = remember { PlayerPreviewOffscreen.register() }
     DisposableEffect(entry) {
@@ -99,6 +101,7 @@ private fun PlayerPreviewLive(
         entry.maxTextureSize = maxTextureSize
         entry.cameraTiltDeg = cameraTiltDeg
         entry.lights = lights
+        entry.tryOn = tryOn
         entry.initialYaw = sharedYaw ?: initialYaw
         if (sharedPitch != null) {
             entry.dragYaw = 0f

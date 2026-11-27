@@ -1350,7 +1350,7 @@ private fun BlockHighlightPage(
                 onNext = { pick((base + 1).mod(names.size)) },
             )
             SwatchRow(
-                "Colour", draft.outlineColor, draft.outlineRainbow,
+                "Color", draft.outlineColor, draft.outlineRainbow,
                 { change { outlineColor = it } }, { change { outlineRainbow = it } },
             )
             CardSlider("Opacity", draft.outlineOpacity, { "%.0f%%".fmt(it * 100f) }) {
@@ -1365,7 +1365,7 @@ private fun BlockHighlightPage(
             CardToggle("Fill", draft.fill) { change { fill = it } }
             if (draft.fill) {
                 SwatchRow(
-                    "Fill colour", draft.fillColor, draft.fillRainbow,
+                    "Fill color", draft.fillColor, draft.fillRainbow,
                     { change { fillColor = it } }, { change { fillRainbow = it } },
                 )
                 CardSlider("Fill opacity", draft.fillOpacity, { "%.0f%%".fmt(it * 100f) }) {

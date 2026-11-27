@@ -13,6 +13,7 @@ import org.polyfrost.polyplus.client.PolyPlusCosmeticsConfig
 import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.lobby.LobbyTime
+import org.polyfrost.polyplus.client.pets.PetPlay
 import java.nio.file.Files
 
 class ConfigSplitMigrationTest {
@@ -33,6 +34,7 @@ class ConfigSplitMigrationTest {
                 "customPanorama": false,
                 "hideHeadCosmeticsWithHelmet": true,
                 "hideFeetCosmeticsWithBoots": false,
+                "petInteractions": false,
                 "showChatEmoji": false
             }
         """.trimIndent()
@@ -67,6 +69,12 @@ class ConfigSplitMigrationTest {
     fun `cosmetics options are carried over`() {
         assertTrue(PolyPlusCosmeticsConfig.hideHeadCosmeticsWithHelmet)
         assertFalse(PolyPlusCosmeticsConfig.hideFeetCosmeticsWithBoots)
+    }
+
+    @Test
+    fun `a turned off pet play switch becomes off`() {
+        assertEquals(PetPlay.OFF, PolyPlusCosmeticsConfig.petPlay)
+        assertTrue(PolyPlusCosmeticsConfig.migratedPetPlay)
     }
 
     @Test

@@ -5,15 +5,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.polyfrost.polyplus.client.PolyPlusClient
 import org.polyfrost.polyplus.client.cosmetics.CosmeticCatalog
 import org.polyfrost.polyplus.client.cosmetics.CosmeticGroupView
 import org.polyfrost.polyplus.client.cosmetics.CosmeticService
 import org.polyfrost.polyplus.client.cosmetics.MojangCape
 import org.polyfrost.polyplus.client.cosmetics.MojangCapeService
+import org.polyfrost.polyplus.client.cosmetics.colors.ColourSaves
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitInfo
 import org.polyfrost.polyplus.client.cosmetics.outfits.OutfitLibrary
 import org.polyfrost.polyplus.client.cosmetics.outfits.PlayerSkinInfo
@@ -28,7 +28,6 @@ import org.polyfrost.polyplus.client.utils.ClientPlatform
 import java.util.concurrent.atomic.AtomicBoolean
 
 private val lookChangePending = AtomicBoolean(false)
-private val equipLock = Mutex()
 
 internal var auraColorFailures by mutableIntStateOf(0)
     private set
@@ -67,9 +66,9 @@ private fun <T> launchLibraryCall(
     call: suspend () -> Result<T>,
     failure: (Throwable) -> String,
     success: (T) -> String,
-) {
+): Job {
     pending?.let(onStatus)
-    PolyPlusClient.SCOPE.launch {
+    return PolyPlusClient.SCOPE.launch {
         val result = call()
         ClientPlatform.runOnMain { onStatus(result.fold(onSuccess = success, onFailure = failure)) }
     }
@@ -183,16 +182,22 @@ internal fun deleteSkin(skin: PlayerSkinInfo, onStatus: (String) -> Unit) {
     ) { "Deleted ${skin.name}." }
 }
 
-internal fun selectAuraColor(color: Int?, onStatus: (String) -> Unit) {
+internal fun selectAuraColor(color: Int?, onStatus: (String) -> Unit): Boolean {
+    val hold = ColourSaves.holdAura()
+    if (hold == null) {
+        onStatus(ColourSaves.STILL_SAVING)
+        return false
+    }
     launchLibraryCall(
         onStatus,
         if (color != null) "Updating aura color..." else "Clearing aura color...",
-        { CosmeticService.setParticleColor(color) },
+        { CosmeticService.setParticleColor(color, hold) },
         {
             auraColorFailures++
-            wardrobeFailure(it, "update your aura color")
+            colourFailureMessage(it, wardrobeFailure(it, "update your aura color"))
         },
-    ) { if (color != null) "Aura color updated." else "Aura color cleared." }
+    ) { if (color != null) "Aura color updated." else "Aura color cleared." }.invokeOnCompletion { hold.release() }
+    return true
 }
 
 internal fun addEmoteToWheel(item: CosmeticUiItem, targetSlot: Int?, onStatus: (String) -> Unit) {
@@ -229,23 +234,19 @@ internal fun rememberCosmeticItems(refreshKey: Int): List<CosmeticUiItem> =
         val groupItems = CosmeticCatalog.cosmeticGroupViews()
             .sortedWith(compareBy<CosmeticGroupView> { it.type.ordinal }.thenBy { it.groupId })
             .map { group ->
-                val byLabel = LinkedHashMap<Pair<String, BodySlot?>, CosmeticVariantUi>()
-                for (variant in group.variants) {
-                    val side = handSide(variant)
-                    byLabel.getOrPut(variant.variantName to side) {
-                        CosmeticVariantUi(variant.id, variant.variantName, side = side)
-                    }
-                }
-                val chips = withBothChips(byLabel.values.map { it.withSideLabel(byLabel.keys) })
-                val equippedVariant = group.variants.firstOrNull { it.id in equippedIds }
-                val wornChipIds = group.variants.filter { it.id in equippedIds }.mapNotNullTo(HashSet()) { byLabel[it.variantName to handSide(it)]?.id }
+                val shown = lockerVariants(group, ownedIds, equippedIds)
+                val byLabel = variantsByLabel(shown)
+                val chips = variantChips(byLabel)
+                val equippedVariant = shown.variants.firstOrNull { it.id in equippedIds }
+                val wornChipIds = shown.variants.filter { it.id in equippedIds }.mapNotNullTo(HashSet()) { byLabel[it.variantName to handSide(it)]?.id }
                 val bothWorn = chips.firstOrNull { it.pieces.size > 1 && wornChipIds.containsAll(it.pieces) }
                 CosmeticUiItem(
                     groupId = group.groupId,
+                    grouped = group.grouped,
                     type = group.type,
                     name = group.name,
                     collection = "${group.type.displayName} Collection",
-                    owned = group.variants.any { it.id in ownedIds },
+                    owned = shown.variants.any { it.id in ownedIds },
                     equipped = equippedVariant != null,
                     variants = chips,
                     equippedVariantId = bothWorn?.id ?: equippedVariant?.let { byLabel[it.variantName to handSide(it)]?.id ?: it.id },
@@ -271,6 +272,27 @@ internal fun rememberCosmeticItems(refreshKey: Int): List<CosmeticUiItem> =
 
         groupItems + emoteItems
     }
+
+internal fun lockerVariants(group: CosmeticGroupView, owned: Set<Int>, equipped: Set<Int>): CosmeticGroupView {
+    if (group.variants.none { it.id in owned }) return group
+    return group.copy(variants = group.variants.filter { it.id in owned || it.id in equipped })
+}
+
+private fun variantsByLabel(group: CosmeticGroupView): Map<Pair<String, BodySlot?>, CosmeticVariantUi> {
+    val byLabel = LinkedHashMap<Pair<String, BodySlot?>, CosmeticVariantUi>()
+    for (variant in group.variants) {
+        val side = handSide(variant)
+        byLabel.getOrPut(variant.variantName to side) {
+            CosmeticVariantUi(variant.id, variant.variantName, side = side)
+        }
+    }
+    return byLabel
+}
+
+private fun variantChips(byLabel: Map<Pair<String, BodySlot?>, CosmeticVariantUi>): List<CosmeticVariantUi> =
+    withBothChips(byLabel.values.map { it.withSideLabel(byLabel.keys) })
+
+internal fun variantChips(group: CosmeticGroupView): List<CosmeticVariantUi> = variantChips(variantsByLabel(group))
 
 private fun handSide(variant: CosmeticDefinition): BodySlot? = when {
     variant.allowsSlot(BodySlot.LeftHand) == variant.allowsSlot(BodySlot.RightHand) -> null
@@ -325,14 +347,23 @@ internal fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) ->
         onComplete("${item.name} is not in your locker.")
         return
     }
+    if (item.type != CosmeticType.Emote && coloursSaving(item)) {
+        onComplete(ColourSaves.STILL_SAVING)
+        return
+    }
+    val ticket = ColourSaves.ticket()
 
     PolyPlusClient.SCOPE.launch {
-        val result = equipLock.withLock {
+        val wanted = item.variant(variantId)
+        if (item.type != CosmeticType.Emote) {
+            CosmeticService.awaitSkinChangeFor(if (wanted != null && wanted.sided) wanted.pieces else listOf(variantId))
+        }
+        val result = CosmeticService.equipQueue.run {
             val variant = item.variant(variantId)
             when {
                 item.type == CosmeticType.Emote -> CosmeticService.equipEmote(variantId)
-                variant != null && variant.sided -> CosmeticService.equipPieces(variant.pieces, wornGroupSlots(item))
-                else -> CosmeticService.equip(variantId)
+                variant != null && variant.sided -> CosmeticService.equipPieces(variant.pieces, wornGroupSlots(item), ticket)
+                else -> CosmeticService.equip(variantId, colourTicket = ticket)
             }
         }
         ClientPlatform.runOnMain {
@@ -348,7 +379,7 @@ internal fun equip(item: CosmeticUiItem, variantId: Int, onComplete: (String) ->
 
 internal fun unequip(item: CosmeticUiItem, variantId: Int? = null, onComplete: (String) -> Unit) {
     PolyPlusClient.SCOPE.launch {
-        val result = equipLock.withLock {
+        val result = CosmeticService.equipQueue.run {
             val side = item.variant(variantId)?.side
             if (item.type == CosmeticType.Emote) {
                 CosmeticService.clearEmote()
@@ -356,7 +387,7 @@ internal fun unequip(item: CosmeticUiItem, variantId: Int? = null, onComplete: (
                 CosmeticService.clearSlot(side)
             } else {
                 val groupIds = CosmeticCatalog.cosmeticGroupViews()
-                    .firstOrNull { it.groupId == item.groupId }
+                    .firstOrNull { it.key == item.key }
                     ?.variants?.mapTo(HashSet()) { it.id }
                     .orEmpty() + listOfNotNull(item.equippedCosmeticId)
                 val slots = CosmeticCatalog.localEquipped().equipped.entries
