@@ -11,6 +11,8 @@ object LobbyLegacyRender {
     private var program = 0
     var failed = false
         private set
+    var failure: Throwable? = null
+        private set
     private var hologram = 0
     private var hologramFailed = false
     private var right = FloatArray(3)
@@ -28,6 +30,7 @@ object LobbyLegacyRender {
         if (failed) return
         if (program == 0) program = runCatching { build("lobby_terrain") }.onFailure {
             failed = true
+            failure = it
             LOBBY_LOGGER.warn("Terrain shader unavailable: {}", it.message)
         }.getOrDefault(0)
         if (program == 0) return

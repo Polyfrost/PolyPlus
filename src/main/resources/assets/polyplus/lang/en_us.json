@@ -1,6 +1,7 @@
 {
   "polyplus.hostWorld": "Host World",
   "polyplus.mainmenu.switchToOneClient": "OneClient Menu",
+  "polyplus.mainmenu.oneClientUnavailable": "The OneClient Menu couldn't start. Restart the game to try again; the reason is in latest.log.",
   "polyplus.featured.sponsored": "Sponsored",
   "polyplus.featured.restore": "Restore",
   "polyplus.reconnect": "Reconnect",

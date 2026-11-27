@@ -28,6 +28,9 @@ object MainMenuReplacement {
     }
 
     @JvmStatic
+    fun lobbyUnavailable(): Boolean = lobbyFailed
+
+    @JvmStatic
     fun enabled(): Boolean = choice() == MainMenuChoice.LOBBY
 
     @JvmStatic
@@ -79,7 +82,8 @@ object MainMenuReplacement {
     }
 
     fun fallBackToVanilla() {
-        LOBBY_LOGGER.warn("The lobby can't run, using the vanilla title screen until the next launch")
+        val (reason, cause) = runCatching { LobbyScene.failure() }.getOrElse { "unknown" to it }
+        LOBBY_LOGGER.error("The lobby can't run because {}, using the vanilla title screen until the next launch", reason, cause)
         lobbyFailed = true
         LobbyScene.stop()
         ClientPlatform.setScreen(

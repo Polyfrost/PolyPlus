@@ -425,6 +425,9 @@ object LobbyScene {
     private var leftAt = 0.0
     private var abandoning = false
     private var loadingTicks = 0
+    private var lastSceneError: Throwable? = null
+    private var failureReason: String? = null
+    private var failureCause: Throwable? = null
 
     @JvmStatic
     fun showing(): Boolean = shown() != null
@@ -721,6 +724,15 @@ object LobbyScene {
         //?}
     }
 
+    fun failure(): Pair<String, Throwable?> {
+        if (phase == Phase.FAILED) return (failureReason ?: "the scene failed") to failureCause
+        //? if = 1.8.9 {
+        /*return "the terrain shader is unavailable" to LobbyLegacyRender.failure
+        *///?} else {
+        return LobbyPipelines.failure()
+        //?}
+    }
+
     fun apiPhase(): LobbyPhase = when (phase) {
         Phase.IDLE -> LobbyPhase.IDLE
         Phase.LOADING -> LobbyPhase.LOADING
@@ -874,9 +886,13 @@ object LobbyScene {
         loadingTicks = 0
         val entry = attempts.removeFirstOrNull()
         if (entry == null) {
+            val sceneError = lastSceneError
+            lastSceneError = null
             if (switching) {
                 switching = false
             } else {
+                failureReason = "no scene could be loaded"
+                failureCause = sceneError
                 phase = Phase.FAILED
                 session?.finish(LobbyPhase.FAILED)
             }
@@ -911,6 +927,7 @@ object LobbyScene {
 
     private fun fail(entry: LobbySceneEntry, error: Throwable) {
         LOBBY_LOGGER.warn("Scene {} did not load", entry.id, error)
+        lastSceneError = error
         tryNext()
     }
 
@@ -2330,6 +2347,7 @@ object LobbyScene {
     private fun watchLoading() {
         if ((phase != Phase.LOADING && !switching) || embedded || ++loadingTicks < STALL_TICKS) return
         LOBBY_LOGGER.error("Lobby scene did not load within {} ticks, trying the next one", STALL_TICKS)
+        lastSceneError = IllegalStateException("Scene did not load within $STALL_TICKS ticks")
         loadGeneration++
         tryNext()
     }
@@ -2525,6 +2543,8 @@ object LobbyScene {
                 LOBBY_LOGGER.error("Lobby scene cleanup failed", cleanup)
                 scrap()
             }
+            failureReason = "the scene failed during $stage"
+            failureCause = error
             phase = Phase.FAILED
         } finally {
             abandoning = false

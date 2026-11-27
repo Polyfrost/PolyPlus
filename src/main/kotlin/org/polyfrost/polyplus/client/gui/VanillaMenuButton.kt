@@ -39,11 +39,19 @@ object VanillaMenuButton {
             .bounds(screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE)
             .build()
 
-    private fun lobbyButton(screenWidth: Int): Button =
-        Button.builder(PolyPlusBadge.badgeIcon) { MainMenuReplacement.switchToLobby() }
-            .tooltip(Tooltip.create(Component.translatable("polyplus.mainmenu.switchToOneClient")))
+    private fun lobbyButton(screenWidth: Int): Button {
+        val unavailable = MainMenuReplacement.lobbyUnavailable()
+        val tooltip = if (unavailable) {
+            Component.translatable("polyplus.mainmenu.oneClientUnavailable")
+        } else {
+            Component.translatable("polyplus.mainmenu.switchToOneClient")
+        }
+        return Button.builder(PolyPlusBadge.badgeIcon) { MainMenuReplacement.switchToLobby() }
+            .tooltip(Tooltip.create(tooltip))
             .bounds(screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE)
             .build()
+            .also { it.active = !unavailable }
+    }
     //?} else {
     /*const val LEGACY_BUTTON_ID = 0x504C5553
 
@@ -52,7 +60,7 @@ object VanillaMenuButton {
     @JvmStatic
     fun legacyButtons(screenWidth: Int): List<ButtonWidget> =
         if (MainMenuReplacement.replacesTitleScreen()) emptyList()
-        else listOf(ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "OC"))
+        else listOf(ButtonWidget(LEGACY_BUTTON_ID, screenWidth - SIZE - MARGIN, MARGIN, SIZE, SIZE, "OC").also { it.active = !MainMenuReplacement.lobbyUnavailable() })
 
     @JvmStatic
     fun onLegacyButton(id: Int): Boolean {
