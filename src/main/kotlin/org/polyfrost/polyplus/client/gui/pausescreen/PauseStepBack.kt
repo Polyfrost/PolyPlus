@@ -271,7 +271,8 @@ private fun BoxScope.FlatAvatar(where: String, maxWidth: Dp, maxHeight: Dp, menu
     val height = minOf(roomHeight * FLAT_AVATAR_SHARE, roomWidth / aspect)
     if (height < FLAT_AVATAR_MIN) return
     val width = height * aspect
-    val centre = (maxWidth * FLAT_AVATAR_X).coerceIn(LobbyLayout.Margin + width / 2, right - width / 2)
+    val minCentre = LobbyLayout.Margin + width / 2
+    val centre = (maxWidth * FLAT_AVATAR_X).coerceIn(minCentre, maxOf(minCentre, right - width / 2))
     Box(Modifier.matchParentSize().padding(top = top, bottom = bottom)) {
         Column(
             Modifier.align(Alignment.CenterStart).offset(x = centre - width / 2).width(width),
