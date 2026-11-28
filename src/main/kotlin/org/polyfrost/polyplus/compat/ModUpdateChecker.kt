@@ -2,13 +2,12 @@ package org.polyfrost.polyplus.compat
 
 import net.minecraft.client.gui.screens.Screen
 import org.polyfrost.polyplus.client.utils.ClientPlatform
-import org.polyfrost.polyplus.privacy.LauncherEnvironment
 import java.lang.reflect.Method
 
 /**
  * Mod Update Checker (https://github.com/ooTruffle/ModUpdateChecker) puts its button on the vanilla
- * title screen, which the lobby replaces, so the lobby shows its own. Not offered under the OneClient
- * launcher, which updates mods itself. 1.8.9 only, and reflective so the mod stays optional.
+ * title screen, which PolyPlus's menus replace, so they show their own. 1.8.9 only, and reflective so
+ * the mod stays optional.
  */
 internal object ModUpdateChecker {
     private const val MOD_ID = "modupdatechecker"
@@ -28,7 +27,7 @@ internal object ModUpdateChecker {
     private class Api(val updateCount: Method, val running: Method, val screens: Any, val create: Method)
 
     private val api: Api? by lazy {
-        if (LauncherEnvironment.isOneClient || !Mods.loaded(MOD_ID)) return@lazy null
+        if (!Mods.loaded(MOD_ID)) return@lazy null
         runCatching {
             val loader = javaClass.classLoader
             val checker = Class.forName(CHECKER, false, loader)
