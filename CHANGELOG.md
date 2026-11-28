@@ -5,6 +5,14 @@ All notable changes to PolyPlus are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Sentry crash reports no longer send your computer name
+
+### Fixed
+- Intentional throws from Hotwire are no longer sent to Sentry
+
 ## [2.4.1] - 2026-11-25
 
 ### Changed

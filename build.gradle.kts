@@ -456,6 +456,8 @@ tasks.withType<JavaCompile>().configureEach {
         disableAllChecks = true
         error("UnnecessarilyFullyQualified")
     }
+    val sourceSetName = sourceSets.find { it.compileJavaTaskName == name }!!.name
+    finalizedBy("checkstyle${sourceSetName.capitalize()}")
 }
 
 abstract class KotlinCompileLimit : BuildService<BuildServiceParameters.None>
@@ -466,10 +468,6 @@ val kotlinCompileLimit = gradle.sharedServices.registerIfAbsent("kotlinCompileLi
 
 tasks.withType<KotlinCompile>().configureEach {
     usesService(kotlinCompileLimit)
-}
-
-tasks.named<JavaCompile>("compileJava") {
-    finalizedBy("checkstyleMain")
 }
 
 // the enabled Detekt rules need type resolution, which only the per-compilation tasks have
