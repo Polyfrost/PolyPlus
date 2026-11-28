@@ -28,9 +28,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import org.polyfrost.compose.host.controller.Controllers
+import org.polyfrost.compose.host.controller.controllerFocusScope
+import org.polyfrost.compose.host.controller.hidesFocusRing
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
@@ -112,10 +121,20 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
     EscapeCloses(onEnd)
     val theme = OneConfigTheme.current
     val appear = remember { Animatable(0f) }
+    var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(START_DELAY_MILLIS)
+        started = true
         appear.animateTo(1f, Motion.finiteSpec(tween(APPEAR_MILLIS)))
     }
+    val controller = Controllers.isActive
+    val blockFocus = remember { FocusRequester() }
+    LaunchedEffect(started, controller) {
+        if (started || !controller) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { blockFocus.requestFocus() }
+    }
+    Box(Modifier.fillMaxSize().controllerFocusScope().hidesFocusRing().focusRequester(blockFocus).focusable(enabled = controller))
     val density = LocalDensity.current
     val pad = with(density) { HolePad.toPx() }
     val gap = with(density) { CardGap.toPx() }
@@ -128,10 +147,19 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
         key(tour.index) {
             val shown = remember { Animatable(0f) }
             LaunchedEffect(Unit) { shown.animateTo(1f, Motion.finiteSpec(tween(APPEAR_MILLIS))) }
+            val nextFocus = remember { FocusRequester() }
+            var cardFocused by remember { mutableStateOf(false) }
+            LaunchedEffect(started, controller, cardFocused) {
+                if (!started || !controller || cardFocused) return@LaunchedEffect
+                withFrameNanos { }
+                runCatching { nextFocus.requestFocus() }
+            }
             Announce("${tour.title()}. ${tour.text()}")
             Column(
                 Modifier
                     .placed { size -> cardOffset(anchor, hole, size, root, gap, margin) }
+                    .onFocusChanged { cardFocused = it.hasFocus }
+                    .controllerFocusScope()
                     .a11yRegion(A11yRegion.Tour)
                     .width(CardWidth)
                     .graphicsLayer { alpha = shown.value }
@@ -147,7 +175,7 @@ internal fun TourLayer(tour: LobbyTour, anchors: Map<TourAnchor, Rect>, onEnd: (
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(text = "Skip tour", onClick = onEnd, size = ControlSize.Large)
                     Spacer(Modifier.weight(1f))
-                    TextButton(text = if (tour.last) "Done" else "Next", onClick = { if (!tour.next()) onEnd() }, size = ControlSize.Large, style = ControlStyle.Primary)
+                    TextButton(text = if (tour.last) "Done" else "Next", onClick = { if (!tour.next()) onEnd() }, modifier = Modifier.focusRequester(nextFocus), size = ControlSize.Large, style = ControlStyle.Primary)
                 }
             }
         }

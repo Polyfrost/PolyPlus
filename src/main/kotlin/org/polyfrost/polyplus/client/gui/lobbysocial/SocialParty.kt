@@ -496,6 +496,7 @@ internal object PartyCardText {
     const val ALLOW = "Allow"
     const val DENY = "Deny"
     const val WANTS_TO_JOIN = "Wants to join your world"
+    const val RESPOND = "Respond"
 
     fun needs(version: String?): String = version?.let { "Needs Minecraft $it" } ?: "Needs another Minecraft version"
 
@@ -519,7 +520,11 @@ internal fun PartyCard(
     dismissEnabled: Boolean = true,
     warning: String? = null,
 ) {
-    Column(modifier.width(PartyCardWidth).popup().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val frame = modifier
+        .width(PartyCardWidth)
+        .popup()
+        .padding(12.dp)
+    Column(frame, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PlayerHead(seedOf(player), 34.dp, Modifier, shape = headShape(34.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

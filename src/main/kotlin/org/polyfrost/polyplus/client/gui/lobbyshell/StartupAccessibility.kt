@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.language.I18n
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.oneconfig.api.platform.v1.Platform
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.a11y.A11y
@@ -160,6 +161,7 @@ internal object StartupAccessibility {
 
     fun handleKey(key: Int, modifiers: Int): Boolean {
         val exit = leave ?: return OnboardingKeys.handle(key)
+        if (Controllers.isDispatching && key != InputConstants.KEY_ESCAPE) return false
         when (key) {
             InputConstants.KEY_ESCAPE -> exit()
             InputConstants.KEY_TAB -> move(if (modifiers and SHIFT_MODIFIER != 0) -1 else 1)

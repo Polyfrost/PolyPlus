@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui
 
+import org.polyfrost.compose.host.controller.ControllerGuide
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import androidx.compose.runtime.Composable
 import com.mojang.blaze3d.platform.InputConstants
@@ -12,6 +13,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 *///?} else {
 /*import net.minecraft.client.gui.screen.Screen
 *///?}
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.oneconfig.api.ui.v1.components.ProvidePopupSounds
 import org.polyfrost.oneconfig.api.ui.v1.platform.OneConfigComposeScreen
 import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager
@@ -39,6 +41,8 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
     override val blurBackground: Boolean get() = false
 
     override val dimBackground: Boolean get() = false
+
+    override val controllerGuide: ControllerGuide get() = ControllerGuide.BottomCenter
 
     override fun init() {
         lobby.open()
@@ -69,7 +73,7 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
     }
 
     override fun handleKeyPressed(key: Int, modifiers: Int): Boolean {
-        if (key in navigationKeys) keyNavigated = true
+        if (key in navigationKeys || Controllers.isDispatching) keyNavigated = true
         LobbyAntics.key(key, lobby.calm())
         if (lobby.setup && StartupAccessibility.handleKey(key, modifiers)) return true
         if (lobby.setup && OnboardingKeyCapture.capture(key)) return true
@@ -85,7 +89,8 @@ class PolyPlusLobbyScreen internal constructor(firstPage: LobbyPage) : OneConfig
             *///?}
         }
         val enter = key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER
-        if (enter && (lobby.tour != null || !keyNavigated || !LobbyA11y.keyboardFocused()) && lobby.openSocial()) return true
+        val keyboardOnly = !Controllers.isDispatching && (!keyNavigated || !LobbyA11y.keyboardFocused())
+        if (enter && (lobby.tour != null || keyboardOnly) && lobby.openSocial()) return true
         return super.handleKeyPressed(key, modifiers)
     }
 

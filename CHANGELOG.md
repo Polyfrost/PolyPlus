@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Controller support with Controlify. The lobby, onboarding, wardrobe, social windows and pause screens all work with a gamepad, and the emote and ping wheels follow the right stick. B switches between your emote wheels while one is open. In the lobby, Y lets you answer party invites and join requests
+- Controlify controls for opening Socials and the Wardrobe, the emote wheel, pings and party voice. Opening Socials or the Wardrobe and the voice toggles can also go in Controlify's radial menu
+
 ### Changed
 - Sentry crash reports no longer send your computer name
+- Needs OneConfig 1.10.0 and PolyCompose 3.1.0
 
 ### Fixed
 - Intentional throws from Hotwire are no longer sent to Sentry

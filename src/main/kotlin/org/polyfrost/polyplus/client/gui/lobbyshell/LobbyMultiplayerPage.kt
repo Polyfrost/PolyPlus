@@ -86,7 +86,6 @@ import org.polyfrost.oneconfig.api.ui.v1.components.MenuHeading
 import org.polyfrost.oneconfig.api.ui.v1.components.MenuRadioGroup
 import org.polyfrost.oneconfig.api.ui.v1.components.AnchoredPopupButton
 import org.polyfrost.oneconfig.api.ui.v1.components.Placement
-import androidx.compose.ui.focus.focusProperties
 import org.polyfrost.polyplus.client.featured.ServerFolders
 import org.polyfrost.oneconfig.api.ui.v1.components.ConfirmDialog
 import org.polyfrost.oneconfig.api.ui.v1.components.DialogButtons
@@ -102,6 +101,7 @@ import org.polyfrost.polyplus.client.PolyPlusLobbyConfig
 import org.polyfrost.polyplus.client.PolyPlusMainMenuConfig
 import org.polyfrost.polyplus.client.featured.FeaturedServers
 import org.polyfrost.polyplus.client.gui.SocialDangerText
+import org.polyfrost.polyplus.client.gui.controllerFocusOnly
 import org.polyfrost.polyplus.client.gui.ASSETS
 import org.polyfrost.polyplus.client.gui.RasterImage
 import org.polyfrost.polyplus.client.gui.SOCIAL_ASSETS
@@ -244,7 +244,7 @@ private fun FolderNameDialog(
                     AnchoredPopupButton(
                         icon = "down",
                         contentDescription = "Pick a folder",
-                        modifier = Modifier.focusProperties { canFocus = false },
+                        modifier = Modifier.controllerFocusOnly(),
                         placement = Placement.BelowEnd,
                     ) { closeMenu ->
                         MenuList(suggestions.map { folder -> MenuAction(folder, { name = folder }, checked = folder.equals(name.trim(), ignoreCase = true)) }, closeMenu)

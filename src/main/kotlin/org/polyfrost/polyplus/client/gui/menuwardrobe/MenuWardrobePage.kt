@@ -31,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import org.polyfrost.compose.host.controller.controllerPan
+import org.polyfrost.polyplus.client.gui.focusableOnController
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -80,6 +82,7 @@ private const val FACING_CAMERA = 180f
 private const val FRONT_YAW = FACING_CAMERA - 16f
 private const val BACK_YAW = -15f
 private const val DRAG_DEGREES = 0.5f
+private const val PAN_DEGREES = 0.125f
 private const val STATUS_VISIBLE_MS = 4_000L
 private const val FALLBACK_MODEL_SCALE = 0.36f
 private const val FALLBACK_ANCHOR = 0.53f
@@ -368,13 +371,19 @@ private fun WardrobeContent(online: Boolean, onBack: () -> Unit, onMarketplace: 
             .fillMaxSize()
         if (liveScene) {
             Box(
-                freeArea.pointerInput(rotation) {
-                    detectDragGestures { change, drag ->
-                        rotation.yaw -= drag.x * DRAG_DEGREES
-                        rotation.userRotated = true
-                        change.consume()
+                freeArea
+                    .pointerInput(rotation) {
+                        detectDragGestures { change, drag ->
+                            rotation.yaw -= drag.x * DRAG_DEGREES
+                            rotation.userRotated = true
+                            change.consume()
+                        }
                     }
-                },
+                    .controllerPan { delta ->
+                        rotation.yaw -= delta.x * PAN_DEGREES
+                        rotation.userRotated = true
+                    }
+                    .focusableOnController(),
             )
         } else {
             Canvas(freeArea) {

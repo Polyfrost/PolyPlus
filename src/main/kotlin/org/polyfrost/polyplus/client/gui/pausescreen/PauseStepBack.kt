@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
+import org.polyfrost.compose.host.controller.focusWhenShown
 import org.polyfrost.polyplus.client.gui.lobbyshell.headShape
 import org.polyfrost.polyplus.client.gui.lobbyshell.centerVerticallyExact
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -126,7 +127,7 @@ internal fun BoxScope.StepBackScreen(screen: OneClientPauseScreen, narrow: Boole
                     Spacer(Modifier.height(6.dp))
                     PauseStateLine(state)
                     Spacer(Modifier.height(if (narrow) 12.dp else 18.dp))
-                    PlayButton(Modifier.fillMaxWidth().onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }, screen.capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game", null, screen::resume)
+                    PlayButton(Modifier.fillMaxWidth().focusWhenShown(true).onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }, screen.capture.entry(PauseSlot.RESUME)?.label ?: "Back to Game", null, screen::resume)
                     Spacer(Modifier.height(if (narrow) 8.dp else 12.dp))
                     StepBackRows(screen, if (narrow) TIGHT_ROW else CLASSIC_ROW)
                 }

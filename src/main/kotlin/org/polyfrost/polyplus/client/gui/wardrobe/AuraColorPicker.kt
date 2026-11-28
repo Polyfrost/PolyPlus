@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -39,7 +40,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
@@ -53,7 +60,11 @@ import androidx.compose.ui.window.PopupProperties
 import java.awt.Color as AwtColor
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import org.polyfrost.compose.host.controller.ControllerAxes
+import org.polyfrost.compose.host.controller.Controllers
+import org.polyfrost.compose.host.controller.controllerArrows
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
+import org.polyfrost.oneconfig.api.ui.v1.a11y.focusRing
 import org.polyfrost.oneconfig.api.ui.v1.components.EscapeCloses
 import org.polyfrost.oneconfig.api.ui.v1.components.Placement
 import org.polyfrost.oneconfig.api.ui.v1.components.Text
@@ -61,6 +72,7 @@ import org.polyfrost.oneconfig.api.ui.v1.components.oneConfigClickable
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberAnchoredPosition
 import org.polyfrost.oneconfig.api.ui.v1.keybind.trackTextInputFocus
 import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
+import org.polyfrost.polyplus.client.gui.focusableOnController
 import org.polyfrost.polyplus.client.gui.lobbyshell.sceneFrost
 
 @Composable
@@ -174,6 +186,66 @@ private fun Color.toArgb(alpha: Float): Int =
         ((red.coerceIn(0f, 1f) * 255f).roundToInt() shl 16) or
         ((green.coerceIn(0f, 1f) * 255f).roundToInt() shl 8) or
         (blue.coerceIn(0f, 1f) * 255f).roundToInt()
+
+private const val PAD_STEP = 0.05f
+private const val HUE_STEP = 10f
+
+private fun Modifier.arrowAdjust(
+    vertical: Boolean,
+    shape: Shape,
+    onDone: () -> Unit,
+    onStep: (dx: Float, dy: Float) -> Boolean,
+): Modifier = composed {
+    var editing by remember { mutableStateOf(false) }
+    var dirty by remember { mutableStateOf(false) }
+    val done by rememberUpdatedState(onDone)
+    val step by rememberUpdatedState(onStep)
+
+    fun stopEditing() {
+        editing = false
+        if (!dirty) return
+        dirty = false
+        done()
+    }
+
+    DisposableEffect(Unit) { onDispose { if (dirty) done() } }
+
+    onFocusChanged { if (!it.isFocused && editing) stopEditing() }
+        .then(if (editing) Modifier.controllerArrows(if (vertical) ControllerAxes.Both else ControllerAxes.Horizontal) else Modifier)
+        .onKeyEvent { event ->
+            when (event.key) {
+                Key.Enter, Key.NumPadEnter -> {
+                    if (event.type == KeyEventType.KeyUp) {
+                        if (editing) stopEditing() else editing = true
+                    }
+                    true
+                }
+                Key.Escape -> {
+                    if (!editing) return@onKeyEvent false
+                    if (event.type == KeyEventType.KeyDown) stopEditing()
+                    true
+                }
+                else -> {
+                    if (!editing || event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    val dx = when (event.key) {
+                        Key.DirectionLeft -> -1f
+                        Key.DirectionRight -> 1f
+                        else -> 0f
+                    }
+                    val dy = when (event.key) {
+                        Key.DirectionUp -> if (vertical) -1f else 0f
+                        Key.DirectionDown -> if (vertical) 1f else 0f
+                        else -> 0f
+                    }
+                    if (dx == 0f && dy == 0f) return@onKeyEvent false
+                    if (step(dx, dy)) dirty = true
+                    true
+                }
+            }
+        }
+        .focusRing(shape, editing && Controllers.isActive)
+        .focusableOnController()
+}
 
 private class AuraPickerState(argb: Int) {
     var hue by mutableFloatStateOf(0f)
@@ -300,6 +372,15 @@ private fun AuraCustomPopover(
             modifier = Modifier.fillMaxWidth().height(120.dp)
                 .clip(barShape)
                 .onSizeChanged { paneSize = Size(it.width.toFloat(), it.height.toFloat()) }
+                .arrowAdjust(vertical = true, barShape, ::emitCommit) { dx, dy ->
+                    val nextSaturation = (state.saturation + dx * PAD_STEP).coerceIn(0f, 1f)
+                    val nextBrightness = (state.brightness - dy * PAD_STEP).coerceIn(0f, 1f)
+                    val changed = nextSaturation != state.saturation || nextBrightness != state.brightness
+                    state.saturation = nextSaturation
+                    state.brightness = nextBrightness
+                    if (changed) emitPreview()
+                    changed
+                }
                 .drawWithCache {
                     val hueColor = hsbToColor(hue, 1f, 1f)
                     val horizontal = Brush.horizontalGradient(listOf(Color.White, hueColor))
@@ -352,6 +433,13 @@ private fun AuraCustomPopover(
                     )
                     onDrawBehind { drawRect(gradient) }
                 }
+                .arrowAdjust(vertical = false, barShape, ::emitCommit) { dx, _ ->
+                    val next = (state.hue + dx * HUE_STEP).coerceIn(0f, 360f)
+                    val changed = next != state.hue
+                    state.hue = next
+                    if (changed) emitPreview()
+                    changed
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -388,6 +476,13 @@ private fun AuraCustomPopover(
         Box(
             modifier = Modifier.fillMaxWidth().height(14.dp)
                 .clip(barShape)
+                .arrowAdjust(vertical = false, barShape, ::emitCommit) { dx, _ ->
+                    val next = (state.alpha + dx * PAD_STEP).coerceIn(0f, 1f)
+                    val changed = next != state.alpha
+                    state.alpha = next
+                    if (changed) emitPreview()
+                    changed
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()

@@ -13,10 +13,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -28,10 +31,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.polyfrost.compose.backend.drawPoly
+import org.polyfrost.compose.host.controller.controllerPan
+import org.polyfrost.polyplus.client.gui.focusableOnController
 import org.polyfrost.polyplus.client.cosmetics.MojangSkinService
 import org.polyfrost.polyplus.client.cosmetics.outfits.SkinLibrary
 
@@ -110,29 +118,41 @@ private fun PlayerPreviewLive(
     val edgeFade = remember { edgeFadeBrush() }
     val bottomFade = remember(bottomFadeFraction) { bottomFadeBrush(bottomFadeFraction) }
 
+    fun turn(drag: Offset) {
+        if (rotation != null) {
+            rotation.yaw -= drag.x * DRAG_YAW_SENSITIVITY
+            rotation.pitch = (rotation.pitch + drag.y * DRAG_PITCH_SENSITIVITY)
+                .coerceIn(-MAX_PITCH, MAX_PITCH)
+            rotation.userRotated = true
+            entry.initialYaw = rotation.yaw
+            entry.dragPitch = rotation.pitch
+        } else {
+            entry.dragYaw -= drag.x * DRAG_YAW_SENSITIVITY
+            entry.dragPitch = (entry.dragPitch + drag.y * DRAG_PITCH_SENSITIVITY)
+                .coerceIn(-MAX_PITCH, MAX_PITCH)
+        }
+    }
+
+    val hold = rememberDragHold { entry.dragging = it }
+
     val dragModifier: Modifier =
         if (allowDrag) {
-            Modifier.pointerInput(entry, rotation) {
-                detectDragGestures(
-                    onDragStart = { entry.dragging = true },
-                    onDragEnd = { entry.dragging = false },
-                    onDragCancel = { entry.dragging = false },
-                ) { change, drag ->
-                    if (rotation != null) {
-                        rotation.yaw -= drag.x * DRAG_YAW_SENSITIVITY
-                        rotation.pitch = (rotation.pitch + drag.y * DRAG_PITCH_SENSITIVITY)
-                            .coerceIn(-MAX_PITCH, MAX_PITCH)
-                        rotation.userRotated = true
-                        entry.initialYaw = rotation.yaw
-                        entry.dragPitch = rotation.pitch
-                    } else {
-                        entry.dragYaw -= drag.x * DRAG_YAW_SENSITIVITY
-                        entry.dragPitch = (entry.dragPitch + drag.y * DRAG_PITCH_SENSITIVITY)
-                            .coerceIn(-MAX_PITCH, MAX_PITCH)
+            Modifier
+                .pointerInput(entry, rotation) {
+                    detectDragGestures(
+                        onDragStart = { hold.mouse(true) },
+                        onDragEnd = { hold.mouse(false) },
+                        onDragCancel = { hold.mouse(false) },
+                    ) { change, drag ->
+                        turn(drag)
+                        change.consume()
                     }
-                    change.consume()
                 }
-            }
+                .controllerPan {
+                    hold.pan()
+                    turn(it * PAN_SCALE)
+                }
+                .focusableOnController()
         } else {
             Modifier
         }
@@ -196,6 +216,7 @@ private fun PlayerPreviewBitmap(
     var pitch by remember(previewKey) { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
     var sizePx by remember { mutableStateOf(IntSize.Zero) }
+    val hold = rememberDragHold { dragging = it }
 
     DisposableEffect(previewKey) {
         PlayerPreviewRenderer.retain(previewKey)
@@ -233,17 +254,24 @@ private fun PlayerPreviewBitmap(
             .onSizeChanged { sizePx = it }
             .then(
                 if (allowDrag) {
-                    Modifier.pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { dragging = true },
-                            onDragEnd = { dragging = false },
-                            onDragCancel = { dragging = false },
-                        ) { change, drag ->
-                            yaw -= drag.x * DRAG_YAW_SENSITIVITY
-                            pitch = (pitch + drag.y * DRAG_PITCH_SENSITIVITY).coerceIn(-MAX_PITCH, MAX_PITCH)
-                            change.consume()
+                    Modifier
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { hold.mouse(true) },
+                                onDragEnd = { hold.mouse(false) },
+                                onDragCancel = { hold.mouse(false) },
+                            ) { change, drag ->
+                                yaw -= drag.x * DRAG_YAW_SENSITIVITY
+                                pitch = (pitch + drag.y * DRAG_PITCH_SENSITIVITY).coerceIn(-MAX_PITCH, MAX_PITCH)
+                                change.consume()
+                            }
                         }
-                    }
+                        .controllerPan { delta ->
+                            hold.pan()
+                            yaw -= delta.x * PAN_SCALE * DRAG_YAW_SENSITIVITY
+                            pitch = (pitch + delta.y * PAN_SCALE * DRAG_PITCH_SENSITIVITY).coerceIn(-MAX_PITCH, MAX_PITCH)
+                        }
+                        .focusableOnController()
                 } else {
                     Modifier
                 },
@@ -256,10 +284,44 @@ private fun PlayerPreviewBitmap(
     }
 }
 
+private class DragHold(private val scope: CoroutineScope, private val apply: (Boolean) -> Unit) {
+    private var mouse = false
+    private var panning = false
+    private var release: Job? = null
+
+    fun mouse(down: Boolean) {
+        mouse = down
+        sync()
+    }
+
+    fun pan() {
+        panning = true
+        sync()
+        release?.cancel()
+        release = scope.launch {
+            delay(PAN_RELEASE_MS)
+            panning = false
+            sync()
+        }
+    }
+
+    private fun sync() = apply(mouse || panning)
+}
+
+@Composable
+private fun rememberDragHold(onHold: (Boolean) -> Unit): DragHold {
+    val scope = rememberCoroutineScope()
+    val hold by rememberUpdatedState(onHold)
+    return remember(scope) { DragHold(scope) { hold(it) } }
+}
+
+private const val PAN_RELEASE_MS = 300L
+
 private const val CAPTURE_POLL_ATTEMPTS = 30
 private const val CAPTURE_POLL_INTERVAL_MS = 16L
 
 private const val AUTO_SPIN_DEG_PER_TICK = 0.6f
 private const val DRAG_YAW_SENSITIVITY = 0.5f
+private const val PAN_SCALE = 0.25f
 private const val DRAG_PITCH_SENSITIVITY = 0.5f
 private const val MAX_PITCH = 45f

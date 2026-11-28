@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -51,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.polyfrost.compose.host.controller.controllerArrows
+import org.polyfrost.compose.host.controller.isFromController
 import org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi
 import org.polyfrost.oneconfig.api.ui.v1.components.Badge
 import org.polyfrost.oneconfig.api.ui.v1.components.Chip
@@ -87,6 +90,7 @@ import org.polyfrost.polyplus.client.network.http.responses.CosmeticType
 
 private const val GRID_COLUMNS = 3
 private const val DOUBLE_CLICK_MS = 400L
+private const val GET_MORE_KEY = "get-more"
 private val TileGap = 8.dp
 private val TileRadius = 12.dp
 internal val OutlineOnHover = ControlIndication(hoverAlpha = 0f, hoverBorder = true)
@@ -195,6 +199,7 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
     var query by remember(model.type) { mutableStateOf("") }
     var filter by remember(model.type) { mutableStateOf(PickerFilter.All) }
     var cursor by remember(model.type) { mutableStateOf(model.selected?.key) }
+    var gridFocused by remember { mutableStateOf(false) }
     val grid = remember(model.type) { LazyGridState() }
     val focus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -204,21 +209,42 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
     LaunchedEffect(model.selected?.key) { model.selected?.key?.let { cursor = it } }
     LaunchedEffect(model.type) { runCatching { focus.requestFocus() } }
 
-    fun move(delta: Int) {
+    fun move(delta: Int, controller: Boolean): Boolean {
         val list = current.entries.filter { it.matches(filter, query) }
-        if (list.isEmpty()) return
-        val from = list.indexOfFirst { it.key == (cursor ?: current.selected?.key ?: current.target?.key) }
-        val next = if (from < 0) 0 else (from + delta).coerceIn(0, list.lastIndex)
+        val getMore = controller && current.onMarketplace != null
+        val last = if (getMore) list.size else list.lastIndex
+        if (last < 0) return false
+        val key = cursor ?: current.selected?.key ?: current.target?.key
+        val from = if (getMore && key == GET_MORE_KEY) list.size else list.indexOfFirst { it.key == key }
+        val raw = from + delta
+        val leaves = raw < 0 || (raw > last && from / GRID_COLUMNS == last / GRID_COLUMNS)
+        if (controller && from >= 0 && leaves) return false
+        val next = if (from < 0) 0 else raw.coerceIn(0, last)
+        if (next == from) return false
+        scope.revealItem(grid, next)
+        if (next == list.size) {
+            cursor = GET_MORE_KEY
+            return true
+        }
         val entry = list[next]
         cursor = entry.key
         if (!current.picksToWheel) current.onPick(entry)
-        scope.revealItem(grid, next)
+        return true
     }
 
     fun confirm(): Boolean {
         val model = current
+        if (cursor == GET_MORE_KEY) {
+            val open = model.onMarketplace ?: return false
+            open()
+            return true
+        }
+        val entry = model.entries.firstOrNull { it.key == cursor }
         if (model.picksToWheel) {
-            val entry = model.entries.firstOrNull { it.key == cursor } ?: return false
+            model.onPick(entry ?: return false)
+            return true
+        }
+        if (entry != null && entry.key != model.selected?.key) {
             model.onPick(entry)
             return true
         }
@@ -230,12 +256,14 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
 
     fun onKey(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
+        val controller = event.isFromController
+        val arrows = !controller || gridFocused
         return when (event.key) {
-            Key.DirectionLeft -> { move(-1); true }
-            Key.DirectionRight -> { move(1); true }
-            Key.DirectionUp -> { move(-GRID_COLUMNS); true }
-            Key.DirectionDown -> { move(GRID_COLUMNS); true }
-            Key.Enter, Key.NumPadEnter -> confirm()
+            Key.DirectionLeft -> arrows && move(-1, controller)
+            Key.DirectionRight -> arrows && move(1, controller)
+            Key.DirectionUp -> arrows && move(-GRID_COLUMNS, controller)
+            Key.DirectionDown -> arrows && move(GRID_COLUMNS, controller)
+            Key.Enter, Key.NumPadEnter -> gridFocused && confirm()
             else -> false
         }
     }
@@ -265,12 +293,14 @@ internal fun SlotPicker(model: PickerModel, modifier: Modifier = Modifier) {
                     .padding(top = CustomizeKit.SectionGap)
                     .focusRequester(focus)
                     .onPreviewKeyEvent(::onKey)
+                    .onFocusChanged { gridFocused = it.isFocused }
+                    .controllerArrows()
                     .focusable(),
             ) {
                 if (shown.isEmpty() && model.onMarketplace == null) {
                     NoMatches(Modifier.fillMaxSize())
                 } else {
-                    PickerGrid(model, shown, grid, cursor) { entry ->
+                    PickerGrid(model, shown, grid, cursor, gridFocused, onTileFocus = { cursor = it.key }) { entry ->
                         cursor = entry.key
                         runCatching { focus.requestFocus() }
                     }
@@ -296,7 +326,15 @@ private fun CoroutineScope.revealItem(grid: LazyGridState, index: Int) {
 }
 
 @Composable
-private fun PickerGrid(model: PickerModel, shown: List<PickerEntry>, grid: LazyGridState, cursor: String?, onTileClick: (PickerEntry) -> Unit) {
+private fun PickerGrid(
+    model: PickerModel,
+    shown: List<PickerEntry>,
+    grid: LazyGridState,
+    cursor: String?,
+    gridFocused: Boolean,
+    onTileFocus: (PickerEntry) -> Unit,
+    onTileClick: (PickerEntry) -> Unit,
+) {
     val current by rememberUpdatedState(model)
     var lastClickKey by remember { mutableStateOf<String?>(null) }
     var lastClickAt by remember { mutableLongStateOf(0L) }
@@ -334,16 +372,19 @@ private fun PickerGrid(model: PickerModel, shown: List<PickerEntry>, grid: LazyG
                     entry = entry,
                     model = model,
                     selected = entry.key == model.selected?.key || (model.picksToWheel && entry.key == cursor),
+                    onFocus = { onTileFocus(entry) },
                     onClick = { click(entry) },
                 )
             }
-            model.onMarketplace?.let { open -> item(key = "get-more") { GetMoreTile(open) } }
+            model.onMarketplace?.let { open ->
+                item(key = GET_MORE_KEY) { GetMoreTile(gridFocused && cursor == GET_MORE_KEY, open) }
+            }
         }
     }
 }
 
 @Composable
-private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean, onClick: () -> Unit) {
+private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean, onFocus: () -> Unit, onClick: () -> Unit) {
     val hover = rememberHoverState()
     TryOnWhileHovered(entry, hover.hovered, model.onHover)
     val theme = OneConfigTheme.current
@@ -353,6 +394,7 @@ private fun PickerTile(entry: PickerEntry, model: PickerModel, selected: Boolean
             .fillMaxWidth()
             .then(if (entry.equipped && !selected) Modifier.border(1.5.dp, OneConfigTheme.accent, shape) else Modifier)
             .hoverable(hover.interactionSource)
+            .onFocusChanged { if (it.isFocused) onFocus() }
             .selectableRow(selected, onClick, entry.name, shape, style = ItemSelectionStyle.Accent, interactionSource = hover.interactionSource)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -391,16 +433,19 @@ private fun EquippedCheck(modifier: Modifier) {
 }
 
 @Composable
-private fun GetMoreTile(onClick: () -> Unit) {
+private fun GetMoreTile(highlighted: Boolean, onClick: () -> Unit) {
     val theme = OneConfigTheme.current
-    val color = theme.textColorSecondary
+    val color = if (highlighted) OneConfigTheme.accent else theme.textColorSecondary
     val shape = OneConfigTheme.shape(TileRadius)
     Column(
         Modifier
             .fillMaxWidth()
             .aspectRatio(0.8f)
             .clip(shape)
-            .border(1.dp, theme.textColorSecondary.copy(alpha = 0.25f), shape)
+            .then(
+                if (highlighted) Modifier.border(1.5.dp, OneConfigTheme.accent, shape)
+                else Modifier.border(1.dp, theme.textColorSecondary.copy(alpha = 0.25f), shape),
+            )
             .oneConfigClickable("Get more in the Marketplace", onClick, shape = shape, recipe = OutlineOnHover)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

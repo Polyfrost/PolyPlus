@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import org.polyfrost.compose.host.controller.ControllerButton
+import org.polyfrost.compose.host.controller.controllerAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -163,6 +165,7 @@ private fun WheelSlotCell(
     Box(
         modifier = modifier
             .themedSurface(SurfaceKind.Field, shape, glass = false)
+            .controllerAction(ControllerButton.X, "Clear slot", enabled = emoteId != null, onPress = onClear)
             .hoverable(hover.interactionSource)
             .selectableCard(
                 selected,

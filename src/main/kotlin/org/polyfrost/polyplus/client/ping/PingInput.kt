@@ -3,6 +3,7 @@ package org.polyfrost.polyplus.client.ping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
+import org.polyfrost.compose.host.controller.Controllers
 import org.polyfrost.oneconfig.api.event.v1.eventHandler
 import org.polyfrost.oneconfig.api.event.v1.events.KeyInputEvent
 import org.polyfrost.oneconfig.api.event.v1.events.MouseInputEvent
@@ -50,6 +51,8 @@ object PingInput {
     private const val HINT_TEXT = 0xFFFFFFFF.toInt()
     private const val MIN_ALPHA = 0.05f
     private const val MS_PER_SECOND = 1000L
+    private const val STICK_OPEN = 0.6f
+    private const val STICK_NEUTRAL = 0.3f
 
     @Volatile
     private var held = false
@@ -62,6 +65,9 @@ object PingInput {
 
     private var pickPress = false
     private var swallowPick = false
+    private var controllerHeld = false
+    private var stickArmed = false
+    private var keyHeld = false
 
     private val downKeys = HashSet<Int>()
     private val downMouse = HashSet<Int>()
@@ -93,6 +99,21 @@ object PingInput {
     fun onKeybindState(pressed: Boolean) {
         ensureStarted()
         if (rawSeen) return
+        keyboard(pressed)
+    }
+
+    fun onControllerState(pressed: Boolean) {
+        ensureStarted()
+        if (pressed == controllerHeld) return
+        controllerHeld = pressed
+        if (pressed) stickArmed = Controllers.rightStick.getDistance() < STICK_OPEN
+        if (keyHeld) return
+        if (pressed) press(fromController = true) else release()
+    }
+
+    private fun keyboard(pressed: Boolean) {
+        keyHeld = pressed
+        if (controllerHeld) return
         if (pressed) press() else release()
     }
 
@@ -104,7 +125,7 @@ object PingInput {
         if (active == rawActive) return
         rawActive = active
         rawSeen = true
-        if (active) press() else release()
+        keyboard(active)
     }
 
     private fun resetRaw() {
@@ -112,12 +133,14 @@ object PingInput {
         downMouse.clear()
         if (!rawActive) return
         rawActive = false
+        keyHeld = false
+        if (controllerHeld) return
         held = false
         pending = false
         pickPress = false
     }
 
-    private fun press() {
+    private fun press(fromController: Boolean = false) {
         held = true
         pending = false
         pickPress = false
@@ -127,7 +150,7 @@ object PingInput {
         pressedAt = System.currentTimeMillis()
         dragX = 0.0
         dragY = 0.0
-        if (!sharesPickInput(PolyPlusConfig.pingKeybind)) return
+        if (fromController || !sharesPickInput(PolyPlusConfig.pingKeybind)) return
         if (hoveredTarget() == null && crosshairInReach() && !usingItem()) pickPress = true else swallowPick = true
     }
 
@@ -224,7 +247,10 @@ object PingInput {
 
     private fun tick() {
         if (!held) swallowPick = false
-        if (pending && held && System.currentTimeMillis() - pressedAt >= HOLD_MS) {
+        val stick = Controllers.rightStick.getDistance()
+        if (controllerHeld && !stickArmed && stick < STICK_NEUTRAL) stickArmed = true
+        val flicked = controllerHeld && stickArmed && stick >= STICK_OPEN
+        if (pending && held && (flicked || System.currentTimeMillis() - pressedAt >= HOLD_MS)) {
             pending = false
             pickPress = false
             if (canPing() && !WheelOverlay.isOpen) openWheel()

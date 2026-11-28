@@ -15,5 +15,15 @@
   "polyplus.session.reconnecting": "Reconnecting...",
   "polyplus.session.refreshFailed": "Refresh failed - click to retry",
   "polyplus.page.wardrobe": "Wardrobe",
-  "polyplus.sodium.options.view_bobbing.tooltip": "If enabled, the player's view will sway and bob when moving around. Players who experience motion sickness while playing may benefit from disabling this."
+  "polyplus.sodium.options.view_bobbing.tooltip": "If enabled, the player's view will sway and bob when moving around. Players who experience motion sickness while playing may benefit from disabling this.",
+  "polyplus.controller.category": "PolyPlus",
+  "polyplus.controller.openSocials": "Open Socials",
+  "polyplus.controller.openWardrobe": "Open Wardrobe",
+  "polyplus.controller.emoteWheel": "Emote Wheel",
+  "polyplus.controller.emoteWheelNext": "Next Emote Wheel",
+  "polyplus.controller.ping": "Ping",
+  "polyplus.controller.pushToTalk": "Push to Talk",
+  "polyplus.controller.toggleMute": "Toggle Mute",
+  "polyplus.controller.toggleDeafen": "Toggle Deafen",
+  "polyplus.controller.joinLeaveVoice": "Join or Leave Voice"
 }

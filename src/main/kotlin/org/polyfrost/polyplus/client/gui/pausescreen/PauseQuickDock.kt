@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.pausescreen
 
+import org.polyfrost.compose.host.controller.focusWhenShown
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
 import org.polyfrost.oneconfig.api.ui.v1.a11y.notFocusable
 import org.polyfrost.polyplus.client.gui.SocialDangerText
@@ -222,6 +223,7 @@ private fun DockResume(screen: OneClientPauseScreen, where: String, narrow: Bool
             .padding(horizontal = 4.dp)
             .width(if (narrow) 128.dp else 168.dp)
             .height(56.dp)
+            .focusWhenShown(true)
             .onGloballyPositioned { screen.resumeBounds = it.boundsInRoot() }
             .clip(shape)
             .background(OneConfigTheme.accent)

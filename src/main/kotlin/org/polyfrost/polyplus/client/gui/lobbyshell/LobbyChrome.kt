@@ -2,6 +2,7 @@
 
 package org.polyfrost.polyplus.client.gui.lobbyshell
 
+import org.polyfrost.compose.host.controller.focusWhenShown
 import org.polyfrost.oneconfig.api.ui.v1.components.rememberHoverState
 import org.polyfrost.polyplus.client.gui.KitDangerColor
 import org.polyfrost.oneconfig.api.ui.v1.a11y.Motion
@@ -298,7 +299,7 @@ private fun BoxScope.LobbyChrome(lobby: LobbyShell, screen: Screen, feed: LobbyF
                 .background(Brush.verticalGradient(listOf(sceneScrim.copy(alpha = 0f), sceneScrim.copy(alpha = 0.6f)))),
         )
     }
-    Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Page)) { when (lobby.page) {
+    Box(Modifier.fillMaxSize().a11yRegion(A11yRegion.Page).focusWhenShown(lobby.page != LobbyPage.Home, lobby.page)) { when (lobby.page) {
         LobbyPage.Home -> {
             Box(Modifier.fillMaxSize().avatarTaps(lobby, notch))
             SceneTags(feed, root, notch)
