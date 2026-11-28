@@ -131,7 +131,10 @@ public class MixinMinecraft {
     private Text polyplus$deferComposeScreenshot(File dir, int width, int height, RenderTarget target, Operation<Text> original) {
         Minecraft self = (Minecraft) (Object) this;
         if (!(self.screen instanceof ComposeScreen)) return original.call(dir, width, height, target);
-        polyplus$pendingScreenshot = () -> self.gui.getChat().addMessage(original.call(dir, width, height, target));
+        polyplus$pendingScreenshot = () -> {
+            Text message = original.call(dir, width, height, target);
+            if (message != null) self.gui.getChat().addMessage(message);
+        };
         return null;
     }
 
